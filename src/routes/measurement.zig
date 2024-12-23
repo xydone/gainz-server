@@ -30,8 +30,8 @@ fn postMeasurement(app: *types.App, req: *httpz.Request, res: *httpz.Response) a
         };
 
         const result = db.createMeasurement(app, measurement.value) catch {
-            //TODO: error handling later, catch |err| above to do it
-            res.status = 409;
+            //TODO: error handling later
+            res.status = 500;
             res.body = "Error encountered";
             return;
         };

@@ -8,24 +8,24 @@ pub const App = struct {
 };
 
 pub const Macronutrients = struct {
-    calories: f32,
+    calories: f64,
     //the reason why we set the following ones to default as null is because std.json.parseFromSlice(...) will just be unable to parse fields with either missing, which are not defaulted
-    fat: ?f32 = null,
-    sat_fat: ?f32 = null,
-    polyunsat_fat: ?f32 = null,
-    monounsat_fat: ?f32 = null,
-    trans_fat: ?f32 = null,
-    cholesterol: ?f32 = null,
-    sodium: ?f32 = null,
-    potassium: ?f32 = null,
-    carbs: ?f32 = null,
-    fiber: ?f32 = null,
-    sugar: ?f32 = null,
-    protein: ?f32 = null,
-    vitamin_a: ?f32 = null,
-    vitamin_c: ?f32 = null,
-    calcium: ?f32 = null,
-    iron: ?f32 = null,
+    fat: ?f64 = null,
+    sat_fat: ?f64 = null,
+    polyunsat_fat: ?f64 = null,
+    monounsat_fat: ?f64 = null,
+    trans_fat: ?f64 = null,
+    cholesterol: ?f64 = null,
+    sodium: ?f64 = null,
+    potassium: ?f64 = null,
+    carbs: ?f64 = null,
+    fiber: ?f64 = null,
+    sugar: ?f64 = null,
+    protein: ?f64 = null,
+    vitamin_a: ?f64 = null,
+    vitamin_c: ?f64 = null,
+    calcium: ?f64 = null,
+    iron: ?f64 = null,
 };
 
 pub const MeasurementType = enum { weight, waist, hips, neck };

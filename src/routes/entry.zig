@@ -14,31 +14,47 @@ pub fn init(router: *httpz.Router(*types.App, *const fn (*types.App, *httpz.requ
 }
 
 fn getEntry(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = req; // autofix
-    _ = app; // autofix
-    log.err("Endpoint not implemented!", .{});
-    res.status = 204;
-    res.body = "Endpoint not implemented yet!";
-    return;
+    if (req.body()) |body| {
+        const request: ?std.json.Parsed(rq.GetEntryRequest) = std.json.parseFromSlice(rq.GetEntryRequest, app.allocator, body, .{}) catch {
+            res.status = 400;
+            res.body = "Body does not match requirements!";
+            return;
+        };
+
+        const result = db.getEntry(app, request.?.value) catch {
+            res.status = 404;
+            res.body = "Entry or user not found!";
+            return;
+        };
+        res.status = 200;
+        try res.json(result, .{});
+        return;
+    } else {
+        res.status = 400;
+        res.body = "No body found!";
+        return;
+    }
 }
 
 fn postEntry(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
         const entry: ?std.json.Parsed(rq.EntryRequest) = std.json.parseFromSlice(rq.EntryRequest, app.allocator, body, .{}) catch {
-            //handle return
+            res.status = 400;
+            res.body = "Body does not match requirements!";
             return;
         };
         const result = db.createEntry(app, entry.?.value) catch {
-            //TODO: error handling later, catch |err| above to do it
-            res.status = 409;
+            //TODO: error handling later
+            res.status = 500;
             res.body = "Error encountered";
             return;
         };
         res.status = 200;
         try res.json(result, .{});
         return;
+    } else {
+        res.status = 400;
+        res.body = "No body found!";
+        return;
     }
-    res.status = 400;
-    res.body = "No body found!";
-    return;
 }

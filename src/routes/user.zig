@@ -29,8 +29,8 @@ pub fn postUser(app: *types.App, req: *httpz.Request, res: *httpz.Response) anye
             return;
         };
         const result = db.createUser(app, user.?.value.display_name) catch {
-            //TODO: error handling later, catch |err| above to do it
-            res.status = 409;
+            //TODO: error handling later
+            res.status = 500;
             res.body = "Error encountered";
             return;
         };

@@ -70,25 +70,27 @@ pub fn createFood(app: *types.App, request: rq.FoodRequest) anyerror!rs.CreateFo
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
+        log.err("Undocumented error at createFood!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
     defer row.?.deinit() catch {};
     const id = row.?.get(i32, 0);
-    const b_n = row.?.get([]u8, 1);
-    const f_n = row.?.get([]u8, 2);
+    const b_n = try app.allocator.dupe(u8, row.?.get([]u8, 1));
+    const f_n = try app.allocator.dupe(u8, row.?.get([]u8, 2));
 
-    return rs.CreateFoodResponse{ .id = id, .food_name = try app.allocator.dupe(u8, b_n), .brand_name = try app.allocator.dupe(u8, f_n) };
+    return rs.CreateFoodResponse{ .id = id, .food_name = f_n, .brand_name = b_n };
 }
 
 pub fn createEntry(app: *types.App, request: rq.EntryRequest) anyerror!rs.CreateEntryResponse {
     var conn = try app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into \"Entry\" (\"category\", \"food_id\", \"user_id\") values ($1,$2,$3) returning id, user_id, food_id, category;", //
-        .{ request.meal_category, request.food_id, request.user_id }) catch |err| {
+    var row = conn.row("insert into \"Entry\" (\"category\", \"food_id\", \"user_id\", \"amount\", \"serving\") values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
+        .{ request.meal_category, request.food_id, request.user_id, request.amount, request.serving_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
+        log.err("Undocumented error at createEntry!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
@@ -109,6 +111,7 @@ pub fn createMeasurement(app: *types.App, request: rq.MeasurementRequest) anyerr
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
+        log.err("Undocumented error at createMeasurement!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
@@ -118,4 +121,72 @@ pub fn createMeasurement(app: *types.App, request: rq.MeasurementRequest) anyerr
     const value = row.?.get(f64, 2);
 
     return rs.CreateMeasurementResponse{ .created_at = created_at, .type = measurement_type, .value = value };
+}
+
+pub fn getEntry(app: *types.App, request: rq.GetEntryRequest) anyerror!rs.GetEntryResponse {
+    var conn = try app.db.acquire();
+    defer conn.release();
+    var row = conn.row("SELECT * FROM \"Entry\" WHERE user_id = $1 and id = $2;", //
+        .{ request.user_id, request.entry }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        log.err("Undocumented error at getEntry!", .{});
+        return err;
+    } orelse return anyerror.NotFound;
+    defer row.deinit() catch {};
+
+    const id = row.get(i32, 0);
+    const created_at = row.get(i64, 1);
+    const user_id = row.get(i32, 2);
+    const food_id = row.get(i32, 3);
+    const meal_category = row.get(types.MealCategory, 4);
+    const amount = row.get(f64, 5);
+    const serving = row.get(i32, 6);
+    return rs.GetEntryResponse{ .created_at = created_at, .id = id, .user_id = user_id, .food_id = food_id, .category = meal_category, .amount = amount, .serving = serving };
+}
+
+pub fn getFood(app: *types.App, request: rq.GetFoodRequest) anyerror!rs.GetFoodResponse {
+    var conn = try app.db.acquire();
+    defer conn.release();
+    var row = conn.rowOpts("SELECT * FROM \"Food\" WHERE id = $1;", //
+        .{request.food_id}, .{ .column_names = true }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        log.err("Undocumented error at getFood!", .{});
+        return err;
+    } orelse return anyerror.NotFound;
+    defer row.deinit() catch {};
+
+    const id = row.get(i32, 0);
+    const created_at = row.get(i64, 1);
+    const macronutrients = types.Macronutrients{
+        .calories = row.getCol(f64, "calories"),
+        .fat = row.getCol(f64, "fat"),
+        .sat_fat = row.getCol(f64, "sat_fat"),
+        .polyunsat_fat = row.getCol(f64, "polyunsat_fat"),
+        .monounsat_fat = row.getCol(f64, "monounsat_fat"),
+        .trans_fat = row.getCol(f64, "trans_fat"),
+        .cholesterol = row.getCol(f64, "cholesterol"),
+        .sodium = row.getCol(f64, "sodium"),
+        .potassium = row.getCol(f64, "potassium"),
+        .carbs = row.getCol(f64, "carbs"),
+        .fiber = row.getCol(f64, "fiber"),
+        .sugar = row.getCol(f64, "sugar"),
+        .protein = row.getCol(f64, "protein"),
+        .vitamin_a = row.getCol(f64, "vitamin_a"),
+        .vitamin_c = row.getCol(f64, "vitamin_c"),
+        .calcium = row.getCol(f64, "calcium"),
+        .iron = row.getCol(f64, "iron"),
+    };
+    const food_name = row.getCol([]u8, "food_name");
+    const brand_name = row.getCol([]u8, "brand_name");
+    return rs.GetFoodResponse{
+        .id = id,
+        .created_at = created_at,
+        .food_name = food_name,
+        .brand_name = brand_name,
+        .macronutrients = macronutrients,
+    };
 }

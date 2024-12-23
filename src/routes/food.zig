@@ -9,12 +9,32 @@ const types = @import("../types.zig");
 const log = std.log.scoped(.food);
 
 pub fn init(router: *httpz.Router(*types.App, *const fn (*types.App, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+    router.*.get("/api/food", getFood, .{});
     router.*.post("/api/food", postFood, .{});
 }
 
-// fn getFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) void {
-//     const self: *Self = @fieldParentPtr("ep", e);
-// }
+fn getFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    if (req.body()) |body| {
+        const request: std.json.Parsed(rq.GetFoodRequest) = std.json.parseFromSlice(rq.GetFoodRequest, app.allocator, body, .{}) catch {
+            res.status = 400;
+            res.body = "Body not properly formatted";
+            return;
+        };
+
+        const result = db.getFood(app, request.value) catch {
+            res.status = 404;
+            res.body = "Food not found!";
+            return;
+        };
+        res.status = 200;
+        try res.json(result, .{});
+        return;
+    } else {
+        res.status = 400;
+        res.body = "Body missing!";
+        return;
+    }
+}
 
 pub fn postFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
@@ -25,9 +45,9 @@ pub fn postFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) anye
         };
 
         const result = db.createFood(app, food.?.value) catch {
-            //TODO: error handling later, catch |err| above to do it
-            res.status = 409;
-            res.body = "Error encountered!";
+            //TODO: error handling later
+            res.status = 500;
+            res.body = "Error encountered";
             return;
         };
         //main return flow exit if body is present and valid
