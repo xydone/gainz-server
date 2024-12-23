@@ -1,0 +1,22 @@
+.{
+    .name = "gainz-server",
+
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .pg = .{
+            .url = "git+https://github.com/karlseguin/pg.zig#a03737e8c9404d1642e9b2fdea8e719dfae5cda8",
+            .hash = "1220eff52824f32e7ab225cd50bf962324ca14c498c7c197a554dc55e5bb612f119f",
+        },
+        .httpz = .{
+            .url = "git+https://github.com/karlseguin/http.zig#32c98e0e34761843125da36b5497e942b276a593",
+            .hash = "12204b4b2788de862ad769b6fed457c1ea2726ea71eea8039778780b925629a42c6e",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
