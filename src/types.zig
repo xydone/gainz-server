@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const httpz = @import("httpz");
 const pg = @import("pg");
 
 pub const App = struct {

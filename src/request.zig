@@ -15,7 +15,6 @@ pub const EntryRequest = struct {
 };
 
 pub const FoodRequest = struct {
-    user_id: i32,
     brand_name: []u8,
     food_name: []u8,
     macronutrients: types.Macronutrients,
