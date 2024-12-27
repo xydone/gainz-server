@@ -26,6 +26,9 @@ pub const Macronutrients = struct {
     vitamin_c: ?f64 = null,
     calcium: ?f64 = null,
     iron: ?f64 = null,
+    added_sugars: ?f64 = null,
+    vitamin_d: ?f64 = null,
+    sugar_alcohols: ?f64 = null,
 };
 
 pub const MeasurementType = enum { weight, waist, hips, neck };

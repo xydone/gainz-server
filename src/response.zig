@@ -76,3 +76,11 @@ pub const GetFoodResponse = struct {
         try writer.print("GetFoodResponse{{ id: {d}, created_at: {d}, macronutrients: {} }}", .{ s.id, s.created_at, s.macronutrients });
     }
 };
+
+pub const GetServingResponse = struct {
+    id: i32,
+    created_at: i64,
+    amount: f64,
+    unit: []u8,
+    multiplier: f64,
+};

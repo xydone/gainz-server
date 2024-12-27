@@ -190,3 +190,81 @@ pub fn getFood(app: *types.App, request: rq.GetFoodRequest) anyerror!rs.GetFoodR
         .macronutrients = macronutrients,
     };
 }
+
+pub fn searchFood(app: *types.App, request: rq.SearchFoodRequest) anyerror![]rs.GetFoodResponse {
+    var conn = try app.db.acquire();
+    defer conn.release();
+    var result = conn.queryOpts("SELECT f.* from  \"Food\" f  WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
+        .{request.search_term}, .{ .column_names = true }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        log.err("Undocumented error at getEntry!", .{});
+        return err;
+    };
+    defer result.deinit();
+    var response = std.ArrayList(rs.GetFoodResponse).init(app.allocator);
+
+    while (try result.next()) |row| {
+        const id = row.get(i32, 0);
+        const created_at = row.get(i64, 1);
+        const macronutrients = types.Macronutrients{
+            .calories = row.getCol(f64, "calories"),
+            .fat = row.getCol(?f64, "fat"),
+            .sat_fat = row.getCol(?f64, "sat_fat"),
+            .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
+            .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
+            .trans_fat = row.getCol(?f64, "trans_fat"),
+            .cholesterol = row.getCol(?f64, "cholesterol"),
+            .sodium = row.getCol(?f64, "sodium"),
+            .potassium = row.getCol(?f64, "potassium"),
+            .carbs = row.getCol(?f64, "carbs"),
+            .fiber = row.getCol(?f64, "fiber"),
+            .sugar = row.getCol(?f64, "sugar"),
+            .protein = row.getCol(?f64, "protein"),
+            .vitamin_a = row.getCol(?f64, "vitamin_a"),
+            .vitamin_c = row.getCol(?f64, "vitamin_c"),
+            .calcium = row.getCol(?f64, "calcium"),
+            .iron = row.getCol(?f64, "iron"),
+            .added_sugars = row.getCol(?f64, "added_sugars"),
+            .vitamin_d = row.getCol(?f64, "vitamin_d"),
+            .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
+        };
+        const food_name = row.getCol([]u8, "food_name");
+        const brand_name = row.getCol([]u8, "brand_name");
+        try response.append(rs.GetFoodResponse{
+            .id = id,
+            .created_at = created_at,
+            .food_name = try app.allocator.dupe(u8, food_name),
+            .brand_name = try app.allocator.dupe(u8, brand_name),
+            .macronutrients = macronutrients,
+        });
+    }
+    return try response.toOwnedSlice();
+}
+
+pub fn getServings(app: *types.App, request: rq.GetServingsRequest) anyerror![]rs.GetServingResponse {
+    var conn = try app.db.acquire();
+    defer conn.release();
+    var result = conn.queryOpts("SELECT * from \"Servings\" WHERE food_id=$1", //
+        .{request.food_id}, .{ .column_names = true }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        log.err("Undocumented error at getEntry!", .{});
+        return err;
+    };
+    defer result.deinit();
+    var response = std.ArrayList(rs.GetServingResponse).init(app.allocator);
+
+    while (try result.next()) |row| {
+        const id = row.get(i32, 0);
+        const created_at = row.get(i64, 1);
+        const amount = row.get(f64, 3);
+        const unit = row.get([]u8, 4);
+        const multiplier = row.get(f64, 5);
+
+        try response.append(rs.GetServingResponse{ .id = id, .created_at = created_at, .amount = amount, .unit = unit, .multiplier = multiplier });
+    }
+    return try response.toOwnedSlice();
+}

@@ -32,3 +32,11 @@ pub const GetFoodRequest = struct {
     user_id: i32,
     food_id: i32,
 };
+
+pub const SearchFoodRequest = struct {
+    search_term: []const u8,
+};
+
+pub const GetServingsRequest = struct {
+    food_id: i32,
+};

@@ -10,6 +10,8 @@ const log = std.log.scoped(.food);
 
 pub fn init(router: *httpz.Router(*types.App, *const fn (*types.App, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     router.*.get("/api/food", getFood, .{});
+    router.*.get("/api/food/search/:search_term", searchFood, .{});
+    router.*.get("/api/food/:id/servings", getServings, .{});
     router.*.post("/api/food", postFood, .{});
 }
 
@@ -59,4 +61,30 @@ pub fn postFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) anye
         res.body = "Body missing!";
         return;
     }
+}
+
+pub fn searchFood(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const request: rq.SearchFoodRequest = .{ .search_term = req.param("search_term").? };
+    const result = db.searchFood(app, request) catch {
+        //TODO: error handling later
+        res.status = 500;
+        res.body = "Error encountered";
+        return;
+    };
+    res.status = 200;
+    try res.json(result, .{});
+    return;
+}
+
+pub fn getServings(app: *types.App, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const request: rq.GetServingsRequest = .{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
+    const result = db.getServings(app, request) catch {
+        //TODO: error handling later
+        res.status = 500;
+        res.body = "Error encountered";
+        return;
+    };
+    res.status = 200;
+    try res.json(result, .{});
+    return;
 }
