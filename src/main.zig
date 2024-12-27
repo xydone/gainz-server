@@ -29,8 +29,12 @@ pub fn main() !void {
     var server = try httpz.Server(*types.App).init(allocator, .{ .port = PORT }, &app);
     defer server.deinit();
     defer server.stop();
-    var router = server.router(.{});
-
+    const cors = try server.middleware(httpz.middleware.Cors, .{
+        .origin = "*",
+        //NOTE: review what headers I'm actually allowing. Copy-paste from https://stackoverflow.com/questions/32500073/request-header-field-access-control-allow-headers-is-not-allowed-by-itself-in-pr
+        .headers = "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+    });
+    var router = server.router(.{ .middlewares = &.{cors} });
     // /api/user
     User.init(router);
     // /api/food
