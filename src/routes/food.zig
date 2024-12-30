@@ -13,13 +13,13 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     const RouteData = Handler.RouteData{ .restricted = true };
 
     router.*.get("/api/food/:food_id", getFood, .{});
-    router.*.get("/api/food/search/:search_term", searchFood, .{});
+    router.*.get("/api/food", searchFood, .{});
     router.*.get("/api/food/:id/servings", getServings, .{});
     router.*.post("/api/food", postFood, .{ .data = &RouteData });
 }
 
 fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.GetFoodRequest = .{ .food_id = try std.fmt.parseInt(i32, req.param("food_id").?, 10), .user_id = ctx.user_id };
+    const request: rq.GetFoodRequest = .{ .food_id = try std.fmt.parseInt(i32, req.param("food_id").?, 10), .user_id = ctx.user_id.? };
 
     const result = db.getFood(ctx, request) catch {
         res.status = 404;
@@ -57,7 +57,16 @@ pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
 }
 
 pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.SearchFoodRequest = .{ .search_term = req.param("search_term").? };
+    const query = try req.query();
+    var search_term: []const u8 = undefined;
+    if (query.get("search")) |q| {
+        search_term = q;
+    } else {
+        res.status = 400;
+        res.body = "Search query missing!";
+        return;
+    }
+    const request: rq.SearchFoodRequest = .{ .search_term = search_term };
     const result = db.searchFood(ctx, request) catch {
         //TODO: error handling later
         res.status = 500;

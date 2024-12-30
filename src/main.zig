@@ -32,7 +32,7 @@ pub fn main() !void {
     const cors = try server.middleware(httpz.middleware.Cors, .{
         .origin = "*",
         //NOTE: review what headers I'm actually allowing. Copy-paste from https://stackoverflow.com/questions/32500073/request-header-field-access-control-allow-headers-is-not-allowed-by-itself-in-pr
-        .headers = "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        .headers = "Origin, X-Requested-With, Content-Type, Accept, x-access-token",
     });
     const router = server.router(.{ .middlewares = &.{cors} });
     // /api/user

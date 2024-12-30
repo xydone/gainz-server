@@ -7,7 +7,6 @@ pub const MeasurementRequest = struct {
 };
 
 pub const EntryRequest = struct {
-    user_id: i32,
     food_id: i32,
     meal_category: types.MealCategory,
     amount: f64,
@@ -15,8 +14,8 @@ pub const EntryRequest = struct {
 };
 
 pub const FoodRequest = struct {
-    brand_name: []u8,
-    food_name: []u8,
+    brand_name: ?[]u8,
+    food_name: ?[]u8,
     macronutrients: types.Macronutrients,
 };
 

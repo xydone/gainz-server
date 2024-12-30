@@ -14,13 +14,13 @@ pub const CreateUserResponse = struct {
 
 pub const CreateFoodResponse = struct {
     id: i32,
-    brand_name: []u8,
-    food_name: []u8,
+    brand_name: ?[]u8,
+    food_name: ?[]u8,
 
     pub fn format(s: CreateFoodResponse, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
         _ = options;
         _ = fmt;
-        try writer.print("CreateFoodResponse{{ id: {d}, food_name: {s}, brand_name: {s} }}", .{ s.id, s.food_name, s.brand_name });
+        try writer.print("CreateFoodResponse{{ id: {d}, food_name: {?}, brand_name: {?} }}", .{ s.id, s.food_name, s.brand_name });
     }
 };
 

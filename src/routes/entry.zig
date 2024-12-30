@@ -16,7 +16,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.GetEntryRequest = .{ .entry = try std.fmt.parseInt(i32, req.param("entry_id").?, 10), .user_id = ctx.user_id };
+    const request: rq.GetEntryRequest = .{ .entry = try std.fmt.parseInt(i32, req.param("entry_id").?, 10), .user_id = ctx.user_id.? };
 
     const result = db.getEntry(ctx, request) catch {
         res.status = 404;

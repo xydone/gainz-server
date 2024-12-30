@@ -47,7 +47,7 @@ pub fn init(allocator: std.mem.Allocator) !*pg.Pool {
 pub fn createUser(ctx: *Handler.RequestContext, display_name: []u8) anyerror!rs.CreateUserResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into \"User\" (display_name) values ($1) returning id,display_name", .{display_name}) catch |err| {
+    var row = conn.row("insert into user (display_name) values ($1) returning id,display_name", .{display_name}) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -66,8 +66,8 @@ pub fn createUser(ctx: *Handler.RequestContext, display_name: []u8) anyerror!rs.
 pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerror!rs.CreateFoodResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into \"Food\" (created_by, brand_name, food_name, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning id,brand_name,food_name", //
-        .{ ctx.user_id, request.brand_name, request.food_name, request.macronutrients.calories, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
+    var row = conn.row("insert into food (created_by, brand_name, food_name, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning id,brand_name,food_name", //
+        .{ ctx.user_id.?, request.brand_name, request.food_name, request.macronutrients.calories, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -77,17 +77,20 @@ pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerro
     //NOTE: you must deinitialize rows or else query time balloons 10x
     defer row.?.deinit() catch {};
     const id = row.?.get(i32, 0);
-    const b_n = try ctx.app.allocator.dupe(u8, row.?.get([]u8, 1));
-    const f_n = try ctx.app.allocator.dupe(u8, row.?.get([]u8, 2));
+    const b_n = row.?.get(?[]u8, 1);
+    const f_n = row.?.get(?[]u8, 2);
 
-    return rs.CreateFoodResponse{ .id = id, .food_name = f_n, .brand_name = b_n };
+    const brand_name = if (b_n == null) null else try ctx.app.allocator.dupe(u8, b_n.?);
+    const food_name = if (f_n == null) null else try ctx.app.allocator.dupe(u8, f_n.?);
+
+    return rs.CreateFoodResponse{ .id = id, .food_name = food_name, .brand_name = brand_name };
 }
 
 pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyerror!rs.CreateEntryResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into \"Entry\" (\"category\", \"food_id\", \"user_id\", \"amount\", \"serving\") values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
-        .{ request.meal_category, request.food_id, request.user_id, request.amount, request.serving_id }) catch |err| {
+    var row = conn.row("insert into entry (category, food_id, user_id, amount, serving) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
+        .{ request.meal_category, request.food_id, ctx.user_id.?, request.amount, request.serving_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -107,7 +110,7 @@ pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyer
 pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.MeasurementRequest) anyerror!rs.CreateMeasurementResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into \"Measurement\" (\"user_id\",\"type\", \"value\") values ($1,$2,$3) returning created_at, type, value;", //
+    var row = conn.row("insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;", //
         .{ request.user_id, request.type, request.value }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -127,7 +130,7 @@ pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.MeasurementRe
 pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyerror!rs.GetEntryResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("SELECT * FROM \"Entry\" WHERE user_id = $1 and id = $2;", //
+    var row = conn.row("SELECT * FROM entry WHERE user_id = $1 and id = $2;", //
         .{ request.user_id, request.entry }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -150,7 +153,7 @@ pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyer
 pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerror!rs.GetFoodResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.rowOpts("SELECT * FROM \"Food\" WHERE id = $1;", //
+    var row = conn.rowOpts("SELECT * FROM food WHERE id = $1;", //
         .{request.food_id}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -195,17 +198,16 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
 pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) anyerror![]rs.GetFoodResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT f.* from  \"Food\" f  WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
+    log.debug("{s}", .{request.search_term});
+    var result = conn.queryOpts("SELECT f.* FROM food f WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
         .{request.search_term}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at getEntry!", .{});
         return err;
     };
     defer result.deinit();
     var response = std.ArrayList(rs.GetFoodResponse).init(ctx.app.allocator);
-
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
         const created_at = row.get(i64, 1);
@@ -247,7 +249,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) a
 pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest) anyerror![]rs.GetServingResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT * from \"Servings\" WHERE food_id=$1", //
+    var result = conn.queryOpts("SELECT * from servings WHERE food_id=$1", //
         .{request.food_id}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
