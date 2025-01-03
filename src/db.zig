@@ -71,7 +71,6 @@ pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerro
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at createFood!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
@@ -94,7 +93,6 @@ pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyer
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at createEntry!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
@@ -115,7 +113,6 @@ pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.MeasurementRe
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at createMeasurement!", .{});
         return err;
     };
     //NOTE: you must deinitialize rows or else query time balloons 10x
@@ -135,7 +132,6 @@ pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyer
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at getEntry!", .{});
         return err;
     } orelse return anyerror.NotFound;
     defer row.deinit() catch {};
@@ -158,7 +154,6 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at getFood!", .{});
         return err;
     } orelse return anyerror.NotFound;
     defer row.deinit() catch {};
@@ -198,7 +193,6 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
 pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) anyerror![]rs.GetFoodResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    log.debug("{s}", .{request.search_term});
     var result = conn.queryOpts("SELECT f.* FROM food f WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
         .{request.search_term}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
@@ -254,7 +248,6 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
-        log.err("Undocumented error at getEntry!", .{});
         return err;
     };
     defer result.deinit();
@@ -268,6 +261,48 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
         const multiplier = row.get(f64, 5);
 
         try response.append(rs.GetServingResponse{ .id = id, .created_at = created_at, .amount = amount, .unit = unit, .multiplier = multiplier });
+    }
+    return try response.toOwnedSlice();
+}
+
+pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequest) anyerror![]rs.GetEntryRangeResponse {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.created_at >= $2 AND e.created_at < $3 GROUP BY group_date ORDER BY group_date;", //
+        .{ @tagName(request.group_type), request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+    defer result.deinit();
+    var response = std.ArrayList(rs.GetEntryRangeResponse).init(ctx.app.allocator);
+
+    while (try result.next()) |row| {
+        const group_date = row.get(i64, 0);
+        const macronutrients = types.Macronutrients{
+            .calories = row.getCol(f64, "calories"),
+            .fat = row.getCol(?f64, "fat"),
+            .sat_fat = row.getCol(?f64, "sat_fat"),
+            .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
+            .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
+            .trans_fat = row.getCol(?f64, "trans_fat"),
+            .cholesterol = row.getCol(?f64, "cholesterol"),
+            .sodium = row.getCol(?f64, "sodium"),
+            .potassium = row.getCol(?f64, "potassium"),
+            .carbs = row.getCol(?f64, "carbs"),
+            .fiber = row.getCol(?f64, "fiber"),
+            .sugar = row.getCol(?f64, "sugar"),
+            .protein = row.getCol(?f64, "protein"),
+            .vitamin_a = row.getCol(?f64, "vitamin_a"),
+            .vitamin_c = row.getCol(?f64, "vitamin_c"),
+            .calcium = row.getCol(?f64, "calcium"),
+            .iron = row.getCol(?f64, "iron"),
+            .added_sugars = row.getCol(?f64, "added_sugars"),
+            .vitamin_d = row.getCol(?f64, "vitamin_d"),
+            .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
+        };
+        try response.append(rs.GetEntryRangeResponse{ .group_date = group_date, .macronutrients = macronutrients });
     }
     return try response.toOwnedSlice();
 }

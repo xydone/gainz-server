@@ -84,3 +84,8 @@ pub const GetServingResponse = struct {
     unit: []u8,
     multiplier: f64,
 };
+
+pub const GetEntryRangeResponse = struct {
+    group_date: i64,
+    macronutrients: types.Macronutrients,
+};

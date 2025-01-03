@@ -26,6 +26,15 @@ pub const GetEntryRequest = struct {
     entry: i32,
 };
 
+pub const GetEntryRangeRequest = struct {
+    user_id: i32,
+    group_type: types.DatePart,
+    /// datetime string (ex: 2024-01-01)
+    range_start: []const u8,
+    /// datetime string (ex: 2024-01-01)
+    range_end: []const u8,
+};
+
 pub const GetFoodRequest = struct {
     user_id: i32,
     food_id: i32,
