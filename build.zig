@@ -9,13 +9,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // const zap = b.dependency("zap", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    //     .openssl = false, // set to true to enable TLS support
-    // });
-
     const httpz = b.dependency("httpz", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const jwt = b.dependency("jwt", .{
         .target = target,
         .optimize = optimize,
     });
@@ -28,7 +27,7 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addImport("pg", pg.module("pg"));
     exe.root_module.addImport("httpz", httpz.module("httpz"));
-    // exe.root_module.addImport("zap", zap.module("zap"));
+    exe.root_module.addImport("jwt", jwt.module("jwt"));
 
     b.installArtifact(exe);
 

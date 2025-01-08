@@ -47,3 +47,8 @@ pub const SearchFoodRequest = struct {
 pub const GetServingsRequest = struct {
     food_id: i32,
 };
+
+pub const CreateTokenRequest = struct {
+    username: []u8,
+    password: []const u8,
+};

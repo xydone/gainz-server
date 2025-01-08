@@ -89,3 +89,8 @@ pub const GetEntryRangeResponse = struct {
     group_date: i64,
     macronutrients: types.Macronutrients,
 };
+
+pub const CreateTokenResponse = struct {
+    access_token: []const u8,
+    expires_in: i32,
+};

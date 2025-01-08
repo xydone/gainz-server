@@ -12,6 +12,10 @@
             .url = "git+https://github.com/karlseguin/http.zig#32c98e0e34761843125da36b5497e942b276a593",
             .hash = "12204b4b2788de862ad769b6fed457c1ea2726ea71eea8039778780b925629a42c6e",
         },
+        .jwt = .{
+            .url = "https://github.com/zigster64/jwt.zig/archive/refs/tags/v1.0.0.tar.gz",
+            .hash = "1220cda303b5e31f634bc648e4da1a733b0dd09c1591dadc292d688fd46038fb1ac2",
+        },
     },
 
     .paths = .{

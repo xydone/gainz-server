@@ -6,6 +6,7 @@ const Handler = @import("handler.zig");
 const rq = @import("request.zig");
 const rs = @import("response.zig");
 const types = @import("types.zig");
+const auth = @import("util/auth.zig");
 const dotenv = @import("util/dotenv.zig");
 
 const EnvErrors = error{
@@ -16,10 +17,7 @@ const EnvErrors = error{
 };
 
 const log = std.log.scoped(.database);
-pub fn init(allocator: std.mem.Allocator) !*pg.Pool {
-    var env = try dotenv.init(allocator, ".env");
-    defer env.deinit();
-
+pub fn init(allocator: std.mem.Allocator, env: dotenv) !*pg.Pool {
     const database_host = env.get("DATABASE_HOST") orelse {
         return EnvErrors.NoDatabaseHost;
     };
@@ -47,7 +45,7 @@ pub fn init(allocator: std.mem.Allocator) !*pg.Pool {
 pub fn createUser(ctx: *Handler.RequestContext, display_name: []u8) anyerror!rs.CreateUserResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into user (display_name) values ($1) returning id,display_name", .{display_name}) catch |err| {
+    var row = conn.row("insert into users (display_name) values ($1) returning id,display_name", .{display_name}) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -133,7 +131,7 @@ pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyer
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
         return err;
-    } orelse return anyerror.NotFound;
+    } orelse return error.NotFound;
     defer row.deinit() catch {};
 
     const id = row.get(i32, 0);
@@ -155,7 +153,7 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
         return err;
-    } orelse return anyerror.NotFound;
+    } orelse return error.NotFound;
     defer row.deinit() catch {};
 
     const id = row.get(i32, 0);
@@ -268,7 +266,7 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
 pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequest) anyerror![]rs.GetEntryRangeResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.created_at >= $2 AND e.created_at < $3 GROUP BY group_date ORDER BY group_date;", //
+    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.created_at >= $2 AND e.created_at < $3 GROUP BY group_date ORDER BY group_date DESC;", //
         .{ @tagName(request.group_type), request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -305,4 +303,23 @@ pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequ
         try response.append(rs.GetEntryRangeResponse{ .group_date = group_date, .macronutrients = macronutrients });
     }
     return try response.toOwnedSlice();
+}
+
+pub fn createToken(ctx: *Handler.RequestContext, request: rq.CreateTokenRequest) anyerror!rs.CreateTokenResponse {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var row = conn.row("SELECT id, password FROM users WHERE username=$1;", //
+        .{request.username}) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    } orelse return error.NotFound;
+    defer row.deinit() catch {};
+    const user_id = row.get(i32, 0);
+    const hash = row.get([]u8, 1);
+    const isValidPassword = try auth.verifyPassword(ctx.app.allocator, hash, request.password);
+    const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.timestamp() + 3600 };
+    const token = if (isValidPassword) try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?) else return error.NotFound;
+    return rs.CreateTokenResponse{ .access_token = token, .expires_in = 10 };
 }
