@@ -11,6 +11,7 @@ const Food = @import("routes/food.zig");
 const User = @import("routes/user.zig");
 const types = @import("types.zig");
 const dotenv = @import("util/dotenv.zig");
+const redis = @import("util/redis.zig");
 
 var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 const allocator = arena.allocator();
@@ -20,16 +21,18 @@ const PORT = 3000;
 pub fn main() !void {
     var env = try dotenv.init(allocator, ".env");
     defer env.deinit();
+
     _ = env.get("JWT_SECRET") orelse {
         log.err("The .env file is missing a \"JWT_SECRET\" parameter, please add it and try again!", .{});
         return;
     };
     const database = try db.init(allocator, env);
-
     defer database.deinit();
 
-    var handler = Handler{ .allocator = allocator, .db = database, .env = env };
+    var redis_client = try redis.RedisClient.init(allocator, "127.0.0.1", 6379);
+    defer redis_client.deinit();
 
+    var handler = Handler{ .allocator = allocator, .db = database, .env = env, .redis_client = &redis_client };
     var server = try httpz.Server(*Handler).init(allocator, .{ .port = PORT }, &handler);
     defer server.deinit();
     defer server.stop();

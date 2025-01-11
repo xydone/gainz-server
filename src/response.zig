@@ -92,5 +92,6 @@ pub const GetEntryRangeResponse = struct {
 
 pub const CreateTokenResponse = struct {
     access_token: []const u8,
+    refresh_token: []const u8,
     expires_in: i32,
 };

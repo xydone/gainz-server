@@ -42,3 +42,13 @@ pub fn createJWT(allocator: std.mem.Allocator, claims: anytype, secret: []const 
         .{ .secret = secret },
     );
 }
+
+pub fn createSessionToken(allocator: std.mem.Allocator) ![]const u8 {
+    //NOTE: is this actually secure?
+    var buf: [128]u8 = undefined;
+    std.crypto.random.bytes(&buf);
+    var dest: [172]u8 = undefined;
+    const temp = std.base64.Base64Encoder.init(std.base64.standard_alphabet_chars, '=').encode(&dest, &buf);
+
+    return allocator.dupe(u8, temp);
+}

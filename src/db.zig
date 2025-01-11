@@ -8,6 +8,10 @@ const rs = @import("response.zig");
 const types = @import("types.zig");
 const auth = @import("util/auth.zig");
 const dotenv = @import("util/dotenv.zig");
+const redis = @import("util/redis.zig");
+
+const ACCESS_TOKEN_EXPIRY = 60 * 30;
+const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 
 const EnvErrors = error{
     NoDatabaseHost,
@@ -319,7 +323,24 @@ pub fn createToken(ctx: *Handler.RequestContext, request: rq.CreateTokenRequest)
     const user_id = row.get(i32, 0);
     const hash = row.get([]u8, 1);
     const isValidPassword = try auth.verifyPassword(ctx.app.allocator, hash, request.password);
-    const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.timestamp() + 3600 };
-    const token = if (isValidPassword) try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?) else return error.NotFound;
-    return rs.CreateTokenResponse{ .access_token = token, .expires_in = 10 };
+    const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.timestamp() + ACCESS_TOKEN_EXPIRY };
+    const access_token = if (isValidPassword) try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?) else return error.NotFound;
+    const refresh_token = try auth.createSessionToken(ctx.app.allocator);
+    _ = try ctx.app.redis_client.setWithExpiry(try std.fmt.allocPrint(ctx.app.allocator, "{}", .{user_id}), refresh_token, REFRESH_TOKEN_EXPIRY);
+    return rs.CreateTokenResponse{ .access_token = access_token, .refresh_token = refresh_token, .expires_in = ACCESS_TOKEN_EXPIRY };
+}
+
+pub fn refreshToken(ctx: *Handler.RequestContext, request: rq.RefreshTokenRequest) anyerror!rs.CreateTokenResponse {
+    var buf: [1024]u8 = undefined;
+    const key = try std.fmt.bufPrint(&buf, "{}", .{request.user_id});
+    const result = ctx.app.redis_client.get(key) catch |err| switch (err) {
+        error.KeyValuePairNotFound => return error.NotFound,
+        else => return error.MiscError,
+    };
+    if (!std.mem.eql(u8, result, ctx.refresh_token.?)) return error.NotFound;
+    const claims = auth.JWTClaims{ .user_id = request.user_id, .exp = std.time.timestamp() + ACCESS_TOKEN_EXPIRY };
+
+    const access_token = try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?);
+
+    return rs.CreateTokenResponse{ .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = ctx.refresh_token.? };
 }

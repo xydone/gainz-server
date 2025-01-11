@@ -52,3 +52,7 @@ pub const CreateTokenRequest = struct {
     username: []u8,
     password: []const u8,
 };
+
+pub const RefreshTokenRequest = struct {
+    user_id: i32,
+};
