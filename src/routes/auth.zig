@@ -18,12 +18,12 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const token = std.json.parseFromSlice(rq.CreateTokenRequest, ctx.app.allocator, body, .{}) catch {
+        const token = std.json.parseFromSliceLeaky(rq.CreateTokenRequest, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createToken(ctx, token.value) catch |err| switch (err) {
+        const result = db.createToken(ctx, token) catch |err| switch (err) {
             error.NotFound => {
                 res.status = 400;
                 res.body = "Wrong username or password!";
@@ -47,12 +47,12 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 
 pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const token = std.json.parseFromSlice(rq.RefreshTokenRequest, ctx.app.allocator, body, .{}) catch {
+        const token = std.json.parseFromSliceLeaky(rq.RefreshTokenRequest, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.refreshToken(ctx, token.value) catch |err| switch (err) {
+        const result = db.refreshToken(ctx, token) catch |err| switch (err) {
             error.NotFound => {
                 res.status = 400;
                 res.body = "Authentication failed!";

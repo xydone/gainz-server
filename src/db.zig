@@ -46,10 +46,11 @@ pub fn init(allocator: std.mem.Allocator, env: dotenv) !*pg.Pool {
     return pool;
 }
 
-pub fn createUser(ctx: *Handler.RequestContext, display_name: []u8) anyerror!rs.CreateUserResponse {
+pub fn createUser(ctx: *Handler.RequestContext, request: rq.UserRequest) anyerror!rs.CreateUserResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into users (display_name) values ($1) returning id,display_name", .{display_name}) catch |err| {
+    const hashed_password = try auth.hashPassword(ctx.app.allocator, request.password);
+    var row = conn.row("insert into users (display_name, username, password) values ($1,$2,$3) returning id,display_name", .{ request.display_name, request.username, hashed_password }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -68,8 +69,8 @@ pub fn createUser(ctx: *Handler.RequestContext, display_name: []u8) anyerror!rs.
 pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerror!rs.CreateFoodResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into food (created_by, brand_name, food_name, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning id,brand_name,food_name", //
-        .{ ctx.user_id.?, request.brand_name, request.food_name, request.macronutrients.calories, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
+    var row = conn.row("insert into food (created_by, brand_name, food_name, food_grams, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) returning id,brand_name,food_name", //
+        .{ ctx.user_id.?, request.brand_name, request.food_name, request.macronutrients.calories, request.food_grams, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -90,7 +91,7 @@ pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerro
 pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyerror!rs.CreateEntryResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into entry (category, food_id, user_id, amount, serving) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
+    var row = conn.row("insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
         .{ request.meal_category, request.food_id, ctx.user_id.?, request.amount, request.serving_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -111,7 +112,7 @@ pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.MeasurementRe
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;", //
-        .{ request.user_id, request.type, request.value }) catch |err| {
+        .{ ctx.user_id, request.type, request.value }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -130,7 +131,7 @@ pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyer
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("SELECT * FROM entry WHERE user_id = $1 and id = $2;", //
-        .{ request.user_id, request.entry }) catch |err| {
+        .{ ctx.user_id, request.entry }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -270,8 +271,8 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
 pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequest) anyerror![]rs.GetEntryRangeResponse {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.created_at >= $2 AND e.created_at < $3 GROUP BY group_date ORDER BY group_date DESC;", //
-        .{ @tagName(request.group_type), request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams ) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams ) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams ) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams ) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams ) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams ) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams ) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams ) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams ) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams ) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams ) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams ) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams ) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams ) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $2 AND e.created_at >= $3 AND e.created_at < $4 GROUP BY group_date ORDER BY group_date DESC;", //
+        .{ @tagName(request.group_type), ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }

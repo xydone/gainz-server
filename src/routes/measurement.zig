@@ -10,27 +10,19 @@ const types = @import("../types.zig");
 const log = std.log.scoped(.weight);
 
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    router.*.get("/api/user/measurement", getMeasurement, .{});
-    router.*.post("/api/user/measurement", postMeasurement, .{});
-}
-
-fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = ctx; // autofix
-    _ = req; // autofix
-    log.err("Endpoint not implemented!", .{});
-    res.status = 204;
-    res.body = "Endpoint not implemented yet!";
-    return;
+    const RouteData = Handler.RouteData{ .restricted = true };
+    router.*.post("/api/user/measurement", postMeasurement, .{ .data = &RouteData });
 }
 
 fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const measurement: std.json.Parsed(rq.MeasurementRequest) = std.json.parseFromSlice(rq.MeasurementRequest, ctx.app.allocator, body, .{}) catch {
-            log.debug("JSON failed to parse!", .{});
+        const measurement = std.json.parseFromSliceLeaky(rq.MeasurementRequest, ctx.app.allocator, body, .{}) catch {
+            res.status = 400;
+            res.body = "Body does not match requirements!";
             return;
         };
 
-        const result = db.createMeasurement(ctx, measurement.value) catch {
+        const result = db.createMeasurement(ctx, measurement) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

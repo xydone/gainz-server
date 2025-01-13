@@ -19,7 +19,12 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.GetFoodRequest = .{ .food_id = try std.fmt.parseInt(i32, req.param("food_id").?, 10), .user_id = ctx.user_id.? };
+    const food_id = std.fmt.parseInt(u32, req.param("food_id").?, 10) catch {
+        res.status = 400;
+        res.body = "Food ID not valid integer!";
+        return;
+    };
+    const request: rq.GetFoodRequest = .{ .food_id = food_id };
 
     const result = db.getFood(ctx, request) catch {
         res.status = 404;
@@ -33,13 +38,13 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
 
 pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const food: ?std.json.Parsed(rq.FoodRequest) = std.json.parseFromSlice(rq.FoodRequest, ctx.app.allocator, body, .{}) catch {
+        const food = std.json.parseFromSliceLeaky(rq.FoodRequest, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body not properly formatted";
             return;
         };
 
-        const result = db.createFood(ctx, food.?.value) catch {
+        const result = db.createFood(ctx, food) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

@@ -10,7 +10,7 @@ pub const App = struct {
 
 pub const Macronutrients = struct {
     calories: f64,
-    //the reason why we set the following ones to default as null is because std.json.parseFromSlice(...) will just be unable to parse fields with either missing, which are not defaulted
+    //the reason why we set the following ones to default as null is because std.json.parseFromSliceLeaky(...) will just be unable to parse fields with either missing, which are not defaulted
     fat: ?f64 = null,
     sat_fat: ?f64 = null,
     polyunsat_fat: ?f64 = null,

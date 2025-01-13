@@ -21,15 +21,14 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     Measurement.init(router);
 }
 
-// fn getUser(app: *types.App, req: *httpz.Request, res: *httpz.Response) void {}
-
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const user: ?std.json.Parsed(rq.UserRequest) = std.json.parseFromSlice(rq.UserRequest, ctx.app.allocator, body, .{}) catch {
-            //handle return in some way
+        const user = std.json.parseFromSliceLeaky(rq.UserRequest, ctx.app.allocator, body, .{}) catch {
+            res.status = 400;
+            res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createUser(ctx, user.?.value.display_name) catch {
+        const result = db.createUser(ctx, user) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

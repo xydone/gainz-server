@@ -17,7 +17,12 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.GetEntryRequest = .{ .entry = try std.fmt.parseInt(i32, req.param("entry_id").?, 10), .user_id = ctx.user_id.? };
+    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
+        res.status = 400;
+        res.body = "Food ID not valid integer!";
+        return;
+    };
+    const request: rq.GetEntryRequest = .{ .entry = entry_id };
 
     const result = db.getEntry(ctx, request) catch {
         res.status = 404;
@@ -52,7 +57,7 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         res.body = "Missing ?end= from request parameters!";
         return;
     };
-    const request: rq.GetEntryRangeRequest = .{ .group_type = group_type, .range_start = start, .range_end = end, .user_id = ctx.user_id.? };
+    const request: rq.GetEntryRangeRequest = .{ .group_type = group_type, .range_start = start, .range_end = end };
     const result = db.getEntryRange(ctx, request) catch {
         res.status = 404;
         res.body = "Entry or user not found!";
@@ -65,12 +70,12 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
 fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const entry: ?std.json.Parsed(rq.EntryRequest) = std.json.parseFromSlice(rq.EntryRequest, ctx.app.allocator, body, .{}) catch {
+        const entry = std.json.parseFromSliceLeaky(rq.EntryRequest, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createEntry(ctx, entry.?.value) catch {
+        const result = db.createEntry(ctx, entry) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

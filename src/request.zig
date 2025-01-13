@@ -1,7 +1,6 @@
 const types = @import("types.zig");
 
 pub const MeasurementRequest = struct {
-    user_id: i32,
     type: types.MeasurementType,
     value: f64,
 };
@@ -16,18 +15,21 @@ pub const EntryRequest = struct {
 pub const FoodRequest = struct {
     brand_name: ?[]u8,
     food_name: ?[]u8,
+    food_grams: f64,
     macronutrients: types.Macronutrients,
 };
 
-pub const UserRequest = struct { display_name: []u8 };
+pub const UserRequest = struct {
+    display_name: []u8,
+    username: []u8,
+    password: []u8,
+};
 
 pub const GetEntryRequest = struct {
-    user_id: i32,
-    entry: i32,
+    entry: u32,
 };
 
 pub const GetEntryRangeRequest = struct {
-    user_id: i32,
     group_type: types.DatePart,
     /// datetime string (ex: 2024-01-01)
     range_start: []const u8,
@@ -36,8 +38,7 @@ pub const GetEntryRangeRequest = struct {
 };
 
 pub const GetFoodRequest = struct {
-    user_id: i32,
-    food_id: i32,
+    food_id: u32,
 };
 
 pub const SearchFoodRequest = struct {
