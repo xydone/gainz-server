@@ -387,3 +387,86 @@ pub fn refreshToken(ctx: *Handler.RequestContext, request: rq.GetRefreshToken) a
 
     return rs.CreateToken{ .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = ctx.refresh_token.? };
 }
+
+pub fn createNote(ctx: *Handler.RequestContext, request: rq.PostNote) anyerror!rs.PostNote {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var row = conn.row("INSERT into notes (created_by, title, description) values ($1,$2,$3) returning id,title,description", //
+        .{ ctx.user_id.?, request.title, request.description }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+    defer row.?.deinit() catch {};
+
+    const id = row.?.get(i32, 0);
+    const title = row.?.get([]u8, 1);
+    const description = row.?.get([]u8, 2);
+
+    return rs.PostNote{ .id = id, .title = title, .description = description };
+}
+
+pub fn getNote(ctx: *Handler.RequestContext, request: rq.GetNote) anyerror!rs.GetNote {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var row = conn.row("SELECT * FROM notes WHERE created_by=$1 AND id=$2", //
+        .{ ctx.user_id.?, request.id }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    } orelse return error.NotFound;
+    defer row.deinit() catch {};
+
+    const id = row.get(i32, 0);
+    const title = row.get([]u8, 2);
+    const description = row.get([]u8, 3);
+
+    return rs.GetNote{ .id = id, .title = title, .description = description };
+}
+
+pub fn getNoteRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerror![]rs.GetNoteEntry {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var result = conn.query("SELECT * FROM note_entry WHERE created_by=$1 AND note_id=$2 AND created_at >=$3 AND created_at<$4", //
+        .{ ctx.user_id.?, request.note_id, request.range_start, request.range_end }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+    defer result.deinit();
+
+    var response = std.ArrayList(rs.GetNoteEntry).init(ctx.app.allocator);
+
+    while (try result.next()) |row| {
+        const id = row.get(i32, 0);
+        const created_at = row.get(i64, 1);
+        const note_id = row.get(i32, 2);
+        const created_by = row.get(i32, 3);
+
+        try response.append(rs.GetNoteEntry{ .id = id, .created_at = created_at, .note_id = note_id, .created_by = created_by });
+    }
+
+    return response.toOwnedSlice();
+}
+
+pub fn createNoteEntry(ctx: *Handler.RequestContext, request: rq.PostNoteEntry) anyerror!rs.PostNoteEntry {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var row = conn.row("INSERT into note_entry (created_by, note_id) values ($1,$2) returning id,created_by,note_id", //
+        .{ ctx.user_id.?, request.note_id }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+    defer row.?.deinit() catch {};
+
+    const id = row.?.get(i32, 0);
+    const created_by = row.?.get(i32, 1);
+    const note_id = row.?.get(i32, 2);
+
+    return rs.PostNoteEntry{ .id = id, .created_by = created_by, .note_id = note_id };
+}

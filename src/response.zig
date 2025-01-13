@@ -69,3 +69,28 @@ pub const CreateToken = struct {
     refresh_token: []const u8,
     expires_in: i32,
 };
+
+pub const PostNote = struct {
+    id: i32,
+    title: []const u8,
+    description: []const u8,
+};
+
+pub const GetNote = struct {
+    id: i32,
+    title: []const u8,
+    description: []const u8,
+};
+
+pub const PostNoteEntry = struct {
+    id: i32,
+    created_by: i32,
+    note_id: i32,
+};
+
+pub const GetNoteEntry = struct {
+    id: i32,
+    created_by: i32,
+    note_id: i32,
+    created_at: i64,
+};

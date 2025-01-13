@@ -69,3 +69,24 @@ pub const PostAuth = struct {
 pub const GetRefreshToken = struct {
     user_id: i32,
 };
+
+pub const PostNote = struct {
+    title: []const u8,
+    description: ?[]const u8,
+};
+
+pub const GetNote = struct {
+    id: u32,
+};
+
+pub const GetNoteRange = struct {
+    note_id: u32,
+    /// datetime string (ex: 2024-01-01)
+    range_start: []const u8,
+    /// datetime string (ex: 2024-01-01)
+    range_end: []const u8,
+};
+
+pub const PostNoteEntry = struct {
+    note_id: u32,
+};

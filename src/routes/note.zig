@@ -1,0 +1,55 @@
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const db = @import("../db.zig");
+const Handler = @import("../handler.zig");
+const rq = @import("../request.zig");
+
+const log = std.log.scoped(.users);
+
+pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+    const RouteData = Handler.RouteData{ .restricted = true };
+    router.*.post("/api/note", postNote, .{ .data = &RouteData });
+    router.*.get("/api/note/:note_id", getNote, .{ .data = &RouteData });
+}
+
+pub fn getNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const note_id = std.fmt.parseInt(u32, req.param("note_id").?, 10) catch {
+        res.status = 400;
+        res.body = "'note_id' not valid integer!";
+        return;
+    };
+    const request = rq.GetNote{ .id = note_id };
+
+    const result = db.getNote(ctx, request) catch |err| switch (err) {
+        error.NotFound => {
+            res.status = 404;
+            res.body = "Note not found!";
+            return;
+        },
+        else => {
+            res.status = 500;
+            res.body = "Error encountered";
+            return;
+        },
+    };
+    try res.json(result, .{});
+}
+
+pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    if (req.body()) |body| {
+        const note = std.json.parseFromSliceLeaky(rq.PostNote, ctx.app.allocator, body, .{}) catch {
+            res.status = 400;
+            res.body = "Body does not match requirements!";
+            return;
+        };
+        const result = db.createNote(ctx, note) catch {
+            //TODO: error handling later
+            res.status = 500;
+            res.body = "Error encountered";
+            return;
+        };
+        try res.json(result, .{});
+    }
+}

@@ -6,12 +6,17 @@ const pg = @import("pg");
 const Auth = @import("./routes/auth.zig");
 const db = @import("db.zig");
 const Handler = @import("handler.zig");
+
+// ROUTES
 const Entry = @import("routes/Entry.zig");
 const Food = @import("routes/food.zig");
 const User = @import("routes/user.zig");
-const types = @import("types.zig");
+const Note = @import("routes/note.zig");
+
+// UTIL
 const dotenv = @import("util/dotenv.zig");
 const redis = @import("util/redis.zig");
+const types = @import("types.zig");
 
 var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 const allocator = arena.allocator();
@@ -49,6 +54,8 @@ pub fn main() !void {
     Food.init(router);
     // /api/auth
     Auth.init(router);
+    // /api/note
+    Note.init(router);
 
     log.info("listening http://localhost:{d}/", .{PORT});
 

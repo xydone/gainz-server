@@ -7,6 +7,7 @@ const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
 const Measurement = @import("./measurement.zig");
+const NoteEntries = @import("note_entries.zig");
 const Entry = @import("entry.zig");
 
 const log = std.log.scoped(.users);
@@ -17,8 +18,10 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     //subroutes
     // /api/user/entry
     Entry.init(router);
-    // /api/user/weight
+    // /api/user/measurement
     Measurement.init(router);
+    // /api/user/notes
+    NoteEntries.init(router);
 }
 
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
