@@ -1,6 +1,18 @@
 const types = @import("types.zig");
 
-pub const MeasurementRequest = struct {
+pub const GetMeasurement = struct {
+    measurement_id: u32,
+};
+
+pub const GetMeasurementRange = struct {
+    measurement_type: types.MeasurementType,
+    /// datetime string (ex: 2024-01-01)
+    range_start: []const u8,
+    /// datetime string (ex: 2024-01-01)
+    range_end: []const u8,
+};
+
+pub const PostMeasurement = struct {
     type: types.MeasurementType,
     value: f64,
 };
