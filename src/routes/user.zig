@@ -23,7 +23,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const user = std.json.parseFromSliceLeaky(rq.UserRequest, ctx.app.allocator, body, .{}) catch {
+        const user = std.json.parseFromSliceLeaky(rq.PostUser, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;

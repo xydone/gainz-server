@@ -46,7 +46,7 @@ pub fn init(allocator: std.mem.Allocator, env: dotenv) !*pg.Pool {
     return pool;
 }
 
-pub fn createUser(ctx: *Handler.RequestContext, request: rq.UserRequest) anyerror!rs.CreateUserResponse {
+pub fn createUser(ctx: *Handler.RequestContext, request: rq.PostUser) anyerror!rs.PostUser {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     const hashed_password = try auth.hashPassword(ctx.app.allocator, request.password);
@@ -63,10 +63,10 @@ pub fn createUser(ctx: *Handler.RequestContext, request: rq.UserRequest) anyerro
 
     const dupe = try ctx.app.allocator.dupe(u8, dn);
 
-    return rs.CreateUserResponse{ .id = id, .display_name = dupe };
+    return rs.PostUser{ .id = id, .display_name = dupe };
 }
 
-pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerror!rs.CreateFoodResponse {
+pub fn createFood(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!rs.PostFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("insert into food (created_by, brand_name, food_name, food_grams, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) returning id,brand_name,food_name", //
@@ -85,10 +85,10 @@ pub fn createFood(ctx: *Handler.RequestContext, request: rq.FoodRequest) anyerro
     const brand_name = if (b_n == null) null else try ctx.app.allocator.dupe(u8, b_n.?);
     const food_name = if (f_n == null) null else try ctx.app.allocator.dupe(u8, f_n.?);
 
-    return rs.CreateFoodResponse{ .id = id, .food_name = food_name, .brand_name = brand_name };
+    return rs.PostFood{ .id = id, .food_name = food_name, .brand_name = brand_name };
 }
 
-pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyerror!rs.CreateEntryResponse {
+pub fn createEntry(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.PostEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
@@ -105,10 +105,10 @@ pub fn createEntry(ctx: *Handler.RequestContext, request: rq.EntryRequest) anyer
     const f_id = row.?.get(i32, 2);
     const category = row.?.get(types.MealCategory, 3);
 
-    return rs.CreateEntryResponse{ .id = id, .user_id = u_id, .food_id = f_id, .category = category };
+    return rs.PostEntry{ .id = id, .user_id = u_id, .food_id = f_id, .category = category };
 }
 
-pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.PostMeasurement) anyerror!rs.CreateMeasurementResponse {
+pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.PostMeasurement) anyerror!rs.PostMeasurement {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;", //
@@ -124,7 +124,7 @@ pub fn createMeasurement(ctx: *Handler.RequestContext, request: rq.PostMeasureme
     const measurement_type = row.?.get(types.MeasurementType, 1);
     const value = row.?.get(f64, 2);
 
-    return rs.CreateMeasurementResponse{ .created_at = created_at, .type = measurement_type, .value = value };
+    return rs.PostMeasurement{ .created_at = created_at, .type = measurement_type, .value = value };
 }
 
 pub fn getMeasurement(ctx: *Handler.RequestContext, request: rq.GetMeasurement) anyerror!rs.GetMeasurement {
@@ -169,7 +169,7 @@ pub fn getMeasurementRange(ctx: *Handler.RequestContext, request: rq.GetMeasurem
     return try response.toOwnedSlice();
 }
 
-pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyerror!rs.GetEntryResponse {
+pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("SELECT * FROM entry WHERE user_id = $1 and id = $2;", //
@@ -188,10 +188,10 @@ pub fn getEntry(ctx: *Handler.RequestContext, request: rq.GetEntryRequest) anyer
     const meal_category = row.get(types.MealCategory, 4);
     const amount = row.get(f64, 5);
     const serving = row.get(i32, 6);
-    return rs.GetEntryResponse{ .created_at = created_at, .id = id, .user_id = user_id, .food_id = food_id, .category = meal_category, .amount = amount, .serving = serving };
+    return rs.GetEntry{ .created_at = created_at, .id = id, .user_id = user_id, .food_id = food_id, .category = meal_category, .amount = amount, .serving = serving };
 }
 
-pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerror!rs.GetFoodResponse {
+pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.rowOpts("SELECT * FROM food WHERE id = $1;", //
@@ -226,7 +226,7 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
     };
     const food_name = row.getCol([]u8, "food_name");
     const brand_name = row.getCol([]u8, "brand_name");
-    return rs.GetFoodResponse{
+    return rs.GetFood{
         .id = id,
         .created_at = created_at,
         .food_name = food_name,
@@ -235,7 +235,7 @@ pub fn getFood(ctx: *Handler.RequestContext, request: rq.GetFoodRequest) anyerro
     };
 }
 
-pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) anyerror![]rs.GetFoodResponse {
+pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]rs.GetFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var result = conn.queryOpts("SELECT f.* FROM food f WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
@@ -246,7 +246,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) a
         return err;
     };
     defer result.deinit();
-    var response = std.ArrayList(rs.GetFoodResponse).init(ctx.app.allocator);
+    var response = std.ArrayList(rs.GetFood).init(ctx.app.allocator);
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
         const created_at = row.get(i64, 1);
@@ -274,7 +274,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) a
         };
         const food_name = row.getCol([]u8, "food_name");
         const brand_name = row.getCol([]u8, "brand_name");
-        try response.append(rs.GetFoodResponse{
+        try response.append(rs.GetFood{
             .id = id,
             .created_at = created_at,
             .food_name = try ctx.app.allocator.dupe(u8, food_name),
@@ -285,7 +285,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, request: rq.SearchFoodRequest) a
     return try response.toOwnedSlice();
 }
 
-pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest) anyerror![]rs.GetServingResponse {
+pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServings) anyerror![]rs.GetServing {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var result = conn.queryOpts("SELECT * from servings WHERE food_id=$1", //
@@ -296,7 +296,7 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
         return err;
     };
     defer result.deinit();
-    var response = std.ArrayList(rs.GetServingResponse).init(ctx.app.allocator);
+    var response = std.ArrayList(rs.GetServing).init(ctx.app.allocator);
 
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
@@ -305,12 +305,12 @@ pub fn getServings(ctx: *Handler.RequestContext, request: rq.GetServingsRequest)
         const unit = row.get([]u8, 4);
         const multiplier = row.get(f64, 5);
 
-        try response.append(rs.GetServingResponse{ .id = id, .created_at = created_at, .amount = amount, .unit = unit, .multiplier = multiplier });
+        try response.append(rs.GetServing{ .id = id, .created_at = created_at, .amount = amount, .unit = unit, .multiplier = multiplier });
     }
     return try response.toOwnedSlice();
 }
 
-pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequest) anyerror![]rs.GetEntryRangeResponse {
+pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyerror![]rs.GetEntryRange {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams ) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams ) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams ) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams ) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams ) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams ) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams ) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams ) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams ) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams ) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams ) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams ) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams ) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams ) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $2 AND e.created_at >= $3 AND e.created_at < $4 GROUP BY group_date ORDER BY group_date DESC;", //
@@ -321,7 +321,7 @@ pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequ
         return err;
     };
     defer result.deinit();
-    var response = std.ArrayList(rs.GetEntryRangeResponse).init(ctx.app.allocator);
+    var response = std.ArrayList(rs.GetEntryRange).init(ctx.app.allocator);
 
     while (try result.next()) |row| {
         const group_date = row.get(i64, 0);
@@ -347,12 +347,12 @@ pub fn getEntryRange(ctx: *Handler.RequestContext, request: rq.GetEntryRangeRequ
             .vitamin_d = row.getCol(?f64, "vitamin_d"),
             .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
-        try response.append(rs.GetEntryRangeResponse{ .group_date = group_date, .macronutrients = macronutrients });
+        try response.append(rs.GetEntryRange{ .group_date = group_date, .macronutrients = macronutrients });
     }
     return try response.toOwnedSlice();
 }
 
-pub fn createToken(ctx: *Handler.RequestContext, request: rq.CreateTokenRequest) anyerror!rs.CreateTokenResponse {
+pub fn createToken(ctx: *Handler.RequestContext, request: rq.PostAuth) anyerror!rs.CreateToken {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row("SELECT id, password FROM users WHERE username=$1;", //
@@ -370,10 +370,10 @@ pub fn createToken(ctx: *Handler.RequestContext, request: rq.CreateTokenRequest)
     const access_token = if (isValidPassword) try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?) else return error.NotFound;
     const refresh_token = try auth.createSessionToken(ctx.app.allocator);
     _ = try ctx.app.redis_client.setWithExpiry(try std.fmt.allocPrint(ctx.app.allocator, "{}", .{user_id}), refresh_token, REFRESH_TOKEN_EXPIRY);
-    return rs.CreateTokenResponse{ .access_token = access_token, .refresh_token = refresh_token, .expires_in = ACCESS_TOKEN_EXPIRY };
+    return rs.CreateToken{ .access_token = access_token, .refresh_token = refresh_token, .expires_in = ACCESS_TOKEN_EXPIRY };
 }
 
-pub fn refreshToken(ctx: *Handler.RequestContext, request: rq.RefreshTokenRequest) anyerror!rs.CreateTokenResponse {
+pub fn refreshToken(ctx: *Handler.RequestContext, request: rq.GetRefreshToken) anyerror!rs.CreateToken {
     var buf: [1024]u8 = undefined;
     const key = try std.fmt.bufPrint(&buf, "{}", .{request.user_id});
     const result = ctx.app.redis_client.get(key) catch |err| switch (err) {
@@ -385,5 +385,5 @@ pub fn refreshToken(ctx: *Handler.RequestContext, request: rq.RefreshTokenReques
 
     const access_token = try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?);
 
-    return rs.CreateTokenResponse{ .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = ctx.refresh_token.? };
+    return rs.CreateToken{ .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = ctx.refresh_token.? };
 }

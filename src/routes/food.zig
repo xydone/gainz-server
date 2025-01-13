@@ -24,7 +24,7 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
         res.body = "Food ID not valid integer!";
         return;
     };
-    const request: rq.GetFoodRequest = .{ .food_id = food_id };
+    const request: rq.GetFood = .{ .food_id = food_id };
 
     const result = db.getFood(ctx, request) catch {
         res.status = 404;
@@ -38,7 +38,7 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
 
 pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const food = std.json.parseFromSliceLeaky(rq.FoodRequest, ctx.app.allocator, body, .{}) catch {
+        const food = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body not properly formatted";
             return;
@@ -71,7 +71,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         res.body = "Search query missing!";
         return;
     }
-    const request: rq.SearchFoodRequest = .{ .search_term = search_term };
+    const request: rq.SearchFood = .{ .search_term = search_term };
     const result = db.searchFood(ctx, request) catch {
         //TODO: error handling later
         res.status = 500;
@@ -84,7 +84,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 }
 
 pub fn getServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const request: rq.GetServingsRequest = .{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
+    const request: rq.GetServings = .{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
     const result = db.getServings(ctx, request) catch {
         //TODO: error handling later
         res.status = 500;

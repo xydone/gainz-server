@@ -2,25 +2,25 @@ const std = @import("std");
 
 const types = @import("types.zig");
 
-pub const CreateUserResponse = struct {
+pub const PostUser = struct {
     id: i32,
     display_name: []u8,
 };
 
-pub const CreateFoodResponse = struct {
+pub const PostFood = struct {
     id: i32,
     brand_name: ?[]u8,
     food_name: ?[]u8,
 };
 
-pub const CreateEntryResponse = struct {
+pub const PostEntry = struct {
     id: i32,
     user_id: i32,
     food_id: i32,
     category: types.MealCategory,
 };
 
-pub const CreateMeasurementResponse = struct {
+pub const PostMeasurement = struct {
     created_at: i64,
     type: types.MeasurementType,
     value: f64,
@@ -33,7 +33,7 @@ pub const GetMeasurement = struct {
     value: f64,
 };
 
-pub const GetEntryResponse = struct {
+pub const GetEntry = struct {
     id: i32,
     created_at: i64,
     user_id: i32,
@@ -43,7 +43,7 @@ pub const GetEntryResponse = struct {
     serving: i32,
 };
 
-pub const GetFoodResponse = struct {
+pub const GetFood = struct {
     id: i32,
     created_at: i64,
     food_name: ?[]u8,
@@ -51,7 +51,7 @@ pub const GetFoodResponse = struct {
     macronutrients: types.Macronutrients,
 };
 
-pub const GetServingResponse = struct {
+pub const GetServing = struct {
     id: i32,
     created_at: i64,
     amount: f64,
@@ -59,12 +59,12 @@ pub const GetServingResponse = struct {
     multiplier: f64,
 };
 
-pub const GetEntryRangeResponse = struct {
+pub const GetEntryRange = struct {
     group_date: i64,
     macronutrients: types.Macronutrients,
 };
 
-pub const CreateTokenResponse = struct {
+pub const CreateToken = struct {
     access_token: []const u8,
     refresh_token: []const u8,
     expires_in: i32,

@@ -22,7 +22,7 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
         res.body = "Food ID not valid integer!";
         return;
     };
-    const request: rq.GetEntryRequest = .{ .entry = entry_id };
+    const request: rq.GetEntry = .{ .entry = entry_id };
 
     const result = db.getEntry(ctx, request) catch {
         res.status = 404;
@@ -57,7 +57,7 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         res.body = "Missing ?end= from request parameters!";
         return;
     };
-    const request: rq.GetEntryRangeRequest = .{ .group_type = group_type, .range_start = start, .range_end = end };
+    const request: rq.GetEntryRange = .{ .group_type = group_type, .range_start = start, .range_end = end };
     const result = db.getEntryRange(ctx, request) catch {
         res.status = 404;
         res.body = "Entry or user not found!";
@@ -70,7 +70,7 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
 fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const entry = std.json.parseFromSliceLeaky(rq.EntryRequest, ctx.app.allocator, body, .{}) catch {
+        const entry = std.json.parseFromSliceLeaky(rq.PostEntry, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;

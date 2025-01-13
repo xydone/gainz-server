@@ -18,7 +18,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const token = std.json.parseFromSliceLeaky(rq.CreateTokenRequest, ctx.app.allocator, body, .{}) catch {
+        const token = std.json.parseFromSliceLeaky(rq.PostAuth, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;
@@ -47,7 +47,7 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 
 pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     if (req.body()) |body| {
-        const token = std.json.parseFromSliceLeaky(rq.RefreshTokenRequest, ctx.app.allocator, body, .{}) catch {
+        const token = std.json.parseFromSliceLeaky(rq.GetRefreshToken, ctx.app.allocator, body, .{}) catch {
             res.status = 400;
             res.body = "Body does not match requirements!";
             return;
