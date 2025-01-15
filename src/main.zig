@@ -3,15 +3,11 @@ const std = @import("std");
 const httpz = @import("httpz");
 const pg = @import("pg");
 
-const Auth = @import("./routes/auth.zig");
 const db = @import("db.zig");
 const Handler = @import("handler.zig");
 
-// ROUTES
-const Entry = @import("routes/Entry.zig");
-const Food = @import("routes/food.zig");
-const User = @import("routes/user.zig");
-const Note = @import("routes/note.zig");
+const API = @import("routes/api.zig");
+const Public = @import("routes/public.zig");
 
 // UTIL
 const dotenv = @import("util/dotenv.zig");
@@ -48,14 +44,12 @@ pub fn main() !void {
         .headers = "*",
     });
     const router = server.router(.{ .middlewares = &.{cors} });
-    // /api/user
-    User.init(router);
-    // /api/food
-    Food.init(router);
-    // /api/auth
-    Auth.init(router);
-    // /api/note
-    Note.init(router);
+
+    // /api endpoinds
+    API.init(router);
+
+    // / endpoinds
+    Public.init(router);
 
     log.info("listening http://localhost:{d}/", .{PORT});
 
