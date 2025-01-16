@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const UserModel = @import("../models/users_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
@@ -31,7 +31,7 @@ pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createUser(ctx, user) catch {
+        const result = UserModel.create(ctx, user) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

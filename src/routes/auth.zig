@@ -2,11 +2,10 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
-const auth = @import("../util/auth.zig");
+const TokenModel = @import("../models/token_model.zig");
 
 const log = std.log.scoped(.users);
 
@@ -23,7 +22,7 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createToken(ctx, token) catch |err| switch (err) {
+        const result = TokenModel.create(ctx, token) catch |err| switch (err) {
             error.NotFound => {
                 res.status = 400;
                 res.body = "Wrong username or password!";
@@ -52,7 +51,7 @@ pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *htt
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.refreshToken(ctx, token) catch |err| switch (err) {
+        const result = TokenModel.refresh(ctx, token) catch |err| switch (err) {
             error.NotFound => {
                 res.status = 400;
                 res.body = "Authentication failed!";

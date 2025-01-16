@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const MeasurementModel = @import("../models/measurements_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
@@ -25,7 +25,7 @@ fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 
     const value = rq.GetMeasurement{ .measurement_id = measurement_id };
 
-    const result = db.getMeasurement(ctx, value) catch |err| switch (err) {
+    const result = MeasurementModel.get(ctx, value) catch |err| switch (err) {
         error.NotFound => {
             //TODO: error handling later
             res.status = 401;
@@ -67,7 +67,7 @@ fn getMeasurementRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
         return;
     };
     const request: rq.GetMeasurementRange = .{ .measurement_type = measurement_type, .range_start = start, .range_end = end };
-    const result = db.getMeasurementRange(ctx, request) catch {
+    const result = MeasurementModel.getInRange(ctx, request) catch {
         res.status = 404;
         res.body = "Measurement or user not found!";
         return;
@@ -85,7 +85,7 @@ fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
             return;
         };
 
-        const result = db.createMeasurement(ctx, measurement) catch {
+        const result = MeasurementModel.create(ctx, measurement) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

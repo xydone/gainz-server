@@ -2,7 +2,8 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const FoodModel = @import("../models/food_model.zig");
+const ServingsModel = @import("../models/servings_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
@@ -26,7 +27,7 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
     };
     const request: rq.GetFood = .{ .food_id = food_id };
 
-    const result = db.getFood(ctx, request) catch {
+    const result = FoodModel.get(ctx, request) catch {
         res.status = 404;
         res.body = "Food not found!";
         return;
@@ -44,7 +45,7 @@ pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
             return;
         };
 
-        const result = db.createFood(ctx, food) catch {
+        const result = FoodModel.create(ctx, food) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";
@@ -72,7 +73,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         return;
     }
     const request: rq.SearchFood = .{ .search_term = search_term };
-    const result = db.searchFood(ctx, request) catch {
+    const result = FoodModel.search(ctx, request) catch {
         //TODO: error handling later
         res.status = 500;
         res.body = "Error encountered";
@@ -85,7 +86,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 
 pub fn getServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const request: rq.GetServings = .{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
-    const result = db.getServings(ctx, request) catch {
+    const result = ServingsModel.get(ctx, request) catch {
         //TODO: error handling later
         res.status = 500;
         res.body = "Error encountered";

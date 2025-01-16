@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const NoteModel = @import("../models/note_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 
@@ -22,7 +22,7 @@ pub fn getNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
     };
     const request = rq.GetNote{ .id = note_id };
 
-    const result = db.getNote(ctx, request) catch |err| switch (err) {
+    const result = NoteModel.get(ctx, request) catch |err| switch (err) {
         error.NotFound => {
             res.status = 404;
             res.body = "Note not found!";
@@ -44,7 +44,7 @@ pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createNote(ctx, note) catch {
+        const result = NoteModel.create(ctx, note) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

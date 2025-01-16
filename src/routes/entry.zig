@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const EntryModel = @import("../models/entry_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const types = @import("../types.zig");
@@ -24,7 +24,7 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
     };
     const request: rq.GetEntry = .{ .entry = entry_id };
 
-    const result = db.getEntry(ctx, request) catch {
+    const result = EntryModel.get(ctx, request) catch {
         res.status = 404;
         res.body = "Entry or user not found!";
         return;
@@ -58,7 +58,7 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         return;
     };
     const request: rq.GetEntryRange = .{ .group_type = group_type, .range_start = start, .range_end = end };
-    const result = db.getEntryRange(ctx, request) catch {
+    const result = EntryModel.getInRange(ctx, request) catch {
         res.status = 404;
         res.body = "Entry or user not found!";
         return;
@@ -75,7 +75,7 @@ fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createEntry(ctx, entry) catch {
+        const result = EntryModel.create(ctx, entry) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";

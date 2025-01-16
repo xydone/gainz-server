@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const db = @import("../db.zig");
+const NoteEntryModel = @import("../models/note_entry_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 
@@ -33,7 +33,7 @@ fn getNoteRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         return;
     };
     const request: rq.GetNoteRange = .{ .note_id = note_id, .range_start = start, .range_end = end };
-    const result = db.getNoteRange(ctx, request) catch {
+    const result = NoteEntryModel.getInRange(ctx, request) catch {
         res.status = 404;
         res.body = "Note or user not found!";
         return;
@@ -50,7 +50,7 @@ pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
             res.body = "Body does not match requirements!";
             return;
         };
-        const result = db.createNoteEntry(ctx, note) catch {
+        const result = NoteEntryModel.create(ctx, note) catch {
             //TODO: error handling later
             res.status = 500;
             res.body = "Error encountered";
