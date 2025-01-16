@@ -65,6 +65,13 @@ pub const GetEntryRange = struct {
 };
 
 pub const CreateToken = struct {
+    display_name: []const u8,
+    access_token: []const u8,
+    refresh_token: []const u8,
+    expires_in: i32,
+};
+
+pub const RefreshToken = struct {
     access_token: []const u8,
     refresh_token: []const u8,
     expires_in: i32,

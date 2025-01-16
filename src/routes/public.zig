@@ -11,6 +11,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 fn dynamicPublicRoutes(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) !void {
+    _ = ctx; // autofix
     const file_path = if (std.mem.eql(u8, req.url.raw, "/")) "index.html" else req.url.raw[1..];
     const file_ext = std.fs.path.extension(file_path);
 
@@ -23,9 +24,12 @@ fn dynamicPublicRoutes(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
 
     const dir = try std.fs.cwd().openDir("src/public/", .{});
     const file = try dir.openFile(file_path, .{});
-    const file_buf = try file.readToEndAlloc(ctx.app.allocator, 1000000);
+
+    //TODO: why 1024? is it good enough?
+    var buf: [1024]u8 = undefined;
+    var fifo = std.fifo.LinearFifo(u8, .Slice).init(&buf);
+    try fifo.pump(file.reader(), res.writer());
     res.content_type = content_type;
-    res.body = file_buf;
     return;
 }
 
