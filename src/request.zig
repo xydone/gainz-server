@@ -42,6 +42,13 @@ pub const GetEntry = struct {
 };
 
 pub const GetEntryRange = struct {
+    /// datetime string (ex: 2024-01-01)
+    range_start: []const u8,
+    /// datetime string (ex: 2024-01-01)
+    range_end: []const u8,
+};
+
+pub const GetEntryStats = struct {
     group_type: types.DatePart,
     /// datetime string (ex: 2024-01-01)
     range_start: []const u8,

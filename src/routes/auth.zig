@@ -7,7 +7,7 @@ const rq = @import("../request.zig");
 const types = @import("../types.zig");
 const TokenModel = @import("../models/token_model.zig");
 
-const log = std.log.scoped(.users);
+const log = std.log.scoped(.auth);
 
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .refresh = true };

@@ -60,6 +60,12 @@ pub const GetServing = struct {
 };
 
 pub const GetEntryRange = struct {
+    created_at: i64,
+    category: types.MealCategory,
+    macronutrients: types.Macronutrients,
+};
+
+pub const GetEntryStats = struct {
     group_date: i64,
     macronutrients: types.Macronutrients,
 };
