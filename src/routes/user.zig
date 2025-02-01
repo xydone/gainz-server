@@ -5,6 +5,7 @@ const httpz = @import("httpz");
 const UserModel = @import("../models/users_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
+const rs = @import("../response.zig");
 const types = @import("../types.zig");
 const Measurement = @import("./measurement.zig");
 const NoteEntries = @import("note_entries.zig");
@@ -25,18 +26,18 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    if (req.body()) |body| {
-        const user = std.json.parseFromSliceLeaky(rq.PostUser, ctx.app.allocator, body, .{}) catch {
-            res.status = 400;
-            res.body = "Body does not match requirements!";
-            return;
-        };
-        const result = UserModel.create(ctx, user) catch {
-            //TODO: error handling later
-            res.status = 500;
-            res.body = "Error encountered";
-            return;
-        };
-        try res.json(result, .{});
-    }
+    const body = req.body() orelse {
+        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        return;
+    };
+    const user = std.json.parseFromSliceLeaky(rq.PostUser, ctx.app.allocator, body, .{}) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        return;
+    };
+    const result = UserModel.create(ctx, user) catch {
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        return;
+    };
+    res.status = 200;
+    try res.json(result, .{});
 }

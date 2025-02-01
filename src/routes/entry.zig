@@ -5,6 +5,7 @@ const httpz = @import("httpz");
 const EntryModel = @import("../models/entry_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
+const rs = @import("../response.zig");
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.entry);
@@ -19,100 +20,82 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        res.status = 400;
-        res.body = "Food ID not valid integer!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     };
     const request: rq.GetEntry = .{ .entry = entry_id };
 
     const result = EntryModel.get(ctx, request) catch {
-        res.status = 404;
-        res.body = "Entry or user not found!";
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
 
 fn getEntryStats(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
+
     // parsing the parameter and then turning the string request to an enum (probably slow?)
     const group_type = std.meta.stringToEnum(types.DatePart, query.get("group") orelse {
-        res.status = 400;
-        res.body = "Missing ?group= from request parameters!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?group= from request parameters!");
         return;
     }) orelse {
         //handle invalid enum type
-        res.status = 400;
-        res.body = "Invalid group type!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Invalid group type!");
         return;
     };
     const start = query.get("start") orelse {
-        res.status = 400;
-        res.body = "Missing ?start= from request parameters!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        res.status = 400;
-        res.body = "Missing ?end= from request parameters!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
 
     const request: rq.GetEntryStats = .{ .group_type = group_type, .range_start = start, .range_end = end };
     const result = EntryModel.getStats(ctx, request) catch {
-        res.status = 404;
-        res.body = "Entry or user not found!";
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
 
 fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
     const start = query.get("start") orelse {
-        res.status = 400;
-        res.body = "Missing ?start= from request parameters!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        res.status = 400;
-        res.body = "Missing ?end= from request parameters!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
 
     const request: rq.GetEntryRange = .{ .range_start = start, .range_end = end };
     const result = EntryModel.getInRange(ctx, request) catch {
-        res.status = 404;
-        res.body = "Entry or user not found!";
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
 
 fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    if (req.body()) |body| {
-        const entry = std.json.parseFromSliceLeaky(rq.PostEntry, ctx.app.allocator, body, .{}) catch {
-            res.status = 400;
-            res.body = "Body does not match requirements!";
-            return;
-        };
-        const result = EntryModel.create(ctx, entry) catch {
-            //TODO: error handling later
-            res.status = 500;
-            res.body = "Error encountered";
-            return;
-        };
-        res.status = 200;
-        try res.json(result, .{});
+    const body = req.body() orelse {
+        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
-    } else {
-        res.status = 400;
-        res.body = "No body found!";
+    };
+    const entry = std.json.parseFromSliceLeaky(rq.PostEntry, ctx.app.allocator, body, .{}) catch {
+        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
-    }
+    };
+    const result = EntryModel.create(ctx, entry) catch {
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        return;
+    };
+    res.status = 200;
+    try res.json(result, .{});
 }

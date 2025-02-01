@@ -6,6 +6,7 @@ const FoodModel = @import("../models/food_model.zig");
 const ServingsModel = @import("../models/servings_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
+const rs = @import("../response.zig");
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.food);
@@ -21,45 +22,36 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const food_id = std.fmt.parseInt(u32, req.param("food_id").?, 10) catch {
-        res.status = 400;
-        res.body = "Food ID not valid integer!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Food ID not valid integer!");
         return;
     };
     const request: rq.GetFood = .{ .food_id = food_id };
 
     const result = FoodModel.get(ctx, request) catch {
-        res.status = 404;
-        res.body = "Food not found!";
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
 
 pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    if (req.body()) |body| {
-        const food = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
-            res.status = 400;
-            res.body = "Body not properly formatted";
-            return;
-        };
+    const body = req.body() orelse {
+        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        return;
+    };
+    const food = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
+        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        return;
+    };
 
-        const result = FoodModel.create(ctx, food) catch {
-            //TODO: error handling later
-            res.status = 500;
-            res.body = "Error encountered";
-            return;
-        };
-        //main return flow exit if body is present and valid
-        res.status = 200;
-        try res.json(result, .{});
+    const result = FoodModel.create(ctx, food) catch {
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
-    } else {
-        res.status = 400;
-        res.body = "Body missing!";
-        return;
-    }
+    };
+
+    res.status = 200;
+    try res.json(result, .{});
 }
 
 pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -68,31 +60,24 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
     if (query.get("search")) |q| {
         search_term = q;
     } else {
-        res.status = 400;
-        res.body = "Search query missing!";
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     }
     const request: rq.SearchFood = .{ .search_term = search_term };
     const result = FoodModel.search(ctx, request) catch {
-        //TODO: error handling later
-        res.status = 500;
-        res.body = "Error encountered";
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
 
 pub fn getServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const request: rq.GetServings = .{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
     const result = ServingsModel.get(ctx, request) catch {
-        //TODO: error handling later
-        res.status = 500;
-        res.body = "Error encountered";
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
     try res.json(result, .{});
-    return;
 }
