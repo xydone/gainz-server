@@ -7,7 +7,6 @@ const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const auth = @import("../util/auth.zig");
 const types = @import("../types.zig");
-
 const log = std.log.scoped(.entry_model);
 
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEntry {
@@ -35,7 +34,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEn
 pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyerror![]rs.GetEntryRange {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT e.id AS id, e.created_at AS created_at, e.category AS category, (e.amount * s.multiplier * f.calories / f.food_grams) AS calories, (e.amount * s.multiplier * f.fat / f.food_grams) AS fat, (e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, (e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, (e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, (e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, (e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, (e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, (e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, (e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, (e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, (e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, (e.amount * s.multiplier * f.protein / f.food_grams) AS protein, (e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, (e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, (e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, (e.amount * s.multiplier * f.iron / f.food_grams) AS iron, (e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, (e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, (e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $1 AND e.created_at >= $2 AND e.created_at < $3 ORDER BY e.created_at DESC;", //
+    var result = conn.queryOpts("SELECT e.id AS id, e.created_at AS created_at, f.brand_name as brand_name, f.food_name as food_name,e.category AS category, (e.amount * s.multiplier * f.calories / f.food_grams) AS calories, (e.amount * s.multiplier * f.fat / f.food_grams) AS fat, (e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, (e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, (e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, (e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, (e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, (e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, (e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, (e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, (e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, (e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, (e.amount * s.multiplier * f.protein / f.food_grams) AS protein, (e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, (e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, (e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, (e.amount * s.multiplier * f.iron / f.food_grams) AS iron, (e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, (e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, (e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $1 AND e.created_at >= $2 AND e.created_at < $3 ORDER BY e.created_at DESC, e.category;", //
         .{ ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -48,6 +47,10 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
     while (try result.next()) |row| {
         const created_at = row.getCol(i64, "created_at");
         const category = row.getCol(types.MealCategory, "category");
+        const food_name = row.getCol([]u8, "food_name");
+        const brand_name = row.getCol([]u8, "brand_name");
+        const food_name_duped = if (food_name.len != 0) try ctx.app.allocator.dupe(u8, food_name) else null;
+        const brand_name_duped = if (brand_name.len != 0) try ctx.app.allocator.dupe(u8, brand_name) else null;
         const macronutrients = types.Macronutrients{
             .calories = row.getCol(f64, "calories"),
             .fat = row.getCol(?f64, "fat"),
@@ -70,7 +73,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
             .vitamin_d = row.getCol(?f64, "vitamin_d"),
             .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
-        try response.append(rs.GetEntryRange{ .category = category, .created_at = created_at, .macronutrients = macronutrients });
+        try response.append(rs.GetEntryRange{ .food_name = food_name_duped, .brand_name = brand_name_duped, .category = category, .created_at = created_at, .macronutrients = macronutrients });
     }
     return try response.toOwnedSlice();
 }

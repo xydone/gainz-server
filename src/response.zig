@@ -106,6 +106,8 @@ pub const GetServing = struct {
 pub const GetEntryRange = struct {
     created_at: i64,
     category: types.MealCategory,
+    food_name: ?[]u8,
+    brand_name: ?[]u8,
     macronutrients: types.Macronutrients,
 };
 
