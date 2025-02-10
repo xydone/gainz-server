@@ -73,10 +73,6 @@ pub const PostAuth = struct {
     password: []const u8,
 };
 
-pub const GetRefreshToken = struct {
-    user_id: i32,
-};
-
 pub const PostNote = struct {
     title: []const u8,
     description: ?[]const u8,
@@ -96,4 +92,8 @@ pub const GetNoteRange = struct {
 
 pub const PostNoteEntry = struct {
     note_id: u32,
+};
+
+pub const RefreshAccessToken = struct {
+    refresh_token: []const u8,
 };

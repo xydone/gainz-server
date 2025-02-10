@@ -3,6 +3,8 @@ const std = @import("std");
 const httpz = @import("httpz");
 const jwt = @import("jwt");
 const pg = @import("pg");
+const rs = @import("response.zig");
+const rq = @import("request.zig");
 
 const types = @import("types.zig");
 const auth = @import("util/auth.zig");
@@ -28,24 +30,26 @@ pub const RequestContext = struct {
 };
 
 pub fn dispatch(self: *Handler, action: httpz.Action(*RequestContext), req: *httpz.Request, res: *httpz.Response) !void {
-    const access_token = req.header("x-access-token");
-    const refresh_token = req.header("x-refresh-token");
+    var access_token = req.header("authorization");
+    const prefix = "Bearer ";
 
     var ctx = RequestContext{ .app = self, .user_id = null, .refresh_token = null };
 
     if (req.route_data) |rd| {
         const route_data: *const RouteData = @ptrCast(@alignCast(rd));
         if (route_data.restricted) {
-            if (access_token == null or access_token.?.len == 0) {
+            if (access_token == null or access_token.?.len == 0 or !std.mem.startsWith(u8, access_token.?, prefix)) {
                 res.status = 401;
                 res.body = "Permission denied!";
                 return;
             }
+            access_token = access_token.?[prefix.len..];
             const decoded = jwt.decode(
                 self.allocator,
                 auth.JWTClaims,
                 access_token.?,
                 .{ .secret = self.env.get("JWT_SECRET").? },
+                //NOTE: there is a leeway by default in the validation struct
                 .{},
             ) catch |err| {
                 log.warn("JWT Error: {s}", .{@errorName(err)});
@@ -56,12 +60,15 @@ pub fn dispatch(self: *Handler, action: httpz.Action(*RequestContext), req: *htt
             ctx.user_id = decoded.claims.user_id;
         }
         if (route_data.refresh) {
-            if (refresh_token == null or refresh_token.?.len == 0) {
-                res.status = 401;
-                res.body = "Permission denied!";
+            const body = req.body() orelse {
+                try rs.handleResponse(res, rs.ResponseError.body_missing, null);
                 return;
-            }
-            ctx.refresh_token = refresh_token;
+            };
+            const json = std.json.parseFromSliceLeaky(rq.RefreshAccessToken, ctx.app.allocator, body, .{}) catch {
+                try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+                return;
+            };
+            ctx.refresh_token = json.refresh_token;
         }
     }
 

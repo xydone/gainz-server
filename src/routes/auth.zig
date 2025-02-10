@@ -41,15 +41,8 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 }
 
 pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
-        return;
-    };
-    const token = std.json.parseFromSliceLeaky(rq.GetRefreshToken, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
-        return;
-    };
-    const result = TokenModel.refresh(ctx, token) catch |err| switch (err) {
+    _ = req; // autofix
+    const result = TokenModel.refresh(ctx) catch |err| switch (err) {
         error.NotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;

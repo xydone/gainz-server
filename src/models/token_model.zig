@@ -9,7 +9,7 @@ const auth = @import("../util/auth.zig");
 
 const log = std.log.scoped(.token_model);
 
-const ACCESS_TOKEN_EXPIRY = 60 * 30;
+const ACCESS_TOKEN_EXPIRY = 15 * 60;
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostAuth) anyerror!rs.CreateToken {
@@ -30,19 +30,17 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostAuth) anyerror!rs.Cr
     const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.timestamp() + ACCESS_TOKEN_EXPIRY };
     const access_token = if (isValidPassword) try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?) else return error.NotFound;
     const refresh_token = try auth.createSessionToken(ctx.app.allocator);
-    _ = try ctx.app.redis_client.setWithExpiry(try std.fmt.allocPrint(ctx.app.allocator, "{}", .{user_id}), refresh_token, REFRESH_TOKEN_EXPIRY);
+    _ = try ctx.app.redis_client.setWithExpiry(refresh_token, try std.fmt.allocPrint(ctx.app.allocator, "{}", .{user_id}), REFRESH_TOKEN_EXPIRY);
     return rs.CreateToken{ .display_name = display_name, .access_token = access_token, .refresh_token = refresh_token, .expires_in = ACCESS_TOKEN_EXPIRY };
 }
 
-pub fn refresh(ctx: *Handler.RequestContext, request: rq.GetRefreshToken) anyerror!rs.RefreshToken {
-    var buf: [1024]u8 = undefined;
-    const key = try std.fmt.bufPrint(&buf, "{}", .{request.user_id});
-    const result = ctx.app.redis_client.get(key) catch |err| switch (err) {
+pub fn refresh(ctx: *Handler.RequestContext) anyerror!rs.RefreshToken {
+    const result = ctx.app.redis_client.get(ctx.refresh_token.?) catch |err| switch (err) {
         error.KeyValuePairNotFound => return error.NotFound,
         else => return error.MiscError,
     };
-    if (!std.mem.eql(u8, result, ctx.refresh_token.?)) return error.NotFound;
-    const claims = auth.JWTClaims{ .user_id = request.user_id, .exp = std.time.timestamp() + ACCESS_TOKEN_EXPIRY };
+    const number = try std.fmt.parseInt(i32, result, 10);
+    const claims = auth.JWTClaims{ .user_id = number, .exp = std.time.timestamp() + ACCESS_TOKEN_EXPIRY };
 
     const access_token = try auth.createJWT(ctx.app.allocator, claims, ctx.app.env.get("JWT_SECRET").?);
 

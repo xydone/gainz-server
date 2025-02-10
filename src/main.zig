@@ -8,6 +8,7 @@ const Handler = @import("handler.zig");
 
 const API = @import("routes/api.zig");
 const Public = @import("routes/public.zig");
+const Cors = @import("middleware/cors.zig");
 
 // UTIL
 const dotenv = @import("util/dotenv.zig");
@@ -33,12 +34,13 @@ pub fn main() !void {
     var redis_client = try redis.RedisClient.init(allocator, "127.0.0.1", 6379);
     defer redis_client.deinit();
 
+    const address = env.get("ADDRESS") orelse "127.0.0.1";
     var handler = Handler{ .allocator = allocator, .db = database, .env = env, .redis_client = &redis_client };
-    var server = try httpz.Server(*Handler).init(allocator, .{ .port = PORT }, &handler);
+    var server = try httpz.Server(*Handler).init(allocator, .{ .port = PORT, .address = address }, &handler);
     defer server.deinit();
     defer server.stop();
 
-    const cors = try server.middleware(httpz.middleware.Cors, .{
+    const cors = try server.middleware(Cors, .{
         .origin = "*",
         //NOTE: review what headers I'm actually allowing
         .headers = "*",
@@ -51,7 +53,7 @@ pub fn main() !void {
     // / endpoinds
     Public.init(router);
 
-    log.info("listening http://localhost:{d}/", .{PORT});
+    log.info("listening http://{s}:{d}/", .{ address, PORT });
 
     try server.listen();
 }

@@ -14,9 +14,9 @@ const log = std.log.scoped(.food);
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
 
-    router.*.get("/api/food/:food_id", getFood, .{});
-    router.*.get("/api/food", searchFood, .{});
-    router.*.get("/api/food/:id/servings", getServings, .{});
+    router.*.get("/api/food/:food_id", getFood, .{ .data = &RouteData });
+    router.*.get("/api/food", searchFood, .{ .data = &RouteData });
+    router.*.get("/api/food/:id/servings", getServings, .{ .data = &RouteData });
     router.*.post("/api/food", postFood, .{ .data = &RouteData });
 }
 
