@@ -7,7 +7,6 @@ const db = @import("db.zig");
 const Handler = @import("handler.zig");
 
 const API = @import("routes/api.zig");
-const Public = @import("routes/public.zig");
 const Cors = @import("middleware/cors.zig");
 
 // UTIL
@@ -49,9 +48,6 @@ pub fn main() !void {
 
     // /api endpoinds
     API.init(router);
-
-    // / endpoinds
-    Public.init(router);
 
     log.info("listening http://{s}:{d}/", .{ address, PORT });
 
