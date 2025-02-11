@@ -54,10 +54,10 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
     };
 }
 
-pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]rs.GetFood {
+pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]rs.SearchFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT f.* FROM food f WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%'", //
+    var result = conn.queryOpts("SELECT f.*, JSON_AGG( CASE WHEN s.created_at IS NULL THEN NULL  ELSE json_build_object( 'id', s.id, 'amount', s.amount, 'unit', s.unit, 'multiplier', s.multiplier ) END ) AS servings FROM food f LEFT JOIN servings s ON f.id = s.food_id WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%' GROUP BY f.id;", //
         .{request.search_term}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -65,10 +65,13 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
         return err;
     };
     defer result.deinit();
-    var response = std.ArrayList(rs.GetFood).init(ctx.app.allocator);
+    var response = std.ArrayList(rs.SearchFood).init(ctx.app.allocator);
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
         const created_at = row.get(i64, 1);
+
+        const food_name = row.getCol([]u8, "food_name");
+        const brand_name = row.getCol([]u8, "brand_name");
         const macronutrients = types.Macronutrients{
             .calories = row.getCol(f64, "calories"),
             .fat = row.getCol(?f64, "fat"),
@@ -91,14 +94,27 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
             .vitamin_d = row.getCol(?f64, "vitamin_d"),
             .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
-        const food_name = row.getCol([]u8, "food_name");
-        const brand_name = row.getCol([]u8, "brand_name");
-        try response.append(rs.GetFood{
+        const servings_unparsed = row.getCol([]u8, "servings");
+        const servings = std.json.parseFromSliceLeaky([]types.Servings, ctx.app.allocator, servings_unparsed, .{}) catch |err| {
+            std.log.debug("{s}", .{servings_unparsed});
+            std.log.debug("{}", .{err});
+            return err;
+        };
+
+        // const servings = std.json.parseFromSliceLeaky(types.Servings, ctx.app.allocator,
+        //     \\{"id":1240,"created_at":1737315796.863155,"amount":100,"unit":"gram","multiplier":1}
+        // , .{}) catch |err| {
+        //     std.log.debug("{s}", .{servings_unparsed});
+        //     std.log.debug("{}", .{err});
+        //     return err;
+        // };
+        try response.append(rs.SearchFood{
             .id = id,
             .created_at = created_at,
             .food_name = try ctx.app.allocator.dupe(u8, food_name),
             .brand_name = try ctx.app.allocator.dupe(u8, brand_name),
             .macronutrients = macronutrients,
+            .servings = servings,
         });
     }
     return try response.toOwnedSlice();

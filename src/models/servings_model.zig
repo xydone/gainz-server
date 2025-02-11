@@ -24,12 +24,11 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetServings) anyerror![]rs.
 
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
-        const created_at = row.get(i64, 1);
         const amount = row.get(f64, 3);
         const unit = row.get([]u8, 4);
         const multiplier = row.get(f64, 5);
 
-        try response.append(rs.GetServing{ .id = id, .created_at = created_at, .amount = amount, .unit = unit, .multiplier = multiplier });
+        try response.append(rs.GetServing{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier });
     }
     return try response.toOwnedSlice();
 }

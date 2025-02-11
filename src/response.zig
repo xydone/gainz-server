@@ -95,13 +95,16 @@ pub const GetFood = struct {
     macronutrients: types.Macronutrients,
 };
 
-pub const GetServing = struct {
+pub const SearchFood = struct {
     id: i32,
     created_at: i64,
-    amount: f64,
-    unit: []u8,
-    multiplier: f64,
+    food_name: ?[]u8,
+    brand_name: ?[]u8,
+    macronutrients: types.Macronutrients,
+    servings: []types.Servings,
 };
+
+pub const GetServing = types.Servings;
 
 pub const GetEntryRange = struct {
     created_at: i64,

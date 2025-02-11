@@ -32,6 +32,13 @@ pub const Macronutrients = struct {
     sugar_alcohols: ?f64 = null,
 };
 
+pub const Servings = struct {
+    id: i32,
+    amount: f64,
+    unit: []u8,
+    multiplier: f64,
+};
+
 pub const MeasurementType = enum { weight, waist, hips, neck };
 
 pub const MealCategory = enum { breakfast, lunch, dinner, misc };
