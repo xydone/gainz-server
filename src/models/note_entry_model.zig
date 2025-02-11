@@ -13,7 +13,7 @@ const log = std.log.scoped(.note_entry_model);
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostNoteEntry) anyerror!rs.PostNoteEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("INSERT into note_entry (created_by, note_id) values ($1,$2) returning id,created_by,note_id", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{ ctx.user_id.?, request.note_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -32,7 +32,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostNoteEntry) anyerror!
 pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerror![]rs.GetNoteEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.query("SELECT * FROM note_entry WHERE created_by=$1 AND note_id=$2 AND created_at >=$3 AND created_at<$4", //
+    var result = conn.query(SQL_STRINGS.getInRange, //
         .{ ctx.user_id.?, request.note_id, request.range_start, request.range_end }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -54,3 +54,8 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerr
 
     return response.toOwnedSlice();
 }
+
+pub const SQL_STRINGS = struct {
+    pub const create = "INSERT into note_entry (created_by, note_id) values ($1,$2) returning id,created_by,note_id";
+    pub const getInRange = "SELECT * FROM note_entry WHERE created_by=$1 AND note_id=$2 AND created_at >=$3 AND created_at<$4";
+};

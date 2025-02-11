@@ -13,7 +13,7 @@ const log = std.log.scoped(.food_model);
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.rowOpts("SELECT * FROM food WHERE id = $1;", //
+    var row = conn.rowOpts(SQL_STRINGS.get, //
         .{request.food_id}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -57,7 +57,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
 pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]rs.SearchFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT f.*, JSON_AGG( CASE WHEN s.created_at IS NULL THEN NULL  ELSE json_build_object( 'id', s.id, 'amount', s.amount, 'unit', s.unit, 'multiplier', s.multiplier ) END ) AS servings FROM food f LEFT JOIN servings s ON f.id = s.food_id WHERE f.food_name ILIKE '%' || $1 || '%' OR f.brand_name ILIKE '%' || $1 || '%' GROUP BY f.id;", //
+    var result = conn.queryOpts(SQL_STRINGS.search, //
         .{request.search_term}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -96,18 +96,9 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
         };
         const servings_unparsed = row.getCol([]u8, "servings");
         const servings = std.json.parseFromSliceLeaky([]types.Servings, ctx.app.allocator, servings_unparsed, .{}) catch |err| {
-            std.log.debug("{s}", .{servings_unparsed});
-            std.log.debug("{}", .{err});
+            log.err("Error parsing servings JSON within search query. Error: {}", .{err});
             return err;
         };
-
-        // const servings = std.json.parseFromSliceLeaky(types.Servings, ctx.app.allocator,
-        //     \\{"id":1240,"created_at":1737315796.863155,"amount":100,"unit":"gram","multiplier":1}
-        // , .{}) catch |err| {
-        //     std.log.debug("{s}", .{servings_unparsed});
-        //     std.log.debug("{}", .{err});
-        //     return err;
-        // };
         try response.append(rs.SearchFood{
             .id = id,
             .created_at = created_at,
@@ -122,7 +113,7 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!rs.PostFood {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into food (created_by, brand_name, food_name, food_grams, calories, fat,sat_fat,polyunsat_fat,monounsat_fat,trans_fat,cholesterol,sodium,potassium,carbs,fiber,sugar,protein,vitamin_a,vitamin_c,calcium,iron ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) returning id,brand_name,food_name", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{ ctx.user_id.?, request.brand_name, request.food_name, request.macronutrients.calories, request.food_grams, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -140,3 +131,88 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!rs.Po
 
     return rs.PostFood{ .id = id, .food_name = food_name, .brand_name = brand_name };
 }
+
+const SQL_STRINGS = struct {
+    pub const get = "SELECT * FROM food WHERE id = $1;";
+    pub const search = 
+        \\SELECT
+        \\  f.*,
+        \\  JSON_AGG(
+        \\    CASE
+        \\      WHEN s.created_at IS NULL THEN NULL
+        \\      ELSE json_build_object(
+        \\        'id',
+        \\        s.id,
+        \\        'amount',
+        \\        s.amount,
+        \\        'unit',
+        \\        s.unit,
+        \\        'multiplier',
+        \\        s.multiplier
+        \\      )
+        \\    END
+        \\  ) AS servings
+        \\FROM
+        \\  food f
+        \\  LEFT JOIN servings s ON f.id = s.food_id
+        \\WHERE
+        \\  f.food_name ILIKE '%' || $1 || '%'
+        \\  OR f.brand_name ILIKE '%' || $1 || '%'
+        \\GROUP BY
+        \\  f.id
+    ;
+    pub const create = 
+        \\insert into
+        \\  food (
+        \\    created_by,
+        \\    brand_name,
+        \\    food_name,
+        \\    food_grams,
+        \\    calories,
+        \\    fat,
+        \\    sat_fat,
+        \\    polyunsat_fat,
+        \\    monounsat_fat,
+        \\    trans_fat,
+        \\    cholesterol,
+        \\    sodium,
+        \\    potassium,
+        \\    carbs,
+        \\    fiber,
+        \\    sugar,
+        \\    protein,
+        \\    vitamin_a,
+        \\    vitamin_c,
+        \\    calcium,
+        \\    iron
+        \\  )
+        \\values
+        \\  (
+        \\    $1,
+        \\    $2,
+        \\    $3,
+        \\    $4,
+        \\    $5,
+        \\    $6,
+        \\    $7,
+        \\    $8,
+        \\    $9,
+        \\    $10,
+        \\    $11,
+        \\    $12,
+        \\    $13,
+        \\    $14,
+        \\    $15,
+        \\    $16,
+        \\    $17,
+        \\    $18,
+        \\    $19,
+        \\    $20,
+        \\    $21
+        \\  )
+        \\returning
+        \\  id,
+        \\  brand_name,
+        \\  food_name
+    ;
+};

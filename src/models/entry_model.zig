@@ -12,7 +12,7 @@ const log = std.log.scoped(.entry_model);
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("SELECT * FROM entry WHERE user_id = $1 and id = $2;", //
+    var row = conn.row(SQL_STRINGS.get, //
         .{ ctx.user_id, request.entry }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -34,8 +34,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEn
 pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyerror![]rs.GetEntryRange {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT e.id AS id, e.created_at AS created_at, f.brand_name as brand_name, f.food_name as food_name,e.category AS category, (e.amount * s.multiplier * f.calories / f.food_grams) AS calories, (e.amount * s.multiplier * f.fat / f.food_grams) AS fat, (e.amount * s.multiplier * f.sat_fat / f.food_grams) AS sat_fat, (e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS polyunsat_fat, (e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS monounsat_fat, (e.amount * s.multiplier * f.trans_fat / f.food_grams) AS trans_fat, (e.amount * s.multiplier * f.cholesterol / f.food_grams) AS cholesterol, (e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, (e.amount * s.multiplier * f.potassium / f.food_grams) AS potassium, (e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, (e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, (e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, (e.amount * s.multiplier * f.protein / f.food_grams) AS protein, (e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS vitamin_a, (e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS vitamin_c, (e.amount * s.multiplier * f.calcium / f.food_grams) AS calcium, (e.amount * s.multiplier * f.iron / f.food_grams) AS iron, (e.amount * s.multiplier * f.added_sugars / f.food_grams) AS added_sugars, (e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS vitamin_d, (e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $1 AND e.created_at >= $2 AND e.created_at < $3 ORDER BY e.created_at DESC, e.category;", //
-        .{ ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+    var result = conn.queryOpts(SQL_STRINGS.getInRange, .{ ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -81,7 +80,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
 pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerror![]rs.GetEntryStats {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT DATE_TRUNC($1, e.created_at) AS group_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams ) AS calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams ) AS sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams ) AS polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams ) AS monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams ) AS trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams ) AS cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams ) AS potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams ) AS protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams ) AS vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams ) AS vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams ) AS calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams ) AS added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams ) AS vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams ) AS sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $2 AND e.created_at >= $3 AND e.created_at <= $4 GROUP BY group_date ORDER BY group_date DESC;", //
+    var result = conn.queryOpts(SQL_STRINGS.getStats, //
         .{ @tagName(request.group_type), ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -123,7 +122,7 @@ pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerro
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.PostEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{ request.meal_category, request.food_id, ctx.user_id.?, request.amount, request.serving_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -139,3 +138,137 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.P
 
     return rs.PostEntry{ .id = id, .user_id = u_id, .food_id = f_id, .category = category };
 }
+
+const SQL_STRINGS = struct {
+    pub const get = "SELECT * FROM entry WHERE user_id = $1 and id = $2;";
+    pub const create = "insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;";
+    pub const getInRange =
+        \\SELECT e.id AS id,
+        \\  e.created_at AS created_at,
+        \\  f.brand_name as brand_name,
+        \\  f.food_name as food_name,
+        \\  e.category AS category,
+        \\  (
+        \\    e.amount * s.multiplier * f.calories / f.food_grams
+        \\  ) AS calories,
+        \\  (e.amount * s.multiplier * f.fat / f.food_grams) AS fat,
+        \\  (
+        \\    e.amount * s.multiplier * f.sat_fat / f.food_grams
+        \\  ) AS sat_fat,
+        \\  (
+        \\    e.amount * s.multiplier * f.polyunsat_fat / f.food_grams
+        \\  ) AS polyunsat_fat,
+        \\  (
+        \\    e.amount * s.multiplier * f.monounsat_fat / f.food_grams
+        \\  ) AS monounsat_fat,
+        \\  (
+        \\    e.amount * s.multiplier * f.trans_fat / f.food_grams
+        \\  ) AS trans_fat,
+        \\  (
+        \\    e.amount * s.multiplier * f.cholesterol / f.food_grams
+        \\  ) AS cholesterol,
+        \\  (
+        \\    e.amount * s.multiplier * f.sodium / f.food_grams
+        \\  ) AS sodium,
+        \\  (
+        \\    e.amount * s.multiplier * f.potassium / f.food_grams
+        \\  ) AS potassium,
+        \\  (e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs,
+        \\  (e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber,
+        \\  (e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar,
+        \\  (
+        \\    e.amount * s.multiplier * f.protein / f.food_grams
+        \\  ) AS protein,
+        \\  (
+        \\    e.amount * s.multiplier * f.vitamin_a / f.food_grams
+        \\  ) AS vitamin_a,
+        \\  (
+        \\    e.amount * s.multiplier * f.vitamin_c / f.food_grams
+        \\  ) AS vitamin_c,
+        \\  (
+        \\    e.amount * s.multiplier * f.calcium / f.food_grams
+        \\  ) AS calcium,
+        \\  (e.amount * s.multiplier * f.iron / f.food_grams) AS iron,
+        \\  (
+        \\    e.amount * s.multiplier * f.added_sugars / f.food_grams
+        \\  ) AS added_sugars,
+        \\  (
+        \\    e.amount * s.multiplier * f.vitamin_d / f.food_grams
+        \\  ) AS vitamin_d,
+        \\  (
+        \\    e.amount * s.multiplier * f.sugar_alcohols / f.food_grams
+        \\  ) AS sugar_alcohols
+        \\FROM entry e
+        \\  JOIN servings s ON e.serving_id = s.id
+        \\  JOIN food f ON e.food_id = f.id
+        \\WHERE e.user_id = $1
+        \\  AND DATE (e.created_at) >= $2
+        \\  AND DATE (e.created_at) <= $3
+        \\ORDER BY e.created_at DESC,
+        \\  e.category;
+    ;
+    pub const getStats =
+        \\SELECT
+        \\  DATE_TRUNC($1, e.created_at) AS group_date,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.calories / f.food_grams
+        \\  ) AS calories,
+        \\  SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS fat,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.sat_fat / f.food_grams
+        \\  ) AS sat_fat,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.polyunsat_fat / f.food_grams
+        \\  ) AS polyunsat_fat,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.monounsat_fat / f.food_grams
+        \\  ) AS monounsat_fat,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.trans_fat / f.food_grams
+        \\  ) AS trans_fat,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.cholesterol / f.food_grams
+        \\  ) AS cholesterol,
+        \\  SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS sodium,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.potassium / f.food_grams
+        \\  ) AS potassium,
+        \\  SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS carbs,
+        \\  SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS fiber,
+        \\  SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS sugar,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.protein / f.food_grams
+        \\  ) AS protein,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.vitamin_a / f.food_grams
+        \\  ) AS vitamin_a,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.vitamin_c / f.food_grams
+        \\  ) AS vitamin_c,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.calcium / f.food_grams
+        \\  ) AS calcium,
+        \\  SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS iron,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.added_sugars / f.food_grams
+        \\  ) AS added_sugars,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.vitamin_d / f.food_grams
+        \\  ) AS vitamin_d,
+        \\  SUM(
+        \\    e.amount * s.multiplier * f.sugar_alcohols / f.food_grams
+        \\  ) AS sugar_alcohols
+        \\FROM
+        \\  entry e
+        \\  JOIN servings s ON e.serving_id = s.id
+        \\  JOIN food f ON e.food_id = f.id
+        \\WHERE
+        \\  e.user_id = $2
+        \\  AND e.created_at >= $3
+        \\  AND e.created_at <= $4
+        \\GROUP BY
+        \\  group_date
+        \\ORDER BY
+        \\  group_date DESC;
+    ;
+};

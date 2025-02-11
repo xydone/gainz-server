@@ -13,7 +13,7 @@ const log = std.log.scoped(.measurements_model);
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostMeasurement) anyerror!rs.PostMeasurement {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{ ctx.user_id, request.type, request.value }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -32,7 +32,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostMeasurement) anyerro
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetMeasurement) anyerror!rs.GetMeasurement {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("SELECT * FROM measurements WHERE user_id = $1 AND id = $2", //
+    var row = conn.row(SQL_STRINGS.get, //
         .{ ctx.user_id.?, request.measurement_id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -51,7 +51,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetMeasurement) anyerror!rs
 pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetMeasurementRange) anyerror![]rs.GetMeasurement {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.query("SELECT * FROM measurements WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 AND type = $4", //
+    var result = conn.query(SQL_STRINGS.getInRange, //
         .{ ctx.user_id.?, request.range_start, request.range_end, request.measurement_type }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -70,3 +70,9 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetMeasurementRange)
     }
     return try response.toOwnedSlice();
 }
+
+pub const SQL_STRINGS = struct {
+    pub const create = "insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;";
+    pub const get = "SELECT * FROM measurements WHERE user_id = $1 AND id = $2";
+    pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 AND type = $4";
+};

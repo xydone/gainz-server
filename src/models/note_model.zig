@@ -13,7 +13,7 @@ const log = std.log.scoped(.note_model);
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostNote) anyerror!rs.PostNote {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("INSERT into notes (created_by, title, description) values ($1,$2,$3) returning id,title,description", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{ ctx.user_id.?, request.title, request.description }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -32,7 +32,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostNote) anyerror!rs.Po
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetNote) anyerror!rs.GetNote {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("SELECT * FROM notes WHERE created_by=$1 AND id=$2", //
+    var row = conn.row(SQL_STRINGS.get, //
         .{ ctx.user_id.?, request.id }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -47,3 +47,8 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetNote) anyerror!rs.GetNot
 
     return rs.GetNote{ .id = id, .title = title, .description = description };
 }
+
+pub const SQL_STRINGS = struct {
+    pub const create = "INSERT into notes (created_by, title, description) values ($1,$2,$3) returning id,title,description";
+    pub const get = "SELECT * FROM notes WHERE created_by=$1 AND id=$2";
+};

@@ -12,7 +12,7 @@ const log = std.log.scoped(.servings_model);
 pub fn get(ctx: *Handler.RequestContext, request: rq.GetServings) anyerror![]rs.GetServing {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.queryOpts("SELECT * from servings WHERE food_id=$1", //
+    var result = conn.queryOpts(SQL_STRINGS.get, //
         .{request.food_id}, .{ .column_names = true }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -32,3 +32,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetServings) anyerror![]rs.
     }
     return try response.toOwnedSlice();
 }
+
+pub const SQL_STRINGS = struct {
+    pub const get = "SELECT * from servings WHERE food_id=$1";
+};

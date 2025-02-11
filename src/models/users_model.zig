@@ -13,7 +13,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostUser) anyerror!rs.Po
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     const hashed_password = try auth.hashPassword(ctx.app.allocator, request.password);
-    var row = conn.row("insert into users (display_name, username, password) values ($1,$2,$3) returning id,display_name", .{ request.display_name, request.username, hashed_password }) catch |err| {
+    var row = conn.row(SQL_STRINGS.create, .{ request.display_name, request.username, hashed_password }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -28,3 +28,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostUser) anyerror!rs.Po
 
     return rs.PostUser{ .id = id, .display_name = dupe };
 }
+
+pub const SQL_STRINGS = struct {
+    pub const create = "insert into users (display_name, username, password) values ($1,$2,$3) returning id,display_name";
+};

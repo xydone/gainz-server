@@ -15,7 +15,7 @@ const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostAuth) anyerror!rs.CreateToken {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row("SELECT id, password,display_name FROM users WHERE username=$1;", //
+    var row = conn.row(SQL_STRINGS.create, //
         .{request.username}) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
@@ -46,3 +46,7 @@ pub fn refresh(ctx: *Handler.RequestContext) anyerror!rs.RefreshToken {
 
     return rs.RefreshToken{ .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = ctx.refresh_token.? };
 }
+
+pub const SQL_STRINGS = struct {
+    pub const create = "SELECT id, password,display_name FROM users WHERE username=$1;";
+};
