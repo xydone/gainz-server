@@ -114,10 +114,7 @@ pub const GetEntryRange = struct {
     macronutrients: types.Macronutrients,
 };
 
-pub const GetEntryStats = struct {
-    group_date: i64,
-    macronutrients: types.Macronutrients,
-};
+pub const GetEntryStats = types.Macronutrients;
 
 pub const CreateToken = struct {
     display_name: []const u8,

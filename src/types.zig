@@ -42,13 +42,3 @@ pub const Servings = struct {
 pub const MeasurementType = enum { weight, waist, hips, neck };
 
 pub const MealCategory = enum { breakfast, lunch, dinner, misc };
-
-/// https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
-pub const DatePart = enum {
-    year,
-    quarter,
-    month,
-    week,
-    day,
-    hour,
-};

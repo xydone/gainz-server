@@ -36,15 +36,6 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
 fn getEntryStats(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
 
-    // parsing the parameter and then turning the string request to an enum (probably slow?)
-    const group_type = std.meta.stringToEnum(types.DatePart, query.get("group") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?group= from request parameters!");
-        return;
-    }) orelse {
-        //handle invalid enum type
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Invalid group type!");
-        return;
-    };
     const start = query.get("start") orelse {
         try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
@@ -54,7 +45,7 @@ fn getEntryStats(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         return;
     };
 
-    const request: rq.GetEntryStats = .{ .group_type = group_type, .range_start = start, .range_end = end };
+    const request: rq.GetEntryStats = .{ .range_start = start, .range_end = end };
     const result = EntryModel.getStats(ctx, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;

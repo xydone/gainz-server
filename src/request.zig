@@ -49,7 +49,6 @@ pub const GetEntryRange = struct {
 };
 
 pub const GetEntryStats = struct {
-    group_type: types.DatePart,
     /// datetime string (ex: 2024-01-01)
     range_start: []const u8,
     /// datetime string (ex: 2024-01-01)
