@@ -88,8 +88,10 @@ pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerro
         return err;
     } orelse return error.NotFound;
     defer row.deinit() catch {};
+    // whenever the range is invalid, it returns one row of nulls, this is a check and a fix for that
+    const calories = row.getCol(?f64, "calories") orelse return error.NotFound;
     const macronutrients = types.Macronutrients{
-        .calories = row.getCol(f64, "calories"),
+        .calories = calories,
         .fat = row.getCol(?f64, "fat"),
         .sat_fat = row.getCol(?f64, "sat_fat"),
         .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
