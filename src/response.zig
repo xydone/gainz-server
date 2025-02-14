@@ -51,12 +51,6 @@ pub const PostUser = struct {
     display_name: []u8,
 };
 
-pub const PostFood = struct {
-    id: i32,
-    brand_name: ?[]u8,
-    food_name: ?[]u8,
-};
-
 pub const PostEntry = struct {
     id: i32,
     user_id: i32,
@@ -103,6 +97,8 @@ pub const SearchFood = struct {
     macronutrients: types.Macronutrients,
     servings: []types.Servings,
 };
+
+pub const PostServing = types.Servings;
 
 pub const GetServing = types.Servings;
 

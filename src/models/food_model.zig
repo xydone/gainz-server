@@ -110,31 +110,23 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
     }
     return try response.toOwnedSlice();
 }
-pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!rs.PostFood {
+
+pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!void {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var row = conn.row(SQL_STRINGS.create, //
-        .{ ctx.user_id.?, request.brand_name, request.food_name, request.macronutrients.calories, request.food_grams, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    };
-    //NOTE: you must deinitialize rows or else query time balloons 10x
-    defer row.?.deinit() catch {};
-    const id = row.?.get(i32, 0);
-    const b_n = row.?.get(?[]u8, 1);
-    const f_n = row.?.get(?[]u8, 2);
-
-    const brand_name = if (b_n == null) null else try ctx.app.allocator.dupe(u8, b_n.?);
-    const food_name = if (f_n == null) null else try ctx.app.allocator.dupe(u8, f_n.?);
-
-    return rs.PostFood{ .id = id, .food_name = food_name, .brand_name = brand_name };
+    try conn.begin();
+    errdefer {
+        conn.rollback() catch unreachable;
+    }
+    _ = try conn.exec(SQL_STRINGS.create, //
+        .{ ctx.user_id.?, request.brand_name, request.food_name, request.food_grams, request.macronutrients.calories, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron } //
+    );
+    try conn.commit();
 }
 
 const SQL_STRINGS = struct {
     pub const get = "SELECT * FROM food WHERE id = $1;";
-    pub const search = 
+    pub const search =
         \\SELECT
         \\  f.*,
         \\  JSON_AGG(
@@ -161,8 +153,9 @@ const SQL_STRINGS = struct {
         \\GROUP BY
         \\  f.id
     ;
-    pub const create = 
-        \\insert into
+    pub const create =
+        \\WITH inserted_food AS (
+        \\ insert into
         \\  food (
         \\    created_by,
         \\    brand_name,
@@ -187,32 +180,11 @@ const SQL_STRINGS = struct {
         \\    iron
         \\  )
         \\values
-        \\  (
-        \\    $1,
-        \\    $2,
-        \\    $3,
-        \\    $4,
-        \\    $5,
-        \\    $6,
-        \\    $7,
-        \\    $8,
-        \\    $9,
-        \\    $10,
-        \\    $11,
-        \\    $12,
-        \\    $13,
-        \\    $14,
-        \\    $15,
-        \\    $16,
-        \\    $17,
-        \\    $18,
-        \\    $19,
-        \\    $20,
-        \\    $21
-        \\  )
-        \\returning
-        \\  id,
-        \\  brand_name,
-        \\  food_name
+        \\($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        \\returning id, brand_name, food_name, created_by
+        \\)
+        \\INSERT INTO servings (created_by, food_id, amount, unit, multiplier) 
+        \\SELECT created_by, id, $4, 'grams', 1 FROM inserted_food
+        \\RETURNING id, amount, unit, multiplier;
     ;
 };
