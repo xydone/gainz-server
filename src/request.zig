@@ -103,3 +103,30 @@ pub const PostNoteEntry = struct {
 pub const RefreshAccessToken = struct {
     refresh_token: []const u8,
 };
+
+pub const PostExercise = struct {
+    name: []u8,
+    description: ?[]u8 = null,
+    base_amount: f64,
+    base_unit: []u8,
+    category_id: u32,
+};
+
+pub const PostCategory = struct {
+    name: []u8,
+    description: ?[]u8 = null,
+};
+
+pub const PostUnit = struct {
+    amount: f64,
+    unit: []u8,
+    multiplier: f64,
+    exercise_id: u32,
+};
+
+pub const PostExerciseEntry = struct {
+    exercise_id: u32,
+    unit_id: u32,
+    value: f32,
+    notes: ?[]u8 = null,
+};

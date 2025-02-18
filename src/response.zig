@@ -149,3 +149,15 @@ pub const GetNoteEntry = struct {
     note_id: i32,
     created_at: i64,
 };
+
+pub const GetCategories = struct {
+    id: i32,
+    name: []u8,
+    description: ?[]u8 = null,
+};
+
+pub const GetExercises = struct {
+    id: i32,
+    name: []u8,
+    description: ?[]u8 = null,
+};

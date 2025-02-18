@@ -10,6 +10,7 @@ const Entry = @import("entry.zig");
 const Food = @import("food.zig");
 const User = @import("user.zig");
 const Note = @import("note.zig");
+const Exercise = @import("exercise.zig");
 
 const log = std.log.scoped(.api);
 
@@ -22,4 +23,6 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     Auth.init(router);
     // /api/note
     Note.init(router);
+    // /api/exercise
+    Exercise.init(router);
 }
