@@ -74,5 +74,5 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetMeasurementRange)
 pub const SQL_STRINGS = struct {
     pub const create = "insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;";
     pub const get = "SELECT * FROM measurements WHERE user_id = $1 AND id = $2";
-    pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND created_at >= $2 AND created_at < $3 AND type = $4";
+    pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
 };
