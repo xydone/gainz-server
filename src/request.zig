@@ -130,3 +130,8 @@ pub const PostExerciseEntry = struct {
     value: f32,
     notes: ?[]u8 = null,
 };
+
+pub const PostGoal = struct {
+    nutrient: types.Nutrients,
+    value: f32,
+};

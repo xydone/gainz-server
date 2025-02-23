@@ -8,6 +8,29 @@ pub const App = struct {
     allocator: std.mem.Allocator,
 };
 
+pub const Nutrients = enum {
+    calories,
+    fat,
+    sat_fat,
+    polyunsat_fat,
+    monounsat_fat,
+    trans_fat,
+    cholesterol,
+    sodium,
+    potassium,
+    carbs,
+    fiber,
+    sugar,
+    protein,
+    vitamin_a,
+    vitamin_c,
+    calcium,
+    iron,
+    added_sugars,
+    vitamin_d,
+    sugar_alcohols,
+};
+
 pub const Macronutrients = struct {
     calories: f64,
     //the reason why we set the following ones to default as null is because std.json.parseFromSliceLeaky(...) will just be unable to parse fields with either missing, which are not defaulted

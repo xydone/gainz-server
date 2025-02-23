@@ -9,6 +9,7 @@ const rs = @import("../response.zig");
 const types = @import("../types.zig");
 const Measurement = @import("./measurement.zig");
 const NoteEntries = @import("note_entries.zig");
+const Goals = @import("goals.zig");
 const Entry = @import("entry.zig");
 
 const log = std.log.scoped(.users);
@@ -23,6 +24,8 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     Measurement.init(router);
     // /api/user/notes
     NoteEntries.init(router);
+    // /api/user/goals
+    Goals.init(router);
 }
 
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
