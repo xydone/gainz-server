@@ -24,7 +24,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
 
     const id = row.get(i32, 0);
     const created_at = row.get(i64, 1);
-    const macronutrients = types.Macronutrients{
+    const nutrients = types.Nutrients{
         .calories = row.getCol(f64, "calories"),
         .fat = row.getCol(f64, "fat"),
         .sat_fat = row.getCol(f64, "sat_fat"),
@@ -50,7 +50,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
         .created_at = created_at,
         .food_name = food_name,
         .brand_name = brand_name,
-        .macronutrients = macronutrients,
+        .nutrients = nutrients,
     };
 }
 
@@ -72,7 +72,7 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
 
         const food_name = row.getCol([]u8, "food_name");
         const brand_name = row.getCol([]u8, "brand_name");
-        const macronutrients = types.Macronutrients{
+        const nutrients = types.Nutrients{
             .calories = row.getCol(f64, "calories"),
             .fat = row.getCol(?f64, "fat"),
             .sat_fat = row.getCol(?f64, "sat_fat"),
@@ -104,7 +104,7 @@ pub fn search(ctx: *Handler.RequestContext, request: rq.SearchFood) anyerror![]r
             .created_at = created_at,
             .food_name = try ctx.app.allocator.dupe(u8, food_name),
             .brand_name = try ctx.app.allocator.dupe(u8, brand_name),
-            .macronutrients = macronutrients,
+            .nutrients = nutrients,
             .servings = servings,
         });
     }
@@ -119,7 +119,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!void 
         conn.rollback() catch unreachable;
     }
     _ = try conn.exec(SQL_STRINGS.create, //
-        .{ ctx.user_id.?, request.brand_name, request.food_name, request.food_grams, request.macronutrients.calories, request.macronutrients.fat, request.macronutrients.sat_fat, request.macronutrients.polyunsat_fat, request.macronutrients.monounsat_fat, request.macronutrients.trans_fat, request.macronutrients.cholesterol, request.macronutrients.sodium, request.macronutrients.potassium, request.macronutrients.carbs, request.macronutrients.fiber, request.macronutrients.sugar, request.macronutrients.protein, request.macronutrients.vitamin_a, request.macronutrients.vitamin_c, request.macronutrients.calcium, request.macronutrients.iron } //
+        .{ ctx.user_id.?, request.brand_name, request.food_name, request.food_grams, request.nutrients.calories, request.nutrients.fat, request.nutrients.sat_fat, request.nutrients.polyunsat_fat, request.nutrients.monounsat_fat, request.nutrients.trans_fat, request.nutrients.cholesterol, request.nutrients.sodium, request.nutrients.potassium, request.nutrients.carbs, request.nutrients.fiber, request.nutrients.sugar, request.nutrients.protein, request.nutrients.vitamin_a, request.nutrients.vitamin_c, request.nutrients.calcium, request.nutrients.iron } //
     );
     try conn.commit();
 }

@@ -8,7 +8,7 @@ pub const App = struct {
     allocator: std.mem.Allocator,
 };
 
-pub const Nutrients = enum {
+pub const NutrientsNames = enum {
     calories,
     fat,
     sat_fat,
@@ -31,7 +31,7 @@ pub const Nutrients = enum {
     sugar_alcohols,
 };
 
-pub const Macronutrients = struct {
+pub const Nutrients = struct {
     calories: f64,
     //the reason why we set the following ones to default as null is because std.json.parseFromSliceLeaky(...) will just be unable to parse fields with either missing, which are not defaulted
     fat: ?f64 = null,

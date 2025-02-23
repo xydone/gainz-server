@@ -28,7 +28,7 @@ pub const PostFood = struct {
     brand_name: ?[]u8,
     food_name: ?[]u8,
     food_grams: f64,
-    macronutrients: types.Macronutrients,
+    nutrients: types.Nutrients,
 };
 
 pub const PostUser = struct {
@@ -132,6 +132,6 @@ pub const PostExerciseEntry = struct {
 };
 
 pub const PostGoal = struct {
-    nutrient: types.Nutrients,
+    nutrient: types.NutrientsNames,
     value: f32,
 };

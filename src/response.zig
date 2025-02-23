@@ -86,7 +86,7 @@ pub const GetFood = struct {
     created_at: i64,
     food_name: ?[]u8,
     brand_name: ?[]u8,
-    macronutrients: types.Macronutrients,
+    nutrients: types.Nutrients,
 };
 
 pub const SearchFood = struct {
@@ -94,7 +94,7 @@ pub const SearchFood = struct {
     created_at: i64,
     food_name: ?[]u8,
     brand_name: ?[]u8,
-    macronutrients: types.Macronutrients,
+    nutrients: types.Nutrients,
     servings: []types.Servings,
 };
 
@@ -107,10 +107,10 @@ pub const GetEntryRange = struct {
     category: types.MealCategory,
     food_name: ?[]u8,
     brand_name: ?[]u8,
-    macronutrients: types.Macronutrients,
+    nutrients: types.Nutrients,
 };
 
-pub const GetEntryStats = types.Macronutrients;
+pub const GetEntryStats = types.Nutrients;
 
 pub const CreateToken = struct {
     display_name: []const u8,

@@ -50,7 +50,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
         const brand_name = row.getCol([]u8, "brand_name");
         const food_name_duped = if (food_name.len != 0) try ctx.app.allocator.dupe(u8, food_name) else null;
         const brand_name_duped = if (brand_name.len != 0) try ctx.app.allocator.dupe(u8, brand_name) else null;
-        const macronutrients = types.Macronutrients{
+        const nutrients = types.Nutrients{
             .calories = row.getCol(f64, "calories"),
             .fat = row.getCol(?f64, "fat"),
             .sat_fat = row.getCol(?f64, "sat_fat"),
@@ -72,7 +72,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
             .vitamin_d = row.getCol(?f64, "vitamin_d"),
             .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
-        try response.append(rs.GetEntryRange{ .food_name = food_name_duped, .brand_name = brand_name_duped, .category = category, .created_at = created_at, .macronutrients = macronutrients });
+        try response.append(rs.GetEntryRange{ .food_name = food_name_duped, .brand_name = brand_name_duped, .category = category, .created_at = created_at, .nutrients = nutrients });
     }
     return try response.toOwnedSlice();
 }
@@ -90,7 +90,7 @@ pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerro
     defer row.deinit() catch {};
     // whenever the range is invalid, it returns one row of nulls, this is a check and a fix for that
     const calories = row.getCol(?f64, "calories") orelse return error.NotFound;
-    const macronutrients = types.Macronutrients{
+    const nutrients = types.Nutrients{
         .calories = calories,
         .fat = row.getCol(?f64, "fat"),
         .sat_fat = row.getCol(?f64, "sat_fat"),
@@ -112,7 +112,7 @@ pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerro
         .vitamin_d = row.getCol(?f64, "vitamin_d"),
         .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
     };
-    return macronutrients;
+    return nutrients;
 }
 
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.PostEntry {
