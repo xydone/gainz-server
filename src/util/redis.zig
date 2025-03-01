@@ -17,12 +17,16 @@ pub const RedisClient = struct {
         self.connection.close();
     }
 
+    fn trimResponse(response: []u8) []u8 {
+        return response[0 .. response.len - 2];
+    }
+
     pub fn sendCommand(self: *RedisClient, command: []const u8) ![]u8 {
         try self.connection.writer().writeAll(command);
         var buf: [1024]u8 = undefined;
         const readBytes = try self.connection.reader().read(&buf);
 
-        return self.allocator.dupe(u8, buf[0..readBytes]);
+        return trimResponse(try self.allocator.dupe(u8, buf[0..readBytes]));
     }
 
     pub fn set(self: *RedisClient, key: []const u8, value: []const u8) ![]u8 {
@@ -46,5 +50,10 @@ pub const RedisClient = struct {
         const length = it.next().?;
         if (std.mem.eql(u8, length, "$-1")) return error.KeyValuePairNotFound;
         return it.next().?;
+    }
+    pub fn delete(self: *RedisClient, key: []const u8) ![]u8 {
+        var buf: [1024]u8 = undefined;
+        const command = try std.fmt.bufPrint(&buf, "*2\r\n$3\r\nDEL\r\n${d}\r\n{s}\r\n", .{ key.len, key });
+        return try self.sendCommand(command);
     }
 };

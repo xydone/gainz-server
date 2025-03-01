@@ -7,7 +7,7 @@ const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const auth = @import("../util/auth.zig");
 
-const log = std.log.scoped(.token_model);
+const log = std.log.scoped(.auth_model);
 
 const ACCESS_TOKEN_EXPIRY = 15 * 60;
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
@@ -50,3 +50,8 @@ pub fn refresh(ctx: *Handler.RequestContext) anyerror!rs.RefreshToken {
 pub const SQL_STRINGS = struct {
     pub const create = "SELECT id, password,display_name FROM users WHERE username=$1;";
 };
+
+pub fn invalidate(ctx: *Handler.RequestContext) anyerror!bool {
+    const response = try ctx.app.redis_client.delete(ctx.refresh_token.?);
+    return if (std.mem.eql(u8, response, ":0")) false else true;
+}
