@@ -31,6 +31,35 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEn
     return rs.GetEntry{ .created_at = created_at, .id = id, .user_id = user_id, .food_id = food_id, .category = meal_category, .amount = amount, .serving = serving };
 }
 
+pub fn getRecent(ctx: *Handler.RequestContext, request: rq.GetEntryRecent) anyerror![]rs.GetEntryRecent {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var result = conn.queryOpts(SQL_STRINGS.getRecent, .{ ctx.user_id, request.limit }, .{ .column_names = true, .allocator = ctx.app.allocator }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+
+    defer result.deinit();
+    var response = std.ArrayList(rs.GetEntryRecent).init(ctx.app.allocator);
+    while (try result.next()) |row| {
+        const id = row.getCol(i32, "id");
+        const created_at = row.getCol(i64, "created_at");
+        const food_name = try ctx.app.allocator.dupe(u8, row.getCol([]u8, "food_name"));
+        const brand_name = try ctx.app.allocator.dupe(u8, row.getCol([]u8, "brand_name"));
+        const nutrients = try row.to(types.Nutrients, .{ .map = .name });
+        try response.append(.{
+            .nutrients = nutrients,
+            .created_at = created_at,
+            .brand_name = if (brand_name.len != 0) brand_name else null,
+            .food_name = if (food_name.len != 0) food_name else null,
+            .id = id,
+        });
+    }
+    return response.toOwnedSlice();
+}
+
 pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyerror![]rs.GetEntryRange {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
@@ -137,6 +166,19 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.P
 
 const SQL_STRINGS = struct {
     pub const get = "SELECT * FROM entry WHERE user_id = $1 and id = $2;";
+    pub const getRecent =
+        \\ SELECT 
+        \\ f.*
+        \\ FROM
+        \\ entry AS e
+        \\ JOIN food AS f on e.food_id = f.id
+        \\ WHERE
+        \\ user_id = $1
+        \\ ORDER BY
+        \\ e.created_at DESC
+        \\ LIMIT
+        \\ $2;
+    ;
     pub const create = "insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;";
     pub const getInRange =
         \\SELECT e.id AS id,

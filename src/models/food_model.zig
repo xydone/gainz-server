@@ -24,6 +24,8 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
 
     const id = row.get(i32, 0);
     const created_at = row.get(i64, 1);
+    const food_name = row.getCol([]u8, "food_name");
+    const brand_name = row.getCol([]u8, "brand_name");
     const nutrients = types.Nutrients{
         .calories = row.getCol(f64, "calories"),
         .fat = row.getCol(f64, "fat"),
@@ -43,14 +45,18 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetFood) anyerror!rs.GetFoo
         .calcium = row.getCol(f64, "calcium"),
         .iron = row.getCol(f64, "iron"),
     };
-    const food_name = row.getCol([]u8, "food_name");
-    const brand_name = row.getCol([]u8, "brand_name");
+    const servings_unparsed = row.getCol([]u8, "servings");
+    const servings = std.json.parseFromSliceLeaky([]types.Servings, ctx.app.allocator, servings_unparsed, .{}) catch |err| {
+        log.err("Error parsing servings JSON within search query. Error: {}", .{err});
+        return err;
+    };
     return rs.GetFood{
         .id = id,
         .created_at = created_at,
         .food_name = food_name,
         .brand_name = brand_name,
         .nutrients = nutrients,
+        .servings = servings,
     };
 }
 
@@ -125,7 +131,31 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostFood) anyerror!void 
 }
 
 const SQL_STRINGS = struct {
-    pub const get = "SELECT * FROM food WHERE id = $1;";
+    pub const get =
+        \\SELECT
+        \\f.*,
+        \\JSON_AGG(
+        \\CASE
+        \\WHEN s.created_at IS NULL THEN NULL
+        \\ELSE json_build_object(
+        \\'id',
+        \\s.id,
+        \\'amount',
+        \\s.amount,
+        \\'unit',
+        \\s.unit,
+        \\'multiplier',
+        \\s.multiplier
+        \\)
+        \\END
+        \\) AS servings
+        \\FROM
+        \\food AS f
+        \\LEFT JOIN servings s ON f.id = s.food_id
+        \\WHERE
+        \\f.id = $1
+        \\GROUP BY f.id;
+    ;
     pub const search =
         \\SELECT
         \\  f.*,

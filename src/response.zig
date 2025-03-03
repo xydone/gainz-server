@@ -87,6 +87,15 @@ pub const GetFood = struct {
     food_name: ?[]u8,
     brand_name: ?[]u8,
     nutrients: types.Nutrients,
+    servings: []types.Servings,
+};
+
+pub const GetEntryRecent = struct {
+    id: i32,
+    created_at: i64,
+    food_name: ?[]u8,
+    brand_name: ?[]u8,
+    nutrients: types.Nutrients,
 };
 
 pub const SearchFood = struct {

@@ -41,6 +41,10 @@ pub const GetEntry = struct {
     entry: u32,
 };
 
+pub const GetEntryRecent = struct {
+    limit: u32,
+};
+
 pub const GetEntryRange = struct {
     /// datetime string (ex: 2024-01-01)
     range_start: []const u8,

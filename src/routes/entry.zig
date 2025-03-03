@@ -13,6 +13,7 @@ const log = std.log.scoped(.entry);
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.get("/api/user/entry/:entry_id", getEntry, .{ .data = &RouteData });
+    router.*.get("/api/user/entry/recent", getRecent, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats", getEntryStats, .{ .data = &RouteData });
     router.*.get("/api/user/entry", getEntryRange, .{ .data = &RouteData });
     router.*.post("/api/user/entry", postEntry, .{ .data = &RouteData });
@@ -30,6 +31,24 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
         return;
     };
     res.status = 200;
+    try res.json(result, .{});
+}
+
+fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const query = try req.query();
+
+    const limit = std.fmt.parseInt(u32, query.get("limit") orelse "10", 10) catch {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        return;
+    };
+    const request: rq.GetEntryRecent = .{ .limit = limit };
+
+    const result = EntryModel.getRecent(ctx, request) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        return;
+    };
+    res.status = 200;
+
     try res.json(result, .{});
 }
 
