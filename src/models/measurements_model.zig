@@ -14,7 +14,7 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostMeasurement) anyerro
     var conn = try ctx.app.db.acquire();
     defer conn.release();
     var row = conn.row(SQL_STRINGS.create, //
-        .{ ctx.user_id, request.type, request.value }) catch |err| {
+        .{ ctx.user_id, request.type, request.value, request.date }) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
@@ -72,7 +72,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetMeasurementRange)
 }
 
 pub const SQL_STRINGS = struct {
-    pub const create = "insert into measurements (user_id,type, value) values ($1,$2,$3) returning created_at, type, value;";
+    pub const create = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,$4) RETURNING created_at, type, value;";
     pub const get = "SELECT * FROM measurements WHERE user_id = $1 AND id = $2";
     pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
 };
