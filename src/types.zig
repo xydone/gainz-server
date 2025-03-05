@@ -8,7 +8,8 @@ pub const App = struct {
     allocator: std.mem.Allocator,
 };
 
-pub const NutrientsNames = enum {
+pub const GoalTargets = enum {
+    weight,
     calories,
     fat,
     sat_fat,

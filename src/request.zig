@@ -137,6 +137,6 @@ pub const PostExerciseEntry = struct {
 };
 
 pub const PostGoal = struct {
-    nutrient: types.NutrientsNames,
+    target: types.GoalTargets,
     value: f32,
 };

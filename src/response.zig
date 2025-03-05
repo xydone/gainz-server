@@ -173,6 +173,6 @@ pub const GetExercises = struct {
 
 pub const GetGoals = struct {
     id: i32,
-    nutrient: []u8,
+    target: []u8,
     value: f64,
 };
