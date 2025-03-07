@@ -46,7 +46,7 @@ pub fn main() !void {
         //NOTE: review what headers I'm actually allowing
         .headers = "*",
     });
-    const router = server.router(.{ .middlewares = &.{cors} });
+    const router = try server.router(.{ .middlewares = &.{cors} });
 
     // /api endpoinds
     API.init(router);

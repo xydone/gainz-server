@@ -1,20 +1,20 @@
 .{
-    .name = "gainz-server",
-
+    .name = .gainz_server,
+    .minimum_zig_version = "0.14.0",
     .version = "0.0.0",
 
     .dependencies = .{
         .pg = .{
-            .url = "git+https://github.com/karlseguin/pg.zig#a03737e8c9404d1642e9b2fdea8e719dfae5cda8",
-            .hash = "1220eff52824f32e7ab225cd50bf962324ca14c498c7c197a554dc55e5bb612f119f",
+            .url = "git+https://github.com/karlseguin/pg.zig?ref=master#c4c851192e6e55ec793836c991afdd1a5c747276",
+            .hash = "pg-0.0.0-Wp_7gbPdBQCcAZ9ItP9sGNlJ7hBCNG_Z9eyZZBDRhszy",
         },
         .httpz = .{
-            .url = "git+https://github.com/karlseguin/http.zig#32c98e0e34761843125da36b5497e942b276a593",
-            .hash = "12204b4b2788de862ad769b6fed457c1ea2726ea71eea8039778780b925629a42c6e",
+            .url = "git+https://github.com/karlseguin/http.zig?ref=master#56258131ef4505543fef5484451867c13c5ff322",
+            .hash = "httpz-0.0.0-PNVzrJSuBgDFvO7mtd2qDzaq8_hXIu1BqFuL1jwAV8Ac",
         },
         .jwt = .{
             .url = "https://github.com/zigster64/jwt.zig/archive/refs/tags/v1.0.0.tar.gz",
-            .hash = "1220cda303b5e31f634bc648e4da1a733b0dd09c1591dadc292d688fd46038fb1ac2",
+            .hash = "jwt-0.1.0-AAAAADKHAADNowO14x9jS8ZI5NoaczsN0JwVkdrcKS1o",
         },
     },
 
@@ -23,4 +23,5 @@
         "build.zig.zon",
         "src",
     },
+    .fingerprint = 0xcb41fcf02f3c3c3,
 }

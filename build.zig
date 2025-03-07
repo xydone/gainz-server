@@ -2,8 +2,12 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-
     const optimize = b.standardOptimizeOption(.{});
+    const module = b.addModule("gainz_server", .{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const pg = b.dependency("pg", .{
         .target = target,
         .optimize = optimize,
@@ -18,17 +22,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    module.addImport("pg", pg.module("pg"));
+    module.addImport("httpz", httpz.module("httpz"));
+    module.addImport("jwt", jwt.module("jwt"));
 
     const exe = b.addExecutable(.{
-        .name = "gainz-server",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .name = "gainz_server",
+        .root_module = module,
     });
-    exe.root_module.addImport("pg", pg.module("pg"));
-    exe.root_module.addImport("httpz", httpz.module("httpz"));
-    exe.root_module.addImport("jwt", jwt.module("jwt"));
-
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -41,4 +42,11 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    const exe_check = b.addExecutable(.{
+        .name = "gainz_server",
+        .root_module = module,
+    });
+    const check = b.step("check", "Check if gainz_server compiles");
+    check.dependOn(&exe_check.step);
 }

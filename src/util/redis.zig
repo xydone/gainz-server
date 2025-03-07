@@ -17,7 +17,8 @@ pub const RedisClient = struct {
         self.connection.close();
     }
 
-    fn trimResponse(response: []u8) []u8 {
+    fn trimResponse(response: []u8) ![]u8 {
+        if (response.len == 0) return error.ResponseTooShort;
         return response[0 .. response.len - 2];
     }
 
@@ -26,7 +27,7 @@ pub const RedisClient = struct {
         var buf: [1024]u8 = undefined;
         const readBytes = try self.connection.reader().read(&buf);
 
-        return trimResponse(try self.allocator.dupe(u8, buf[0..readBytes]));
+        return try trimResponse(try self.allocator.dupe(u8, buf[0..readBytes]));
     }
 
     pub fn set(self: *RedisClient, key: []const u8, value: []const u8) ![]u8 {
