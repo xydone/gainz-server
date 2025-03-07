@@ -14,11 +14,7 @@ const dotenv = @import("util/dotenv.zig");
 const redis = @import("util/redis.zig");
 const types = @import("types.zig");
 
-// var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-// const allocator = arena.allocator();
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = gpa.allocator();
-
+const allocator = std.heap.smp_allocator;
 const log = std.log.scoped(.main);
 const PORT = 3000;
 pub fn main() !void {

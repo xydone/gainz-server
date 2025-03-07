@@ -121,6 +121,11 @@ pub const GetEntryRange = struct {
 
 pub const GetEntryStats = types.Nutrients;
 
+pub const GetEntryStatsDetailed = struct {
+    entry_date: i64,
+    nutrients: types.Nutrients,
+};
+
 pub const CreateToken = struct {
     display_name: []const u8,
     access_token: []const u8,

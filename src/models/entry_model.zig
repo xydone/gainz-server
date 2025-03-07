@@ -144,6 +144,25 @@ pub fn getStats(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerro
     return nutrients;
 }
 
+pub fn getStatsDetailed(ctx: *Handler.RequestContext, request: rq.GetEntryStats) anyerror![]rs.GetEntryStatsDetailed {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    var result = conn.queryOpts(SQL_STRINGS.getStatsDetailed, //
+        .{ ctx.user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+        if (conn.err) |pg_err| {
+            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+        }
+        return err;
+    };
+    var response = std.ArrayList(rs.GetEntryStatsDetailed).init(ctx.app.allocator);
+    while (try result.next()) |row| {
+        const entry_date = row.getCol(i64, "entry_date");
+        const nutrients = try row.to(types.Nutrients, .{ .map = .name });
+        try response.append(.{ .entry_date = entry_date, .nutrients = nutrients });
+    }
+    return response.toOwnedSlice();
+}
+
 pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.PostEntry {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
@@ -246,4 +265,95 @@ const SQL_STRINGS = struct {
         \\  e.category;
     ;
     pub const getStats = "SELECT AVG(daily_calories) AS calories, AVG(daily_fat) AS fat, AVG(daily_sat_fat) AS sat_fat, AVG(daily_polyunsat_fat) AS polyunsat_fat, AVG(daily_monounsat_fat) AS monounsat_fat, AVG(daily_trans_fat) AS trans_fat, AVG(daily_cholesterol) AS cholesterol, AVG(daily_sodium) AS sodium, AVG(daily_potassium) AS potassium, AVG(daily_carbs) AS carbs, AVG(daily_fiber) AS fiber, AVG(daily_sugar) AS sugar, AVG(daily_protein) AS protein, AVG(daily_vitamin_a) AS vitamin_a, AVG(daily_vitamin_c) AS vitamin_c, AVG(daily_calcium) AS calcium, AVG(daily_iron) AS iron, AVG(daily_added_sugars) AS added_sugars, AVG(daily_vitamin_d) AS vitamin_d, AVG(daily_sugar_alcohols) AS sugar_alcohols FROM ( SELECT DATE(e.created_at) AS entry_date, SUM(e.amount * s.multiplier * f.calories / f.food_grams) AS daily_calories, SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS daily_fat, SUM(e.amount * s.multiplier * f.sat_fat / f.food_grams) AS daily_sat_fat, SUM(e.amount * s.multiplier * f.polyunsat_fat / f.food_grams) AS daily_polyunsat_fat, SUM(e.amount * s.multiplier * f.monounsat_fat / f.food_grams) AS daily_monounsat_fat, SUM(e.amount * s.multiplier * f.trans_fat / f.food_grams) AS daily_trans_fat, SUM(e.amount * s.multiplier * f.cholesterol / f.food_grams) AS daily_cholesterol, SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS daily_sodium, SUM(e.amount * s.multiplier * f.potassium / f.food_grams) AS daily_potassium, SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS daily_carbs, SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS daily_fiber, SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS daily_sugar, SUM(e.amount * s.multiplier * f.protein / f.food_grams) AS daily_protein, SUM(e.amount * s.multiplier * f.vitamin_a / f.food_grams) AS daily_vitamin_a, SUM(e.amount * s.multiplier * f.vitamin_c / f.food_grams) AS daily_vitamin_c, SUM(e.amount * s.multiplier * f.calcium / f.food_grams) AS daily_calcium, SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS daily_iron, SUM(e.amount * s.multiplier * f.added_sugars / f.food_grams) AS daily_added_sugars, SUM(e.amount * s.multiplier * f.vitamin_d / f.food_grams) AS daily_vitamin_d, SUM(e.amount * s.multiplier * f.sugar_alcohols / f.food_grams) AS daily_sugar_alcohols FROM entry e JOIN servings s ON e.serving_id = s.id JOIN food f ON e.food_id = f.id WHERE e.user_id = $1 AND Date(e.created_at) >= $2 AND Date(e.created_at) <= $3 GROUP BY entry_date ) AS daily_data";
+    pub const getStatsDetailed =
+        \\ SELECT
+        \\ entry_date::timestamp,
+        \\ AVG(daily_calories) AS calories,
+        \\ AVG(daily_fat) AS fat,
+        \\ AVG(daily_sat_fat) AS sat_fat,
+        \\ AVG(daily_polyunsat_fat) AS polyunsat_fat,
+        \\ AVG(daily_monounsat_fat) AS monounsat_fat,
+        \\ AVG(daily_trans_fat) AS trans_fat,
+        \\ AVG(daily_cholesterol) AS cholesterol,
+        \\ AVG(daily_sodium) AS sodium,
+        \\ AVG(daily_potassium) AS potassium,
+        \\ AVG(daily_carbs) AS carbs,
+        \\ AVG(daily_fiber) AS fiber,
+        \\ AVG(daily_sugar) AS sugar,
+        \\ AVG(daily_protein) AS protein,
+        \\ AVG(daily_vitamin_a) AS vitamin_a,
+        \\ AVG(daily_vitamin_c) AS vitamin_c,
+        \\ AVG(daily_calcium) AS calcium,
+        \\ AVG(daily_iron) AS iron,
+        \\ AVG(daily_added_sugars) AS added_sugars,
+        \\ AVG(daily_vitamin_d) AS vitamin_d,
+        \\ AVG(daily_sugar_alcohols) AS sugar_alcohols
+        \\ FROM
+        \\ (
+        \\ SELECT
+        \\ DATE (e.created_at) AS entry_date,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.calories / f.food_grams
+        \\ ) AS daily_calories,
+        \\ SUM(e.amount * s.multiplier * f.fat / f.food_grams) AS daily_fat,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.sat_fat / f.food_grams
+        \\ ) AS daily_sat_fat,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.polyunsat_fat / f.food_grams
+        \\ ) AS daily_polyunsat_fat,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.monounsat_fat / f.food_grams
+        \\ ) AS daily_monounsat_fat,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.trans_fat / f.food_grams
+        \\ ) AS daily_trans_fat,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.cholesterol / f.food_grams
+        \\ ) AS daily_cholesterol,
+        \\ SUM(e.amount * s.multiplier * f.sodium / f.food_grams) AS daily_sodium,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.potassium / f.food_grams
+        \\ ) AS daily_potassium,
+        \\ SUM(e.amount * s.multiplier * f.carbs / f.food_grams) AS daily_carbs,
+        \\ SUM(e.amount * s.multiplier * f.fiber / f.food_grams) AS daily_fiber,
+        \\ SUM(e.amount * s.multiplier * f.sugar / f.food_grams) AS daily_sugar,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.protein / f.food_grams
+        \\ ) AS daily_protein,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.vitamin_a / f.food_grams
+        \\ ) AS daily_vitamin_a,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.vitamin_c / f.food_grams
+        \\ ) AS daily_vitamin_c,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.calcium / f.food_grams
+        \\ ) AS daily_calcium,
+        \\ SUM(e.amount * s.multiplier * f.iron / f.food_grams) AS daily_iron,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.added_sugars / f.food_grams
+        \\ ) AS daily_added_sugars,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.vitamin_d / f.food_grams
+        \\ ) AS daily_vitamin_d,
+        \\ SUM(
+        \\ e.amount * s.multiplier * f.sugar_alcohols / f.food_grams
+        \\ ) AS daily_sugar_alcohols
+        \\ FROM
+        \\ entry e
+        \\ JOIN servings s ON e.serving_id = s.id
+        \\ JOIN food f ON e.food_id = f.id
+        \\ WHERE
+        \\ e.user_id = $1
+        \\ AND Date(e.created_at) >= $2
+        \\ AND Date(e.created_at) <= $3
+        \\ GROUP BY
+        \\ entry_date
+        \\ ) AS daily_data 
+        \\ GROUP BY
+        \\ entry_date
+        \\ ORDER BY
+        \\ entry_date
+    ;
 };

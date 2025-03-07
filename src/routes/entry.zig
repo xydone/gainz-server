@@ -15,6 +15,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     router.*.get("/api/user/entry/:entry_id", getEntry, .{ .data = &RouteData });
     router.*.get("/api/user/entry/recent", getRecent, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats", getEntryStats, .{ .data = &RouteData });
+    router.*.get("/api/user/entry/stats/detailed", getEntryStatsDetailed, .{ .data = &RouteData });
     router.*.get("/api/user/entry", getEntryRange, .{ .data = &RouteData });
     router.*.post("/api/user/entry", postEntry, .{ .data = &RouteData });
 }
@@ -66,6 +67,26 @@ fn getEntryStats(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
     const request: rq.GetEntryStats = .{ .range_start = start, .range_end = end };
     const result = EntryModel.getStats(ctx, request) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        return;
+    };
+    res.status = 200;
+    try res.json(result, .{});
+}
+
+fn getEntryStatsDetailed(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const query = try req.query();
+    const start = query.get("start") orelse {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        return;
+    };
+    const end = query.get("end") orelse {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        return;
+    };
+
+    const request: rq.GetEntryStats = .{ .range_start = start, .range_end = end };
+    const result = EntryModel.getStatsDetailed(ctx, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
