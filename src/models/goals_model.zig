@@ -22,54 +22,31 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostGoal) anyerror!void 
     };
 }
 
-pub fn get(ctx: *Handler.RequestContext) anyerror![]rs.GetGoals {
+pub fn get(ctx: *Handler.RequestContext) anyerror!rs.GetGoals {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
-    var result = conn.query(SQL_STRINGS.get, //
+    var row = conn.row(SQL_STRINGS.get, //
         .{ctx.user_id}) catch |err| {
         if (conn.err) |pg_err| {
             log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
         }
         return err;
-    };
-    defer result.deinit();
-
-    var response = std.ArrayList(rs.GetGoals).init(ctx.app.allocator);
-    while (try result.next()) |row| {
-        const id = row.get(i32, 0);
-        const target = row.get([]u8, 1);
-        const value = row.get(f64, 2);
-        try response.append(.{ .id = id, .target = target, .value = value });
-    }
-
-    return try response.toOwnedSlice();
+    } orelse return error.NotFound;
+    defer row.deinit() catch {};
+    const goals = row.get(?[]u8, 0) orelse return error.NoGoals;
+    const parsed = try std.json.parseFromSlice(rs.GetGoals, ctx.app.allocator, goals, .{});
+    return parsed.value;
 }
 
 pub const SQL_STRINGS = struct {
     pub const create = "insert into goals (created_by, target, value) values ($1,$2,$3)";
     pub const get =
-        \\ SELECT
-        \\ id,
-        \\ target,
-        \\ value
-        \\ FROM
-        \\ (
-        \\ SELECT
-        \\ id,
-        \\ target,
-        \\ value,
-        \\ ROW_NUMBER() OVER (
-        \\ PARTITION BY
-        \\ target
-        \\ ORDER BY
-        \\ id DESC
-        \\ ) AS rn
-        \\ FROM
-        \\ goals
-        \\ WHERE
-        \\ created_by = $1
-        \\ ) AS ranked_data
-        \\ WHERE
-        \\ rn = 1;
+        \\ SELECT jsonb_object_agg(target, value) AS goals
+        \\ FROM (
+        \\ SELECT DISTINCT ON (target) target, value
+        \\ FROM goals
+        \\ WHERE created_by = $1
+        \\ ORDER BY target, id DESC
+        \\ ) sub;
     ;
 };

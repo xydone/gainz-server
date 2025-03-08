@@ -176,8 +176,4 @@ pub const GetExercises = struct {
     description: ?[]u8 = null,
 };
 
-pub const GetGoals = struct {
-    id: i32,
-    target: []u8,
-    value: f64,
-};
+pub const GetGoals = types.Nutrients;
