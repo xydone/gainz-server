@@ -68,6 +68,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetMeasurementRange)
         const value = row.get(f64, 3);
         try response.append(rs.GetMeasurement{ .id = id, .created_at = created_at, .measurement_type = measurement_type, .value = value });
     }
+    if (response.items.len == 0) return error.NotFound;
     return try response.toOwnedSlice();
 }
 

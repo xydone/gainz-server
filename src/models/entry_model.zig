@@ -160,6 +160,7 @@ pub fn getStatsDetailed(ctx: *Handler.RequestContext, request: rq.GetEntryStats)
         const nutrients = try row.to(types.Nutrients, .{ .map = .name });
         try response.append(.{ .entry_date = entry_date, .nutrients = nutrients });
     }
+    if (response.items.len == 0) return error.NotFound;
     return response.toOwnedSlice();
 }
 
