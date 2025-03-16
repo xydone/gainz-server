@@ -13,8 +13,8 @@
             .hash = "httpz-0.0.0-PNVzrJSuBgDFvO7mtd2qDzaq8_hXIu1BqFuL1jwAV8Ac",
         },
         .jwt = .{
-            .url = "https://github.com/zigster64/jwt.zig/archive/refs/tags/v1.0.0.tar.gz",
-            .hash = "jwt-0.1.0-AAAAADKHAADNowO14x9jS8ZI5NoaczsN0JwVkdrcKS1o",
+            .url = "git+https://github.com/xydone/zig-jwt#cd95f31405502bbb98c19afdf6d8816085f167d3",
+            .hash = "jwt-0.1.0-NpgsfhamAADrKAGeGmj_2aN1p3gw6y3YZBIPmruylq0V",
         },
     },
 
