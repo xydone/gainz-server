@@ -12,12 +12,14 @@ const log = std.log.scoped(.entry);
 
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
+    router.*.post("/api/user/entry", postEntry, .{ .data = &RouteData });
     router.*.get("/api/user/entry/:entry_id", getEntry, .{ .data = &RouteData });
+    router.*.delete("/api/user/entry/:entry_id", deleteEntry, .{ .data = &RouteData });
+    router.*.put("/api/user/entry/:entry_id", putEntry, .{ .data = &RouteData });
     router.*.get("/api/user/entry/recent", getRecent, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats", getEntryStats, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats/detailed", getEntryStatsDetailed, .{ .data = &RouteData });
     router.*.get("/api/user/entry", getEntryRange, .{ .data = &RouteData });
-    router.*.post("/api/user/entry", postEntry, .{ .data = &RouteData });
 }
 
 fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -33,6 +35,42 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
     };
     res.status = 200;
     try res.json(result, .{});
+}
+
+fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        return;
+    };
+
+    EntryModel.delete(ctx, rq.DeleteEntry{ .id = entry_id }) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
+        return;
+    };
+    res.status = 200;
+}
+
+fn putEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        return;
+    };
+
+    const body = req.body() orelse {
+        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        return;
+    };
+
+    const entry = std.json.parseFromSliceLeaky(rq.EditEntry, ctx.app.allocator, body, .{}) catch {
+        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        return;
+    };
+
+    EntryModel.edit(ctx, entry, entry_id) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
+        return;
+    };
+    res.status = 200;
 }
 
 fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {

@@ -42,6 +42,16 @@ pub const GetEntry = struct {
     entry: u32,
 };
 
+pub const DeleteEntry = struct {
+    id: u32,
+};
+
+pub const EditEntry = struct {
+    meal_category: types.MealCategory,
+    amount: f64,
+    serving_id: i32,
+};
+
 pub const GetEntryRecent = struct {
     limit: u32,
 };

@@ -41,6 +41,7 @@ pub fn main() !void {
         .origin = "*",
         //NOTE: review what headers I'm actually allowing
         .headers = "*",
+        .methods = "*",
     });
     const router = try server.router(.{ .middlewares = &.{cors} });
 

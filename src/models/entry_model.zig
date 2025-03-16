@@ -31,6 +31,20 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetEntry) anyerror!rs.GetEn
     return rs.GetEntry{ .created_at = created_at, .id = id, .user_id = user_id, .food_id = food_id, .category = meal_category, .amount = amount, .serving = serving };
 }
 
+pub fn delete(ctx: *Handler.RequestContext, request: rq.DeleteEntry) anyerror!void {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    const deleted = try conn.exec(SQL_STRINGS.delete, .{request.id}) orelse return error.NotFound;
+    if (deleted == 0) return error.NotFound;
+}
+
+pub fn edit(ctx: *Handler.RequestContext, request: rq.EditEntry, entry_id: u32) anyerror!void {
+    var conn = try ctx.app.db.acquire();
+    defer conn.release();
+    const deleted = try conn.exec(SQL_STRINGS.edit, .{ entry_id, request.meal_category, request.amount, request.serving_id }) orelse return error.NotFound;
+    if (deleted == 0) return error.NotFound;
+}
+
 pub fn getRecent(ctx: *Handler.RequestContext, request: rq.GetEntryRecent) anyerror![]rs.GetEntryRecent {
     var conn = try ctx.app.db.acquire();
     defer conn.release();
@@ -73,10 +87,14 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
     var response = std.ArrayList(rs.GetEntryRange).init(ctx.app.allocator);
 
     while (try result.next()) |row| {
+        const entry_id = row.getCol(i32, "id");
+        const food_id = row.getCol(i32, "food_id");
+        const serving_id = row.getCol(i32, "serving_id");
         const created_at = row.getCol(i64, "created_at");
         const category = row.getCol(types.MealCategory, "category");
         const food_name = row.getCol([]u8, "food_name");
         const brand_name = row.getCol([]u8, "brand_name");
+        const amount = row.getCol(f64, "amount");
         const food_name_duped = if (food_name.len != 0) try ctx.app.allocator.dupe(u8, food_name) else null;
         const brand_name_duped = if (brand_name.len != 0) try ctx.app.allocator.dupe(u8, brand_name) else null;
         const nutrients = types.Nutrients{
@@ -101,7 +119,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
             .vitamin_d = row.getCol(?f64, "vitamin_d"),
             .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
-        try response.append(rs.GetEntryRange{ .food_name = food_name_duped, .brand_name = brand_name_duped, .category = category, .created_at = created_at, .nutrients = nutrients });
+        try response.append(rs.GetEntryRange{ .entry_id = entry_id, .food_id = food_id, .serving_id = serving_id, .amount = amount, .food_name = food_name_duped, .brand_name = brand_name_duped, .category = category, .created_at = created_at, .nutrients = nutrients });
     }
     return try response.toOwnedSlice();
 }
@@ -186,6 +204,8 @@ pub fn create(ctx: *Handler.RequestContext, request: rq.PostEntry) anyerror!rs.P
 
 const SQL_STRINGS = struct {
     pub const get = "SELECT * FROM entry WHERE user_id = $1 and id = $2;";
+    pub const delete = "DELETE FROM entry WHERE id = $1";
+    pub const edit = "UPDATE entry SET category = $2, amount = $3, serving_id = $4 WHERE id = $1;";
     pub const getRecent =
         \\ SELECT 
         \\ f.*
@@ -202,9 +222,12 @@ const SQL_STRINGS = struct {
     pub const create = "insert into entry (category, food_id, user_id, amount, serving_id) values ($1,$2,$3,$4,$5) returning id, user_id, food_id, category;";
     pub const getInRange =
         \\SELECT e.id AS id,
+        \\  f.id AS food_id,
+        \\  s.id AS serving_id,
         \\  e.created_at AS created_at,
         \\  f.brand_name as brand_name,
         \\  f.food_name as food_name,
+        \\  e.amount AS amount,
         \\  e.category AS category,
         \\  (
         \\    e.amount * s.multiplier * f.calories / f.food_grams
