@@ -25,8 +25,9 @@ pub fn init(allocator: std.mem.Allocator, env: dotenv) !*pg.Pool {
     const database_username = env.get("DATABASE_USERNAME") orelse {
         return EnvErrors.NoDatabaseUsername;
     };
+    const database_port = try std.fmt.parseInt(u16, env.get("DATABASE_PORT") orelse "5432", 10);
     const pool = try pg.Pool.init(allocator, .{ .size = 5, .connect = .{
-        .port = 5432,
+        .port = database_port,
         .host = database_host,
     }, .auth = .{
         .username = database_username,

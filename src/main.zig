@@ -28,7 +28,9 @@ pub fn main() !void {
     const database = try db.init(allocator, env);
     defer database.deinit();
 
-    var redis_client = try redis.RedisClient.init(allocator, "127.0.0.1", 6379);
+    const redis_port = try std.fmt.parseInt(u16, env.get("REDIS_PORT") orelse "6379", 10);
+
+    var redis_client = try redis.RedisClient.init(allocator, "127.0.0.1", redis_port);
     defer redis_client.deinit();
 
     const address = env.get("ADDRESS") orelse "127.0.0.1";
