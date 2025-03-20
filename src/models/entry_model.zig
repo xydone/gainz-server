@@ -60,14 +60,14 @@ pub fn getRecent(ctx: *Handler.RequestContext, request: rq.GetEntryRecent) anyer
     while (try result.next()) |row| {
         const id = row.getCol(i32, "id");
         const created_at = row.getCol(i64, "created_at");
-        const food_name = try ctx.app.allocator.dupe(u8, row.getCol([]u8, "food_name"));
-        const brand_name = try ctx.app.allocator.dupe(u8, row.getCol([]u8, "brand_name"));
+        const food_name = row.getCol(?[]u8, "food_name");
+        const brand_name = row.getCol(?[]u8, "brand_name");
         const nutrients = try row.to(types.Nutrients, .{ .map = .name });
         try response.append(.{
             .nutrients = nutrients,
             .created_at = created_at,
-            .brand_name = if (brand_name.len != 0) brand_name else null,
-            .food_name = if (food_name.len != 0) food_name else null,
+            .brand_name = if (brand_name != null) try ctx.app.allocator.dupe(u8, brand_name.?) else null,
+            .food_name = if (food_name != null) try ctx.app.allocator.dupe(u8, food_name.?) else null,
             .id = id,
         });
     }
@@ -92,11 +92,11 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetEntryRange) anyer
         const serving_id = row.getCol(i32, "serving_id");
         const created_at = row.getCol(i64, "created_at");
         const category = row.getCol(types.MealCategory, "category");
-        const food_name = row.getCol([]u8, "food_name");
-        const brand_name = row.getCol([]u8, "brand_name");
+        const food_name = row.getCol(?[]u8, "food_name");
+        const brand_name = row.getCol(?[]u8, "brand_name");
         const amount = row.getCol(f64, "amount");
-        const food_name_duped = if (food_name.len != 0) try ctx.app.allocator.dupe(u8, food_name) else null;
-        const brand_name_duped = if (brand_name.len != 0) try ctx.app.allocator.dupe(u8, brand_name) else null;
+        const food_name_duped = if (food_name != null) try ctx.app.allocator.dupe(u8, food_name.?) else null;
+        const brand_name_duped = if (brand_name != null) try ctx.app.allocator.dupe(u8, brand_name.?) else null;
         const nutrients = types.Nutrients{
             .calories = row.getCol(f64, "calories"),
             .fat = row.getCol(?f64, "fat"),
