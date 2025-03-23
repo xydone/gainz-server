@@ -17,19 +17,24 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-
     const jwt = b.dependency("jwt", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zdt = b.dependency("zdt", .{
         .target = target,
         .optimize = optimize,
     });
     module.addImport("pg", pg.module("pg"));
     module.addImport("httpz", httpz.module("httpz"));
     module.addImport("jwt", jwt.module("jwt"));
+    module.addImport("zdt", zdt.module("zdt"));
 
     const exe = b.addExecutable(.{
         .name = "gainz_server",
         .root_module = module,
     });
+    exe.linkLibC();
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

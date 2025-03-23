@@ -16,6 +16,10 @@
             .url = "git+https://github.com/xydone/zig-jwt#cd95f31405502bbb98c19afdf6d8816085f167d3",
             .hash = "jwt-0.1.0-NpgsfhamAADrKAGeGmj_2aN1p3gw6y3YZBIPmruylq0V",
         },
+        .zdt = .{
+            .url = "git+https://github.com/FObersteiner/zdt#d9dc11e913370775ed57a1c43a81350cea1fda8e",
+            .hash = "zdt-0.6.2-xr0_vLG7EAAN4dsgKs-oJ4Mr5LirR4c69Iu0TTc1sbDx",
+        },
     },
 
     .paths = .{
