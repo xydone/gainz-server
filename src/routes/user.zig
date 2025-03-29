@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const UserModel = @import("../models/users_model.zig");
+const User = @import("../models/users_model.zig").User;
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
@@ -29,18 +29,22 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 }
 
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const allocator = ctx.app.allocator;
     const body = req.body() orelse {
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const user = std.json.parseFromSliceLeaky(rq.PostUser, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(rq.PostUser, allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
-    const result = UserModel.create(ctx, user) catch {
+    var user = User.create(ctx.app.db, allocator, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
+    defer user.deinit();
+    const response = rs.PostUser{ .display_name = user.display_name, .id = user.id };
+
     res.status = 200;
-    try res.json(result, .{});
+    try res.json(response, .{});
 }

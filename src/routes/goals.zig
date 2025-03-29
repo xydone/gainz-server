@@ -6,7 +6,7 @@ const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
-const GoalsModel = @import("../models/goals_model.zig");
+const Goals = @import("../models/goals_model.zig").Goals;
 
 const log = std.log.scoped(.goals);
 
@@ -21,21 +21,22 @@ pub fn createGoal(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const goal = std.json.parseFromSliceLeaky(rq.PostGoal, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(rq.PostGoal, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     };
-    GoalsModel.create(ctx, goal) catch {
+    const goal = Goals.create(ctx.user_id.?, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
+    _ = goal; // autofix
     res.status = 200;
 }
 
 pub fn getGoals(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
 
-    const response = GoalsModel.get(ctx) catch |err| switch (err) {
+    const response = Goals.get(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
         error.NoGoals => {
             try rs.handleResponse(res, rs.ResponseError.not_found, "The user has no goals entered!");
             return;

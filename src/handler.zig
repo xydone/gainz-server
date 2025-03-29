@@ -8,7 +8,7 @@ const rq = @import("request.zig");
 
 const types = @import("types.zig");
 const auth = @import("util/auth.zig");
-const dotenv = @import("util/dotenv.zig");
+const dotenv = @import("util/dotenv.zig").dotenv;
 const redis = @import("util/redis.zig");
 
 allocator: std.mem.Allocator,
@@ -68,7 +68,7 @@ fn verifyToken(req: *httpz.Request, res: *httpz.Response, ctx: *RequestContext) 
                 return error.InvalidToken;
             }
             access_token = access_token.?[prefix.len..];
-            const decoded = jwt.decode(
+            var decoded = jwt.decode(
                 ctx.app.allocator,
                 auth.JWTClaims,
                 access_token.?,
@@ -80,6 +80,7 @@ fn verifyToken(req: *httpz.Request, res: *httpz.Response, ctx: *RequestContext) 
                 res.body = "Invalid JWT, permission denied!";
                 return error.InvalidJWT;
             };
+            defer decoded.deinit();
             ctx.user_id = decoded.claims.user_id;
         }
         if (route_data.refresh) {

@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
     const pg = b.dependency("pg", .{
         .target = target,
         .optimize = optimize,
@@ -25,6 +26,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
     module.addImport("pg", pg.module("pg"));
     module.addImport("httpz", httpz.module("httpz"));
     module.addImport("jwt", jwt.module("jwt"));
@@ -35,6 +37,7 @@ pub fn build(b: *std.Build) void {
         .root_module = module,
     });
     exe.linkLibC();
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -44,6 +47,14 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
+
+    const exe_unit_tests = b.addTest(.{
+        .root_module = module,
+        .test_runner = .{ .path = b.path("test_runner.zig"), .mode = .simple },
+    });
+    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+    const test_step = b.step("test", "Test code with custom test runner");
+    test_step.dependOn(&run_exe_unit_tests.step);
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);

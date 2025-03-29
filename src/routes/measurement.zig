@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const MeasurementModel = @import("../models/measurements_model.zig");
+const Measurement = @import("../models/measurements_model.zig").Measurement;
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
@@ -25,7 +25,7 @@ fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 
     const value = rq.GetMeasurement{ .measurement_id = measurement_id };
 
-    const result = MeasurementModel.get(ctx, value) catch |err| switch (err) {
+    const result = Measurement.get(ctx.user_id.?, ctx.app.db, value) catch |err| switch (err) {
         error.NotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;
@@ -35,7 +35,13 @@ fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
             return;
         },
     };
-    try res.json(result, .{});
+    const response = rs.GetMeasurement{
+        .created_at = result.created_at,
+        .id = result.id,
+        .type = result.type,
+        .value = result.value,
+    };
+    try res.json(response, .{});
     return;
 }
 
@@ -58,12 +64,13 @@ fn getMeasurementRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
         return;
     };
     const request: rq.GetMeasurementRange = .{ .measurement_type = measurement_type, .range_start = start, .range_end = end };
-    const result = MeasurementModel.getInRange(ctx, request) catch {
+    var measurements = Measurement.getInRange(ctx.user_id.?, ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
+    defer measurements.deinit();
     res.status = 200;
-    try res.json(result, .{});
+    try res.json(measurements.list, .{});
 }
 
 fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -76,10 +83,11 @@ fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
         return;
     };
 
-    const result = MeasurementModel.create(ctx, measurement) catch {
+    const result = Measurement.create(ctx.user_id.?, ctx.app.db, measurement) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
-    try res.json(result, .{});
+    const response = rs.PostMeasurement{ .created_at = result.created_at, .type = result.type, .value = result.value };
+    try res.json(response, .{});
 }

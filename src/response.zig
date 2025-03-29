@@ -67,7 +67,7 @@ pub const PostMeasurement = struct {
 pub const GetMeasurement = struct {
     id: i32,
     created_at: i64,
-    measurement_type: types.MeasurementType,
+    type: types.MeasurementType,
     value: f64,
 };
 
@@ -78,7 +78,7 @@ pub const GetEntry = struct {
     food_id: i32,
     category: types.MealCategory,
     amount: f64,
-    serving: i32,
+    serving_id: i32,
 };
 
 pub const GetFood = struct {
@@ -131,7 +131,6 @@ pub const GetEntryStatsDetailed = struct {
 };
 
 pub const CreateToken = struct {
-    display_name: []const u8,
     access_token: []const u8,
     refresh_token: []const u8,
     expires_in: i32,
@@ -182,8 +181,8 @@ pub const GetExercises = struct {
 
 //TODO: spread operator?
 pub const GetGoals = struct {
-    weight: f64,
-    calories: f64,
+    weight: ?f64 = null,
+    calories: ?f64 = null,
     //the reason why we set the following ones to default as null is because std.json.parseFromSliceLeaky(...) will just be unable to parse fields with either missing, which are not defaulted
     fat: ?f64 = null,
     sat_fat: ?f64 = null,

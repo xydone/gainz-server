@@ -27,7 +27,7 @@ pub const RedisClient = struct {
         var buf: [1024]u8 = undefined;
         const readBytes = try self.connection.reader().read(&buf);
 
-        return try trimResponse(try self.allocator.dupe(u8, buf[0..readBytes]));
+        return try trimResponse(buf[0..readBytes]);
     }
 
     pub fn set(self: *RedisClient, key: []const u8, value: []const u8) ![]u8 {

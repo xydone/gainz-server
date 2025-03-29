@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const FoodModel = @import("../models/food_model.zig");
+const FoodModel = @import("../models/food_model.zig").Food;
 const ServingsModel = @import("../models/servings_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
@@ -28,12 +28,22 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
     };
     const request: rq.GetFood = .{ .food_id = food_id };
 
-    const result = FoodModel.get(ctx, request) catch {
+    var result = FoodModel.get(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
+    defer result.deinit();
+
+    const response = rs.GetFood{
+        .brand_name = result.brand_name,
+        .created_at = result.created_at,
+        .food_name = result.food_name,
+        .id = result.id,
+        .nutrients = result.nutrients,
+        .servings = result.servings.?.value,
+    };
     res.status = 200;
-    try res.json(result, .{});
+    try res.json(response, .{});
 }
 
 pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -41,15 +51,16 @@ pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const food = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
 
-    FoodModel.create(ctx, food) catch {
+    const food_id = FoodModel.create(ctx.user_id.?, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
+    _ = food_id; // autofix
 
     res.status = 200;
 }
@@ -64,12 +75,25 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         return;
     }
     const request: rq.SearchFood = .{ .search_term = search_term };
-    const result = FoodModel.search(ctx, request) catch {
+    const result = FoodModel.search(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
+    defer result.deinit();
     res.status = 200;
-    try res.json(result, .{});
+
+    var response = std.ArrayList(rs.SearchFood).init(ctx.app.allocator);
+    for (result.list) |food| {
+        try response.append(rs.SearchFood{
+            .brand_name = food.brand_name,
+            .food_name = food.food_name,
+            .created_at = food.created_at,
+            .id = food.id,
+            .nutrients = food.nutrients,
+            .servings = food.servings.?.value,
+        });
+    }
+    try res.json(try response.toOwnedSlice(), .{});
 }
 
 pub fn postServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {

@@ -55,7 +55,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerr
     return response.toOwnedSlice();
 }
 
-pub const SQL_STRINGS = struct {
+const SQL_STRINGS = struct {
     pub const create = "INSERT into note_entry (created_by, note_id) values ($1,$2) returning id,created_by,note_id";
     pub const getInRange = "SELECT * FROM note_entry WHERE created_by=$1 AND note_id=$2 AND created_at >=$3 AND created_at<$4";
 };

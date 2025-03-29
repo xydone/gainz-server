@@ -10,7 +10,7 @@ const API = @import("routes/api.zig");
 const Cors = @import("middleware/cors.zig");
 
 // UTIL
-const dotenv = @import("util/dotenv.zig");
+const dotenv = @import("util/dotenv.zig").dotenv;
 const redis = @import("util/redis.zig");
 const types = @import("types.zig");
 
@@ -53,4 +53,25 @@ pub fn main() !void {
     log.info("listening http://{s}:{d}/", .{ address, PORT });
 
     try server.listen();
+}
+
+const Tests = @import("tests/tests.zig");
+
+test "tests:beforeAll" {
+    //Guarantee that this is only ran in a test environment
+    try Tests.TestEnvironment.init();
+    const database = Tests.test_env.database;
+
+    const conn = try database.acquire();
+    const row = try conn.row("SELECT current_database();", .{});
+    const name = row.?.get([]u8, 0);
+    if (!std.mem.startsWith(u8, name, "TEST_")) return error.NotRunningOnTestDB;
+    std.testing.refAllDecls(@This());
+}
+
+test "tests:afterAll" {
+    var test_env = Tests.test_env;
+    defer test_env.deinit();
+    const conn = try test_env.database.acquire();
+    _ = try conn.exec("TRUNCATE TABLE users,food,entry,goals,servings,measurements RESTART IDENTITY CASCADE;", .{});
 }

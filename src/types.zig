@@ -61,6 +61,21 @@ pub const Servings = struct {
     amount: f64,
     unit: []u8,
     multiplier: f64,
+
+    pub fn format(
+        self: Servings,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt; // autofix
+        _ = options; // autofix
+        try writer.writeAll("Servings{ ");
+        try writer.print(".id = {d}, .amount = {d}, .unit = \"{s}\", .multiplier = {d}", .{
+            self.id, self.amount, self.unit, self.multiplier,
+        });
+        try writer.writeAll(" }");
+    }
 };
 
 pub const MeasurementType = enum { weight, waist, hips, neck };

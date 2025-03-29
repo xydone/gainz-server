@@ -48,7 +48,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetNote) anyerror!rs.GetNot
     return rs.GetNote{ .id = id, .title = title, .description = description };
 }
 
-pub const SQL_STRINGS = struct {
+const SQL_STRINGS = struct {
     pub const create = "INSERT into notes (created_by, title, description) values ($1,$2,$3) returning id,title,description";
     pub const get = "SELECT * FROM notes WHERE created_by=$1 AND id=$2";
 };

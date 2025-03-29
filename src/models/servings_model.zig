@@ -52,7 +52,7 @@ pub fn get(ctx: *Handler.RequestContext, request: rq.GetServings) anyerror![]rs.
     return try response.toOwnedSlice();
 }
 
-pub const SQL_STRINGS = struct {
+const SQL_STRINGS = struct {
     pub const create = "INSERT INTO servings (created_by, food_id, amount, unit, multiplier) VALUES($1,$2,$3,$4,$5) RETURNING id, amount, unit, multiplier;";
     pub const get = "SELECT * from servings WHERE food_id=$1";
 };

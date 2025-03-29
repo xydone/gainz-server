@@ -2,7 +2,7 @@ const std = @import("std");
 
 const pg = @import("pg");
 
-const dotenv = @import("util/dotenv.zig");
+const dotenv = @import("util/dotenv.zig").dotenv;
 
 const EnvErrors = error{
     NoDatabaseHost,

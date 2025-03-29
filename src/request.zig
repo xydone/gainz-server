@@ -15,14 +15,15 @@ pub const GetMeasurementRange = struct {
 pub const PostMeasurement = struct {
     type: types.MeasurementType,
     value: f64,
-    date: []const u8,
+    date: ?[]const u8,
 };
 
 pub const PostEntry = struct {
     food_id: i32,
-    meal_category: types.MealCategory,
+    category: types.MealCategory,
     amount: f64,
     serving_id: i32,
+    created_at: ?[]const u8 = null,
 };
 
 pub const PostFood = struct {
@@ -63,7 +64,7 @@ pub const GetEntryRange = struct {
     range_end: []const u8,
 };
 
-pub const GetEntryStats = struct {
+pub const GetEntryBreakdown = struct {
     /// datetime string (ex: 2024-01-01)
     range_start: []const u8,
     /// datetime string (ex: 2024-01-01)
@@ -148,5 +149,5 @@ pub const PostExerciseEntry = struct {
 
 pub const PostGoal = struct {
     target: types.GoalTargets,
-    value: f32,
+    value: f64,
 };
