@@ -5,12 +5,12 @@
 
     .dependencies = .{
         .pg = .{
-            .url = "git+https://github.com/karlseguin/pg.zig?ref=master#c4c851192e6e55ec793836c991afdd1a5c747276",
-            .hash = "pg-0.0.0-Wp_7gbPdBQCcAZ9ItP9sGNlJ7hBCNG_Z9eyZZBDRhszy",
+            .url = "git+https://github.com/karlseguin/pg.zig?ref=master#64a70d813386e4cfab7d5927d5efcfae0a2aea18",
+            .hash = "pg-0.0.0-Wp_7gcf9BQC1UCvCha1tkKTIPgT8ybuxJQGEb3ekz0ti",
         },
         .httpz = .{
-            .url = "git+https://github.com/karlseguin/http.zig?ref=master#56258131ef4505543fef5484451867c13c5ff322",
-            .hash = "httpz-0.0.0-PNVzrJSuBgDFvO7mtd2qDzaq8_hXIu1BqFuL1jwAV8Ac",
+            .url = "git+https://github.com/karlseguin/http.zig?ref=master#91600601f81544c6eeff48e83b76e1e6c5fea00b",
+            .hash = "httpz-0.0.0-PNVzrLa0BgBOHnKWUMiDXXU8iXKdc8qENAWc60QubUq6",
         },
         .jwt = .{
             .url = "git+https://github.com/xydone/zig-jwt#cd95f31405502bbb98c19afdf6d8816085f167d3",

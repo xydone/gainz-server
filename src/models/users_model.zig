@@ -24,7 +24,6 @@ pub const User = struct {
 
         var row = conn.row(SQL_STRINGS.create, .{ request.display_name, request.username, hashed_password }) catch |err| {
             if (conn.err) |pg_err| {
-                try conn.readyForQuery();
                 if (pg_err.isUnique()) {
                     return UserErrors.UsernameNotUnique;
                 }

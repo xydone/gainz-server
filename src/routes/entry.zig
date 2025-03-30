@@ -7,7 +7,6 @@ const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
-const util = @import("../util/util.zig");
 
 const log = std.log.scoped(.entry);
 pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {

@@ -175,15 +175,18 @@ const SlowTracker = struct {
     max: usize,
     slowest: SlowestQueue,
     timer: std.time.Timer,
+    stats: std.ArrayList(u64),
 
     fn init(allocator: Allocator, count: u32) SlowTracker {
         const timer = std.time.Timer.start() catch @panic("failed to start timer");
         var slowest = SlowestQueue.init(allocator, {});
         slowest.ensureTotalCapacity(count) catch @panic("OOM");
+        const stats = std.ArrayList(u64).init(allocator);
         return .{
             .max = count,
             .timer = timer,
             .slowest = slowest,
+            .stats = stats,
         };
     }
 
@@ -194,6 +197,7 @@ const SlowTracker = struct {
 
     fn deinit(self: SlowTracker) void {
         self.slowest.deinit();
+        self.stats.deinit();
     }
 
     fn startTiming(self: *SlowTracker) void {
@@ -204,6 +208,7 @@ const SlowTracker = struct {
         var timer = self.timer;
         const ns = timer.lap();
 
+        self.stats.append(ns) catch @panic("OOM");
         var slowest = &self.slowest;
 
         if (slowest.count() < self.max) {
@@ -232,6 +237,29 @@ const SlowTracker = struct {
     fn display(self: *SlowTracker, printer: Printer) !void {
         var slowest = self.slowest;
         const count = slowest.count();
+
+        //Calculate mean
+        var mean: f64 = undefined;
+        for (self.stats.items) |stat| {
+            mean += @floatFromInt(stat);
+        }
+        mean = mean / @as(f64, @floatFromInt(self.stats.items.len));
+
+        printer.fmt("Mean: {d:.2}ms\n", .{mean / std.time.ns_per_ms});
+
+        //Calculate median
+        std.mem.sort(u64, self.stats.items, {}, std.sort.asc(u64));
+        var median: u64 = undefined;
+        if (self.stats.items.len % 2 == 0) {
+            const middle1 = self.stats.items[self.stats.items.len / 2 - 1];
+            const middle2 = self.stats.items[self.stats.items.len / 2];
+            median = (middle1 + middle2) / 2;
+        } else {
+            median = self.stats.items[self.stats.items.len / 2];
+        }
+        printer.fmt("Median: {d:.2}ms\n", .{@as(f64, @floatFromInt(median)) / std.time.ns_per_ms});
+
+        //Display slowest
         printer.fmt("Slowest {d} test{s}: \n", .{ count, if (count != 1) "s" else "" });
         while (slowest.removeMinOrNull()) |info| {
             const ms = @as(f64, @floatFromInt(info.ns)) / 1_000_000.0;
