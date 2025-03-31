@@ -91,10 +91,11 @@ fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
     };
     const request: rq.GetEntryRecent = .{ .limit = limit };
 
-    const result = Entry.getRecent(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    var result = Entry.getRecent(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
+    defer result.deinit();
     res.status = 200;
 
     var response = std.ArrayList(rs.GetEntryRecent).init(ctx.app.allocator);

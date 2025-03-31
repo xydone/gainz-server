@@ -155,8 +155,8 @@ pub const Entry = struct {
             const entry_created_at = row.getCol(i64, "entry_created_at");
             const food_created_at = row.getCol(i64, "created_at");
             const amount = row.getCol(f64, "amount");
-            const food_name = row.getCol(?[]u8, "food_name");
-            const brand_name = row.getCol(?[]u8, "brand_name");
+            const food_name = try std.fmt.allocPrint(allocator, "{?s}", .{row.getCol(?[]u8, "food_name")});
+            const brand_name = try std.fmt.allocPrint(allocator, "{?s}", .{row.getCol(?[]u8, "brand_name")});
             const nutrients = try row.to(types.Nutrients, .{ .map = .name });
             try response.append(Entry{
                 .id = entry_id,
@@ -599,6 +599,7 @@ test "get entry recent - all" {
     defer entry_list.deinit();
 
     try std.testing.expectEqual(4, entry_list.list.len);
+    try std.testing.expectEqualStrings("Test brand", entry_list.list[0].food.?.brand_name.?);
 }
 
 test "get entry recent - partial" {
