@@ -15,7 +15,7 @@ pub const GetMeasurementRange = struct {
 pub const PostMeasurement = struct {
     type: types.MeasurementType,
     value: f64,
-    date: ?[]const u8,
+    date: ?[]const u8 = null,
 };
 
 pub const PostEntry = struct {

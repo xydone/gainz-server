@@ -105,6 +105,7 @@ fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
             .created_at = entry.created_at,
             .brand_name = entry.food.?.brand_name,
             .food_name = entry.food.?.food_name,
+            .food_id = entry.food_id,
             .nutrients = entry.food.?.nutrients,
         });
     }

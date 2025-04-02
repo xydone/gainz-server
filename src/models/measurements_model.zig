@@ -29,7 +29,12 @@ pub const Measurement = struct {
         var conn = try database.acquire();
         defer conn.release();
         var row = conn.row(SQL_STRINGS.create, //
-            .{ user_id, request.type, request.value, request.date }) catch |err| {
+            .{
+                user_id,
+                request.type,
+                request.value,
+                request.date,
+            }) catch |err| {
             if (conn.err) |pg_err| {
                 log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
             }
@@ -91,7 +96,7 @@ pub const Measurement = struct {
 };
 
 const SQL_STRINGS = struct {
-    pub const create = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE($4, NOW())) RETURNING id,created_at, type, value;";
+    pub const create = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE(TO_TIMESTAMP($4, 'YYYY-MM-DD'), NOW())) RETURNING id,created_at, type, value;";
     pub const get = "SELECT * FROM measurements WHERE user_id = $1 AND id = $2";
     pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
 };
