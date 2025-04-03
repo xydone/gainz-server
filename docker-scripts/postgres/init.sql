@@ -61,7 +61,8 @@ CREATE TYPE public.measurement AS ENUM (
     'weight',
     'waist',
     'hips',
-    'neck'
+    'neck',
+    'height'
 );
 
 

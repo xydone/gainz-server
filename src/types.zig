@@ -77,7 +77,7 @@ pub const Servings = struct {
         try writer.writeAll(" }");
     }
 };
-
-pub const MeasurementType = enum { weight, waist, hips, neck };
+//TODO: dynamically load them in?
+pub const MeasurementType = enum { weight, waist, hips, neck, height };
 
 pub const MealCategory = enum { breakfast, lunch, dinner, misc };
