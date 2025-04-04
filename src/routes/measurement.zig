@@ -14,6 +14,7 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/user/measurement", postMeasurement, .{ .data = &RouteData });
     router.*.get("/api/user/measurement/", getMeasurementRange, .{ .data = &RouteData });
+    router.*.get("/api/user/measurement/recent", getMeasurementRecent, .{ .data = &RouteData });
     router.*.get("/api/user/measurement/:measurement_id", getMeasurement, .{ .data = &RouteData });
 }
 
@@ -71,6 +72,25 @@ fn getMeasurementRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
     defer measurements.deinit();
     res.status = 200;
     try res.json(measurements.list, .{});
+}
+
+fn getMeasurementRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const query = try req.query();
+    // parsing the parameter and then turning the string request to an enum (probably slow?)
+    const measurement_type = std.meta.stringToEnum(types.MeasurementType, query.get("type") orelse {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?type= from request parameters!");
+        return;
+    }) orelse {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, "Invalid \'type\' field!");
+        return;
+    };
+    const request: rq.GetMeasurementRecent = .{ .measurement_type = measurement_type };
+    const measurements = Measurement.getRecent(ctx.user_id.?, ctx.app.db, request) catch {
+        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        return;
+    };
+    res.status = 200;
+    try res.json(measurements, .{});
 }
 
 fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {

@@ -69,6 +69,25 @@ pub const Measurement = struct {
         return Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value };
     }
 
+    pub fn getRecent(user_id: i32, database: *pg.Pool, request: rq.GetMeasurementRecent) anyerror!Measurement {
+        var conn = try database.acquire();
+        defer conn.release();
+        var row = conn.row(SQL_STRINGS.getRecent, //
+            .{ user_id, request.measurement_type }) catch |err| {
+            if (conn.err) |pg_err| {
+                log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+            }
+            return err;
+        } orelse return error.NotFound;
+        defer row.deinit() catch {};
+
+        const id = row.get(i32, 0);
+        const created_at = row.get(i64, 1);
+        const measurement_type = row.get(types.MeasurementType, 2);
+        const value = row.get(f64, 3);
+        return Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value };
+    }
+
     /// Returns MeasurementList, which must be deinitalized.
     pub fn getInRange(user_id: i32, allocator: std.mem.Allocator, database: *pg.Pool, request: rq.GetMeasurementRange) anyerror!MeasurementList {
         var conn = try database.acquire();
@@ -97,7 +116,8 @@ pub const Measurement = struct {
 
 const SQL_STRINGS = struct {
     pub const create = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE(TO_TIMESTAMP($4, 'YYYY-MM-DD'), NOW())) RETURNING id,created_at, type, value;";
-    pub const get = "SELECT * FROM measurements WHERE user_id = $1 AND id = $2";
+    pub const get = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND id = $2";
+    pub const getRecent = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC LIMIT 1;";
     pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
 };
 
@@ -229,4 +249,15 @@ test "get measurement by id" {
 
     const measurement = try Measurement.get(1, test_env.database, get_measurement);
     try std.testing.expectEqual(1, measurement.id);
+}
+
+test "get recent measurement" {
+    const test_env = Tests.test_env;
+    const get_measurement = rq.GetMeasurementRecent{
+        .measurement_type = .weight,
+    };
+
+    const measurement = try Measurement.getRecent(1, test_env.database, get_measurement);
+    //most recent one should be the second one we inserted, as it is not inserted with a specific date
+    try std.testing.expectEqual(2, measurement.id);
 }

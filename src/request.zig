@@ -11,6 +11,9 @@ pub const GetMeasurementRange = struct {
     /// datetime string (ex: 2024-01-01)
     range_end: []const u8,
 };
+pub const GetMeasurementRecent = struct {
+    measurement_type: types.MeasurementType,
+};
 
 pub const PostMeasurement = struct {
     type: types.MeasurementType,
