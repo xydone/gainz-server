@@ -41,9 +41,7 @@ CREATE TYPE public.goal_targets AS ENUM (
     'sugar_alcohols'
 );
 
-
 ALTER TYPE public.goal_targets OWNER TO postgres;
-
 
 CREATE TYPE public.meal_category AS ENUM (
     'breakfast',
@@ -53,9 +51,7 @@ CREATE TYPE public.meal_category AS ENUM (
     'misc'
 );
 
-
 ALTER TYPE public.meal_category OWNER TO postgres;
-
 
 CREATE TYPE public.measurement AS ENUM (
     'weight',
@@ -65,9 +61,7 @@ CREATE TYPE public.measurement AS ENUM (
     'height'
 );
 
-
 ALTER TYPE public.measurement OWNER TO postgres;
-
 
 CREATE TYPE public.nutrients AS ENUM (
     'calories',
@@ -92,13 +86,11 @@ CREATE TYPE public.nutrients AS ENUM (
     'sugar_alcohols'
 );
 
-
 ALTER TYPE public.nutrients OWNER TO postgres;
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
 
 CREATE TABLE public.food (
     id integer NOT NULL,
@@ -129,9 +121,7 @@ CREATE TABLE public.food (
     food_grams double precision NOT NULL
 );
 
-
 ALTER TABLE public.food OWNER TO postgres;
-
 
 CREATE SEQUENCE public."Food_id_seq"
     AS integer
@@ -141,13 +131,9 @@ CREATE SEQUENCE public."Food_id_seq"
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public."Food_id_seq" OWNER TO postgres;
 
-
 ALTER SEQUENCE public."Food_id_seq" OWNED BY public.food.id;
-
-
 
 CREATE TABLE public.entry (
     id integer NOT NULL,
@@ -161,9 +147,7 @@ CREATE TABLE public.entry (
 ALTER TABLE ONLY public.entry ALTER COLUMN food_id SET STATISTICS 100;
 ALTER TABLE ONLY public.entry ALTER COLUMN serving_id SET STATISTICS 100;
 
-
 ALTER TABLE public.entry OWNER TO postgres;
-
 
 CREATE SEQUENCE public."Log_id_seq"
     AS integer
@@ -173,13 +157,9 @@ CREATE SEQUENCE public."Log_id_seq"
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public."Log_id_seq" OWNER TO postgres;
 
-
 ALTER SEQUENCE public."Log_id_seq" OWNED BY public.entry.id;
-
-
 
 CREATE TABLE public.measurements (
     id integer NOT NULL,
@@ -189,13 +169,9 @@ CREATE TABLE public.measurements (
     user_id integer NOT NULL
 );
 
-
 ALTER TABLE public.measurements OWNER TO postgres;
 
-
 COMMENT ON COLUMN public.measurements.value IS 'metric system';
-
-
 
 CREATE SEQUENCE public."Measurement_id_seq"
     AS integer
@@ -205,13 +181,9 @@ CREATE SEQUENCE public."Measurement_id_seq"
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public."Measurement_id_seq" OWNER TO postgres;
 
-
 ALTER SEQUENCE public."Measurement_id_seq" OWNED BY public.measurements.id;
-
-
 
 CREATE TABLE public.servings (
     id integer NOT NULL,
@@ -223,13 +195,9 @@ CREATE TABLE public.servings (
     food_id integer NOT NULL
 );
 
-
 ALTER TABLE public.servings OWNER TO postgres;
 
-
 COMMENT ON COLUMN public.servings.multiplier IS 'Multiplier stands for what you have to multiply your values defined in the Food table to achieve the amount of the unit';
-
-
 
 CREATE SEQUENCE public."Servings_id_seq"
     AS integer
@@ -239,13 +207,9 @@ CREATE SEQUENCE public."Servings_id_seq"
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public."Servings_id_seq" OWNER TO postgres;
 
-
 ALTER SEQUENCE public."Servings_id_seq" OWNED BY public.servings.id;
-
-
 
 CREATE TABLE public.users (
     id integer NOT NULL,
@@ -255,9 +219,7 @@ CREATE TABLE public.users (
     password character varying(255) NOT NULL
 );
 
-
 ALTER TABLE public.users OWNER TO postgres;
-
 
 CREATE SEQUENCE public."User_id_seq"
     AS integer
@@ -267,13 +229,9 @@ CREATE SEQUENCE public."User_id_seq"
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public."User_id_seq" OWNER TO postgres;
 
-
 ALTER SEQUENCE public."User_id_seq" OWNED BY public.users.id;
-
-
 
 CREATE TABLE public.exercise (
     id integer NOT NULL,
@@ -283,9 +241,7 @@ CREATE TABLE public.exercise (
     description character varying(255)
 );
 
-
 ALTER TABLE public.exercise OWNER TO postgres;
-
 
 CREATE TABLE public.exercise_category (
     id integer NOT NULL,
@@ -295,9 +251,7 @@ CREATE TABLE public.exercise_category (
     description character varying(255)
 );
 
-
 ALTER TABLE public.exercise_category OWNER TO postgres;
-
 
 CREATE SEQUENCE public.exercise_category_id_seq
     AS integer
@@ -307,13 +261,9 @@ CREATE SEQUENCE public.exercise_category_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.exercise_category_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.exercise_category_id_seq OWNED BY public.exercise_category.id;
-
-
 
 CREATE TABLE public.exercise_entry (
     id integer NOT NULL,
@@ -325,9 +275,7 @@ CREATE TABLE public.exercise_entry (
     notes character varying(255)
 );
 
-
 ALTER TABLE public.exercise_entry OWNER TO postgres;
-
 
 CREATE SEQUENCE public.exercise_entry_id_seq
     AS integer
@@ -337,22 +285,16 @@ CREATE SEQUENCE public.exercise_entry_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.exercise_entry_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.exercise_entry_id_seq OWNED BY public.exercise_entry.id;
-
-
 
 CREATE TABLE public.exercise_has_category (
     exercise_id integer NOT NULL,
     category_id integer NOT NULL
 );
 
-
 ALTER TABLE public.exercise_has_category OWNER TO postgres;
-
 
 CREATE SEQUENCE public.exercise_id_seq
     AS integer
@@ -362,13 +304,9 @@ CREATE SEQUENCE public.exercise_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.exercise_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.exercise_id_seq OWNED BY public.exercise.id;
-
-
 
 CREATE TABLE public.exercise_unit (
     id integer NOT NULL,
@@ -376,13 +314,10 @@ CREATE TABLE public.exercise_unit (
     created_by integer NOT NULL,
     amount double precision NOT NULL,
     unit character varying(255) NOT NULL,
-    multiplier double precision NOT NULL,
-    exercise_id integer NOT NULL
+    multiplier double precision NOT NULL
 );
 
-
 ALTER TABLE public.exercise_unit OWNER TO postgres;
-
 
 CREATE SEQUENCE public.exercise_value_id_seq
     AS integer
@@ -392,13 +327,9 @@ CREATE SEQUENCE public.exercise_value_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.exercise_value_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.exercise_value_id_seq OWNED BY public.exercise_unit.id;
-
-
 
 CREATE TABLE public.goals (
     id integer NOT NULL,
@@ -408,9 +339,7 @@ CREATE TABLE public.goals (
     created_by integer NOT NULL
 );
 
-
 ALTER TABLE public.goals OWNER TO postgres;
-
 
 CREATE SEQUENCE public.goals_id_seq
     AS integer
@@ -420,13 +349,9 @@ CREATE SEQUENCE public.goals_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.goals_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.goals_id_seq OWNED BY public.goals.id;
-
-
 
 CREATE TABLE public.note_entry (
     id integer NOT NULL,
@@ -435,9 +360,7 @@ CREATE TABLE public.note_entry (
     created_by integer NOT NULL
 );
 
-
 ALTER TABLE public.note_entry OWNER TO postgres;
-
 
 CREATE SEQUENCE public.note_entries_id_seq
     AS integer
@@ -447,13 +370,9 @@ CREATE SEQUENCE public.note_entries_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.note_entries_id_seq OWNER TO postgres;
 
-
 ALTER SEQUENCE public.note_entries_id_seq OWNED BY public.note_entry.id;
-
-
 
 CREATE TABLE public.notes (
     id integer NOT NULL,
@@ -463,9 +382,7 @@ CREATE TABLE public.notes (
     created_by integer NOT NULL
 );
 
-
 ALTER TABLE public.notes OWNER TO postgres;
-
 
 CREATE SEQUENCE public.notes_id_seq
     AS integer
@@ -475,237 +392,134 @@ CREATE SEQUENCE public.notes_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
 ALTER SEQUENCE public.notes_id_seq OWNER TO postgres;
-
 
 ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
 
-
-
 ALTER TABLE ONLY public.entry ALTER COLUMN id SET DEFAULT nextval('public."Log_id_seq"'::regclass);
-
-
 
 ALTER TABLE ONLY public.exercise ALTER COLUMN id SET DEFAULT nextval('public.exercise_id_seq'::regclass);
 
-
-
 ALTER TABLE ONLY public.exercise_category ALTER COLUMN id SET DEFAULT nextval('public.exercise_category_id_seq'::regclass);
-
-
 
 ALTER TABLE ONLY public.exercise_entry ALTER COLUMN id SET DEFAULT nextval('public.exercise_entry_id_seq'::regclass);
 
-
-
 ALTER TABLE ONLY public.exercise_unit ALTER COLUMN id SET DEFAULT nextval('public.exercise_value_id_seq'::regclass);
-
-
 
 ALTER TABLE ONLY public.food ALTER COLUMN id SET DEFAULT nextval('public."Food_id_seq"'::regclass);
 
-
-
 ALTER TABLE ONLY public.goals ALTER COLUMN id SET DEFAULT nextval('public.goals_id_seq'::regclass);
-
-
 
 ALTER TABLE ONLY public.measurements ALTER COLUMN id SET DEFAULT nextval('public."Measurement_id_seq"'::regclass);
 
-
-
 ALTER TABLE ONLY public.note_entry ALTER COLUMN id SET DEFAULT nextval('public.note_entries_id_seq'::regclass);
-
-
 
 ALTER TABLE ONLY public.notes ALTER COLUMN id SET DEFAULT nextval('public.notes_id_seq'::regclass);
 
-
-
 ALTER TABLE ONLY public.servings ALTER COLUMN id SET DEFAULT nextval('public."Servings_id_seq"'::regclass);
 
-
-
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public."User_id_seq"'::regclass);
-
-
 
 ALTER TABLE ONLY public.food
     ADD CONSTRAINT "Food_pkey" PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Log_pkey" PRIMARY KEY (id);
-
-
 
 ALTER TABLE ONLY public.measurements
     ADD CONSTRAINT "Measurement_pkey" PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.servings
     ADD CONSTRAINT "Servings_pkey" PRIMARY KEY (id);
-
-
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.exercise_category
     ADD CONSTRAINT exercise_category_pkey PRIMARY KEY (id);
-
-
 
 ALTER TABLE ONLY public.exercise_entry
     ADD CONSTRAINT exercise_entry_pkey PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.exercise_has_category
     ADD CONSTRAINT exercise_has_category_pkey PRIMARY KEY (exercise_id, category_id);
-
-
 
 ALTER TABLE ONLY public.exercise
     ADD CONSTRAINT exercise_pkey PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.exercise_unit
     ADD CONSTRAINT exercise_value_pkey PRIMARY KEY (id);
-
-
 
 ALTER TABLE ONLY public.goals
     ADD CONSTRAINT goals_pkey PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT note_entries_pkey PRIMARY KEY (id);
-
-
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
 
-
-
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_username_key UNIQUE (username);
 
-
-
 CREATE INDEX entry_index_4 ON public.entry USING btree (created_at);
 
-
-
 CREATE INDEX idx_entry_food_id ON public.entry USING btree (food_id);
-
-
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT "Created by To User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
 
-
-
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to Food" FOREIGN KEY (food_id) REFERENCES public.food(id);
-
-
 
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to Serving" FOREIGN KEY (serving_id) REFERENCES public.servings(id);
 
-
-
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to User" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
 
 ALTER TABLE ONLY public.food
     ADD CONSTRAINT "Food to User" FOREIGN KEY (created_by) REFERENCES public.users(id);
 
-
-
 ALTER TABLE ONLY public.measurements
     ADD CONSTRAINT "Measurement_relation_1" FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
 
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT "Note Entries to Note's ID" FOREIGN KEY (id) REFERENCES public.notes(id) ON UPDATE CASCADE;
 
-
-
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT "Note Entry to User ID" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
-
-
 
 ALTER TABLE ONLY public.servings
     ADD CONSTRAINT "Servings to Food" FOREIGN KEY (food_id) REFERENCES public.food(id);
 
-
-
 ALTER TABLE ONLY public.servings
     ADD CONSTRAINT "Servings to User" FOREIGN KEY (created_by) REFERENCES public.users(id);
-
-
 
 ALTER TABLE ONLY public.exercise_category
     ADD CONSTRAINT exercise_category_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
 
-
-
 ALTER TABLE ONLY public.exercise_entry
     ADD CONSTRAINT exercise_entry_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
-
-
 
 ALTER TABLE ONLY public.exercise_entry
     ADD CONSTRAINT exercise_entry_relation_2 FOREIGN KEY (exercise_id) REFERENCES public.exercise(id);
 
-
-
 ALTER TABLE ONLY public.exercise_entry
     ADD CONSTRAINT exercise_entry_relation_3 FOREIGN KEY (unit_id) REFERENCES public.exercise_unit(id);
-
-
 
 ALTER TABLE ONLY public.exercise_has_category
     ADD CONSTRAINT exercise_has_category_relation_1 FOREIGN KEY (exercise_id) REFERENCES public.exercise(id);
 
-
-
 ALTER TABLE ONLY public.exercise_has_category
     ADD CONSTRAINT exercise_has_category_relation_2 FOREIGN KEY (category_id) REFERENCES public.exercise_category(id);
-
-
 
 ALTER TABLE ONLY public.exercise
     ADD CONSTRAINT exercise_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
 
-
-
-ALTER TABLE ONLY public.exercise_unit
-    ADD CONSTRAINT exercise_unit_relation_2 FOREIGN KEY (exercise_id) REFERENCES public.exercise(id);
-
-
-
 ALTER TABLE ONLY public.exercise_unit
     ADD CONSTRAINT exercise_value_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
 
-
-
 ALTER TABLE ONLY public.goals
     ADD CONSTRAINT goals_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
-
-
 

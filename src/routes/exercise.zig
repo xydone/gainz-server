@@ -6,7 +6,9 @@ const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
-const ExerciseModel = @import("../models/exercise_model.zig");
+const Exercise = @import("../models/exercise_model.zig").Exercise;
+const Category = @import("../models/exercise_model.zig").Category;
+const Unit = @import("../models/exercise_model.zig").Unit;
 
 const log = std.log.scoped(.exercise);
 
@@ -26,12 +28,13 @@ pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, 
 
 pub fn getExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
-    const categories = ExerciseModel.getExercises(ctx) catch {
+    var exercises = Exercise.getAll(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
+    defer exercises.deinit();
     res.status = 200;
-    try res.json(categories, .{});
+    try res.json(exercises.list, .{});
 }
 
 pub fn createExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -39,15 +42,17 @@ pub fn createExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *h
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const exercise = std.json.parseFromSliceLeaky(rq.PostExercise, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(rq.PostExercise, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    ExerciseModel.createExercise(ctx, exercise) catch {
+    const exercise = Exercise.create(ctx, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
+
+    return res.json(exercise, .{});
 }
 
 pub fn createCategory(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -59,7 +64,7 @@ pub fn createCategory(ctx: *Handler.RequestContext, req: *httpz.Request, res: *h
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    ExerciseModel.createCategory(ctx, category) catch {
+    Category.create(ctx, category) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -75,7 +80,7 @@ pub fn createUnit(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    ExerciseModel.createUnit(ctx, unit) catch {
+    Unit.create(ctx, unit) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -91,7 +96,7 @@ pub fn createExerciseEntry(ctx: *Handler.RequestContext, req: *httpz.Request, re
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    ExerciseModel.createExerciseEntry(ctx, exercise_entry) catch {
+    Exercise.logExercise(ctx, exercise_entry) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -100,7 +105,7 @@ pub fn createExerciseEntry(ctx: *Handler.RequestContext, req: *httpz.Request, re
 
 pub fn getCategories(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
-    const categories = ExerciseModel.getCategories(ctx) catch {
+    const categories = Category.get(ctx) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
