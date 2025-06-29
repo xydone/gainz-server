@@ -4,6 +4,10 @@ pub const GetMeasurement = struct {
     measurement_id: u32,
 };
 
+pub const DeleteFood = struct {
+    id: u32,
+};
+
 pub const GetMeasurementRange = struct {
     measurement_type: types.MeasurementType,
     /// datetime string (ex: 2024-01-01)
@@ -11,6 +15,11 @@ pub const GetMeasurementRange = struct {
     /// datetime string (ex: 2024-01-01)
     range_end: []const u8,
 };
+
+pub const DeleteMeasurement = struct {
+    measurement_id: i32,
+};
+
 pub const GetMeasurementRecent = struct {
     measurement_type: types.MeasurementType,
 };
@@ -30,16 +39,16 @@ pub const PostEntry = struct {
 };
 
 pub const PostFood = struct {
-    brand_name: ?[]u8,
-    food_name: ?[]u8,
+    brand_name: ?[]const u8,
+    food_name: ?[]const u8,
     food_grams: f64,
     nutrients: types.Nutrients,
 };
 
 pub const PostUser = struct {
-    display_name: []u8,
-    username: []u8,
-    password: []u8,
+    display_name: []const u8,
+    username: []const u8,
+    password: []const u8,
 };
 
 pub const GetEntry = struct {
@@ -94,7 +103,7 @@ pub const GetServings = struct {
 };
 
 pub const PostAuth = struct {
-    username: []u8,
+    username: []const u8,
     password: []const u8,
 };
 
@@ -154,3 +163,5 @@ pub const PostGoal = struct {
     target: types.GoalTargets,
     value: f64,
 };
+
+pub const PostWorkout = struct {};

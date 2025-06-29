@@ -2,7 +2,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const User = @import("../models/users_model.zig").User;
+const create = @import("../models/users_model.zig").create;
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
@@ -14,7 +14,7 @@ const Entry = @import("entry.zig");
 
 const log = std.log.scoped(.users);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     router.*.post("/api/user", createUser, .{});
 
     //subroutes
@@ -38,7 +38,7 @@ pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
-    var user = User.create(ctx.app.db, allocator, json) catch {
+    var user = create(ctx.app.db, allocator, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };

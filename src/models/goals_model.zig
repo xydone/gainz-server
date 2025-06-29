@@ -29,7 +29,7 @@ pub const Goals = struct {
         return Goals{ .target = target, .value = value };
     }
 
-    pub fn get(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool) anyerror!rs.GetGoals {
+    pub fn get(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool) !std.json.Parsed(rs.GetGoals) {
         var conn = try database.acquire();
         defer conn.release();
         var row = conn.row(SQL_STRINGS.get, //
@@ -42,7 +42,7 @@ pub const Goals = struct {
         defer row.deinit() catch {};
         const goals = row.get(?[]u8, 0) orelse return error.NoGoals;
         const parsed = try std.json.parseFromSlice(rs.GetGoals, allocator, goals, .{});
-        return parsed.value;
+        return parsed;
     }
 };
 const SQL_STRINGS = struct {
@@ -61,18 +61,69 @@ const SQL_STRINGS = struct {
 //TESTS
 
 const Tests = @import("../tests/tests.zig");
+const TestSetup = Tests.TestSetup;
 
-test "create goal" {
+test "Goal | Create" {
+    // SETUP
     const test_env = Tests.test_env;
-    const create_goal = rq.PostGoal{ .target = .weight, .value = 85.13 };
-    const goal = try Goals.create(1, test_env.database, create_goal);
-    try std.testing.expectEqual(create_goal.target, goal.target);
-    try std.testing.expectEqual(create_goal.value, goal.value);
+    const Benchmark = @import("../tests/benchmark.zig");
+    const test_name = "Goal | Create";
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit();
+
+    const create_goal = rq.PostGoal{
+        .target = .weight,
+        .value = 85.13,
+    };
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const goal = Goals.create(setup.user.id, test_env.database, create_goal) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(create_goal.target, goal.target) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(create_goal.value, goal.value) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
 }
 
-test "get goal" {
+test "Goal | Get" {
+    // SETUP
+    const Benchmark = @import("../tests/benchmark.zig");
+    const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    const goals = try Goals.get(test_env.allocator, 1, test_env.database);
-    const expected_goals = rs.GetGoals{ .weight = 85.13 };
-    try std.testing.expectEqual(expected_goals, goals);
+    const test_name = "Goal | Get";
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit();
+
+    const create_goal = rq.PostGoal{
+        .target = .weight,
+        .value = 85.13,
+    };
+    const goal = try Goals.create(setup.user.id, test_env.database, create_goal);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const result = Goals.get(allocator, setup.user.id, test_env.database) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer result.deinit();
+
+        std.testing.expectEqual(goal.value, result.value.weight) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
 }

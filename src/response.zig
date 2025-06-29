@@ -84,8 +84,8 @@ pub const GetEntry = struct {
 pub const GetFood = struct {
     id: i32,
     created_at: i64,
-    food_name: ?[]u8,
-    brand_name: ?[]u8,
+    food_name: ?[]const u8,
+    brand_name: ?[]const u8,
     nutrients: types.Nutrients,
     servings: []types.Servings,
 };
@@ -94,16 +94,16 @@ pub const GetEntryRecent = struct {
     id: i32,
     food_id: i32,
     created_at: i64,
-    food_name: ?[]u8,
-    brand_name: ?[]u8,
+    food_name: ?[]const u8,
+    brand_name: ?[]const u8,
     nutrients: types.Nutrients,
 };
 
 pub const SearchFood = struct {
     id: i32,
     created_at: i64,
-    food_name: ?[]u8,
-    brand_name: ?[]u8,
+    food_name: ?[]const u8,
+    brand_name: ?[]const u8,
     nutrients: types.Nutrients,
     servings: []types.Servings,
 };
@@ -118,8 +118,8 @@ pub const GetEntryRange = struct {
     serving_id: i32,
     created_at: i64,
     category: types.MealCategory,
-    food_name: ?[]u8,
-    brand_name: ?[]u8,
+    food_name: ?[]const u8,
+    brand_name: ?[]const u8,
     amount: f64,
     nutrients: types.Nutrients,
 };

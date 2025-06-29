@@ -10,7 +10,7 @@ const Goals = @import("../models/goals_model.zig").Goals;
 
 const log = std.log.scoped(.goals);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/user/goals", createGoal, .{ .data = &RouteData });
     router.*.get("/api/user/goals", getGoals, .{ .data = &RouteData });
@@ -46,6 +46,8 @@ pub fn getGoals(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
             return;
         },
     };
+    defer response.deinit();
+
     res.status = 200;
-    return res.json(response, .{});
+    return res.json(response.value, .{});
 }

@@ -2,7 +2,10 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const FoodModel = @import("../models/food_model.zig").Food;
+const get = @import("../models/food_model.zig").get;
+const create = @import("../models/food_model.zig").create;
+const search = @import("../models/food_model.zig").search;
+
 const ServingsModel = @import("../models/servings_model.zig");
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
@@ -11,7 +14,7 @@ const types = @import("../types.zig");
 
 const log = std.log.scoped(.food);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
 
     router.*.get("/api/food/:food_id", getFood, .{ .data = &RouteData });
@@ -28,7 +31,7 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
     };
     const request: rq.GetFood = .{ .food_id = food_id };
 
-    var result = FoodModel.get(ctx.app.allocator, ctx.app.db, request) catch {
+    var result = get(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -40,7 +43,7 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
         .food_name = result.food_name,
         .id = result.id,
         .nutrients = result.nutrients,
-        .servings = result.servings.?.value,
+        .servings = result.servings.?,
     };
     res.status = 200;
     try res.json(response, .{});
@@ -56,7 +59,7 @@ pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         return;
     };
 
-    const food_id = FoodModel.create(ctx.user_id.?, ctx.app.db, json) catch {
+    const food_id = create(ctx.user_id.?, ctx.app.allocator, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -75,7 +78,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         return;
     }
     const request: rq.SearchFood = .{ .search_term = search_term };
-    const result = FoodModel.search(ctx.app.allocator, ctx.app.db, request) catch {
+    const result = search(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -90,7 +93,7 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
             .created_at = food.created_at,
             .id = food.id,
             .nutrients = food.nutrients,
-            .servings = food.servings.?.value,
+            .servings = food.servings.?,
         });
     }
     try res.json(try response.toOwnedSlice(), .{});

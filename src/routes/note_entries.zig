@@ -9,7 +9,7 @@ const rs = @import("../response.zig");
 
 const log = std.log.scoped(.users);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/user/notes", postNote, .{ .data = &RouteData });
     router.*.get("/api/user/notes", getNoteRange, .{ .data = &RouteData });

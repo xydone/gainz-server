@@ -2,15 +2,19 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const Measurement = @import("../models/measurements_model.zig").Measurement;
+const get = @import("../models/measurements_model.zig").get;
+const getInRange = @import("../models/measurements_model.zig").getInRange;
+const getRecent = @import("../models/measurements_model.zig").getRecent;
+const create = @import("../models/measurements_model.zig").create;
+
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
 
-const log = std.log.scoped(.weight);
+const log = std.log.scoped(.measurement);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/user/measurement", postMeasurement, .{ .data = &RouteData });
     router.*.get("/api/user/measurement/", getMeasurementRange, .{ .data = &RouteData });
@@ -26,7 +30,7 @@ fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 
     const value = rq.GetMeasurement{ .measurement_id = measurement_id };
 
-    const result = Measurement.get(ctx.user_id.?, ctx.app.db, value) catch |err| switch (err) {
+    const result = get(ctx.user_id.?, ctx.app.db, value) catch |err| switch (err) {
         error.NotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;
@@ -65,7 +69,7 @@ fn getMeasurementRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
         return;
     };
     const request: rq.GetMeasurementRange = .{ .measurement_type = measurement_type, .range_start = start, .range_end = end };
-    var measurements = Measurement.getInRange(ctx.user_id.?, ctx.app.allocator, ctx.app.db, request) catch {
+    var measurements = getInRange(ctx.user_id.?, ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -85,7 +89,7 @@ fn getMeasurementRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: 
         return;
     };
     const request: rq.GetMeasurementRecent = .{ .measurement_type = measurement_type };
-    const measurements = Measurement.getRecent(ctx.user_id.?, ctx.app.db, request) catch {
+    const measurements = getRecent(ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -103,7 +107,7 @@ fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
         return;
     };
 
-    const result = Measurement.create(ctx.user_id.?, ctx.app.db, measurement) catch {
+    const result = create(ctx.user_id.?, ctx.app.db, measurement) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };

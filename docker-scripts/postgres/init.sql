@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.1
--- Dumped by pg_dump version 16.1
+-- Dumped from database version 16.1 (Debian 16.1-1.pgdg120+1)
+-- Dumped by pg_dump version 16.1 (Debian 16.1-1.pgdg120+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -16,6 +16,18 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: training; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA training;
+
+
+ALTER SCHEMA training OWNER TO postgres;
+
+--
+-- Name: goal_targets; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE public.goal_targets AS ENUM (
     'weight',
@@ -41,7 +53,12 @@ CREATE TYPE public.goal_targets AS ENUM (
     'sugar_alcohols'
 );
 
+
 ALTER TYPE public.goal_targets OWNER TO postgres;
+
+--
+-- Name: meal_category; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE public.meal_category AS ENUM (
     'breakfast',
@@ -51,7 +68,12 @@ CREATE TYPE public.meal_category AS ENUM (
     'misc'
 );
 
+
 ALTER TYPE public.meal_category OWNER TO postgres;
+
+--
+-- Name: measurement; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE public.measurement AS ENUM (
     'weight',
@@ -61,7 +83,12 @@ CREATE TYPE public.measurement AS ENUM (
     'height'
 );
 
+
 ALTER TYPE public.measurement OWNER TO postgres;
+
+--
+-- Name: nutrients; Type: TYPE; Schema: public; Owner: postgres
+--
 
 CREATE TYPE public.nutrients AS ENUM (
     'calories',
@@ -86,14 +113,20 @@ CREATE TYPE public.nutrients AS ENUM (
     'sugar_alcohols'
 );
 
+
 ALTER TYPE public.nutrients OWNER TO postgres;
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
+--
+-- Name: food; Type: TABLE; Schema: public; Owner: postgres
+--
+
 CREATE TABLE public.food (
     id integer NOT NULL,
+    created_by integer,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     calories double precision NOT NULL,
     fat double precision,
@@ -114,14 +147,18 @@ CREATE TABLE public.food (
     iron double precision,
     brand_name character varying(255),
     food_name character varying(255),
-    created_by integer NOT NULL,
     added_sugars double precision,
     vitamin_d double precision,
     sugar_alcohols double precision,
     food_grams double precision NOT NULL
 );
 
+
 ALTER TABLE public.food OWNER TO postgres;
+
+--
+-- Name: Food_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public."Food_id_seq"
     AS integer
@@ -131,9 +168,19 @@ CREATE SEQUENCE public."Food_id_seq"
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public."Food_id_seq" OWNER TO postgres;
 
+--
+-- Name: Food_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public."Food_id_seq" OWNED BY public.food.id;
+
+
+--
+-- Name: entry; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.entry (
     id integer NOT NULL,
@@ -147,7 +194,12 @@ CREATE TABLE public.entry (
 ALTER TABLE ONLY public.entry ALTER COLUMN food_id SET STATISTICS 100;
 ALTER TABLE ONLY public.entry ALTER COLUMN serving_id SET STATISTICS 100;
 
+
 ALTER TABLE public.entry OWNER TO postgres;
+
+--
+-- Name: Log_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public."Log_id_seq"
     AS integer
@@ -157,9 +209,19 @@ CREATE SEQUENCE public."Log_id_seq"
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public."Log_id_seq" OWNER TO postgres;
 
+--
+-- Name: Log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public."Log_id_seq" OWNED BY public.entry.id;
+
+
+--
+-- Name: measurements; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.measurements (
     id integer NOT NULL,
@@ -169,9 +231,19 @@ CREATE TABLE public.measurements (
     user_id integer NOT NULL
 );
 
+
 ALTER TABLE public.measurements OWNER TO postgres;
 
+--
+-- Name: COLUMN measurements.value; Type: COMMENT; Schema: public; Owner: postgres
+--
+
 COMMENT ON COLUMN public.measurements.value IS 'metric system';
+
+
+--
+-- Name: Measurement_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public."Measurement_id_seq"
     AS integer
@@ -181,23 +253,43 @@ CREATE SEQUENCE public."Measurement_id_seq"
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public."Measurement_id_seq" OWNER TO postgres;
 
+--
+-- Name: Measurement_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public."Measurement_id_seq" OWNED BY public.measurements.id;
+
+
+--
+-- Name: servings; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.servings (
     id integer NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by integer NOT NULL,
+    created_by integer,
     amount double precision NOT NULL,
     unit character varying(255) NOT NULL,
     multiplier double precision NOT NULL,
     food_id integer NOT NULL
 );
 
+
 ALTER TABLE public.servings OWNER TO postgres;
 
+--
+-- Name: COLUMN servings.multiplier; Type: COMMENT; Schema: public; Owner: postgres
+--
+
 COMMENT ON COLUMN public.servings.multiplier IS 'Multiplier stands for what you have to multiply your values defined in the Food table to achieve the amount of the unit';
+
+
+--
+-- Name: Servings_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public."Servings_id_seq"
     AS integer
@@ -207,9 +299,19 @@ CREATE SEQUENCE public."Servings_id_seq"
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public."Servings_id_seq" OWNER TO postgres;
 
+--
+-- Name: Servings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public."Servings_id_seq" OWNED BY public.servings.id;
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.users (
     id integer NOT NULL,
@@ -219,7 +321,12 @@ CREATE TABLE public.users (
     password character varying(255) NOT NULL
 );
 
+
 ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: User_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public."User_id_seq"
     AS integer
@@ -229,107 +336,19 @@ CREATE SEQUENCE public."User_id_seq"
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public."User_id_seq" OWNER TO postgres;
+
+--
+-- Name: User_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
 
 ALTER SEQUENCE public."User_id_seq" OWNED BY public.users.id;
 
-CREATE TABLE public.exercise (
-    id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by integer NOT NULL,
-    name character varying(255) NOT NULL,
-    description character varying(255)
-);
 
-ALTER TABLE public.exercise OWNER TO postgres;
-
-CREATE TABLE public.exercise_category (
-    id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by integer NOT NULL,
-    name character varying(255) NOT NULL,
-    description character varying(255)
-);
-
-ALTER TABLE public.exercise_category OWNER TO postgres;
-
-CREATE SEQUENCE public.exercise_category_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-ALTER SEQUENCE public.exercise_category_id_seq OWNER TO postgres;
-
-ALTER SEQUENCE public.exercise_category_id_seq OWNED BY public.exercise_category.id;
-
-CREATE TABLE public.exercise_entry (
-    id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by integer NOT NULL,
-    exercise_id integer NOT NULL,
-    value double precision NOT NULL,
-    unit_id integer NOT NULL,
-    notes character varying(255)
-);
-
-ALTER TABLE public.exercise_entry OWNER TO postgres;
-
-CREATE SEQUENCE public.exercise_entry_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-ALTER SEQUENCE public.exercise_entry_id_seq OWNER TO postgres;
-
-ALTER SEQUENCE public.exercise_entry_id_seq OWNED BY public.exercise_entry.id;
-
-CREATE TABLE public.exercise_has_category (
-    exercise_id integer NOT NULL,
-    category_id integer NOT NULL
-);
-
-ALTER TABLE public.exercise_has_category OWNER TO postgres;
-
-CREATE SEQUENCE public.exercise_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-ALTER SEQUENCE public.exercise_id_seq OWNER TO postgres;
-
-ALTER SEQUENCE public.exercise_id_seq OWNED BY public.exercise.id;
-
-CREATE TABLE public.exercise_unit (
-    id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    created_by integer NOT NULL,
-    amount double precision NOT NULL,
-    unit character varying(255) NOT NULL,
-    multiplier double precision NOT NULL
-);
-
-ALTER TABLE public.exercise_unit OWNER TO postgres;
-
-CREATE SEQUENCE public.exercise_value_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-ALTER SEQUENCE public.exercise_value_id_seq OWNER TO postgres;
-
-ALTER SEQUENCE public.exercise_value_id_seq OWNED BY public.exercise_unit.id;
+--
+-- Name: goals; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.goals (
     id integer NOT NULL,
@@ -339,7 +358,12 @@ CREATE TABLE public.goals (
     created_by integer NOT NULL
 );
 
+
 ALTER TABLE public.goals OWNER TO postgres;
+
+--
+-- Name: goals_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public.goals_id_seq
     AS integer
@@ -349,9 +373,19 @@ CREATE SEQUENCE public.goals_id_seq
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public.goals_id_seq OWNER TO postgres;
 
+--
+-- Name: goals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public.goals_id_seq OWNED BY public.goals.id;
+
+
+--
+-- Name: note_entry; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.note_entry (
     id integer NOT NULL,
@@ -360,7 +394,12 @@ CREATE TABLE public.note_entry (
     created_by integer NOT NULL
 );
 
+
 ALTER TABLE public.note_entry OWNER TO postgres;
+
+--
+-- Name: note_entries_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public.note_entries_id_seq
     AS integer
@@ -370,9 +409,19 @@ CREATE SEQUENCE public.note_entries_id_seq
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public.note_entries_id_seq OWNER TO postgres;
 
+--
+-- Name: note_entries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
 ALTER SEQUENCE public.note_entries_id_seq OWNED BY public.note_entry.id;
+
+
+--
+-- Name: notes; Type: TABLE; Schema: public; Owner: postgres
+--
 
 CREATE TABLE public.notes (
     id integer NOT NULL,
@@ -382,7 +431,12 @@ CREATE TABLE public.notes (
     created_by integer NOT NULL
 );
 
+
 ALTER TABLE public.notes OWNER TO postgres;
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
 
 CREATE SEQUENCE public.notes_id_seq
     AS integer
@@ -392,134 +446,680 @@ CREATE SEQUENCE public.notes_id_seq
     NO MAXVALUE
     CACHE 1;
 
+
 ALTER SEQUENCE public.notes_id_seq OWNER TO postgres;
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
 
 ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
 
+
+--
+-- Name: exercise; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by integer NOT NULL,
+    name character varying(255) NOT NULL,
+    description character varying(255)
+);
+
+
+ALTER TABLE training.exercise OWNER TO postgres;
+
+--
+-- Name: exercise_category; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise_category (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by integer NOT NULL,
+    name character varying(255) NOT NULL,
+    description character varying(255)
+);
+
+
+ALTER TABLE training.exercise_category OWNER TO postgres;
+
+--
+-- Name: exercise_category_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.exercise_category_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.exercise_category_id_seq OWNER TO postgres;
+
+--
+-- Name: exercise_category_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.exercise_category_id_seq OWNED BY training.exercise_category.id;
+
+
+--
+-- Name: exercise_entry; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise_entry (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by integer NOT NULL,
+    exercise_id integer NOT NULL,
+    value double precision NOT NULL,
+    unit_id integer NOT NULL,
+    notes character varying(255)
+);
+
+
+ALTER TABLE training.exercise_entry OWNER TO postgres;
+
+--
+-- Name: exercise_entry_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.exercise_entry_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.exercise_entry_id_seq OWNER TO postgres;
+
+--
+-- Name: exercise_entry_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.exercise_entry_id_seq OWNED BY training.exercise_entry.id;
+
+
+--
+-- Name: exercise_has_category; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise_has_category (
+    exercise_id integer NOT NULL,
+    category_id integer NOT NULL
+);
+
+
+ALTER TABLE training.exercise_has_category OWNER TO postgres;
+
+--
+-- Name: exercise_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.exercise_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.exercise_id_seq OWNER TO postgres;
+
+--
+-- Name: exercise_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.exercise_id_seq OWNED BY training.exercise.id;
+
+
+--
+-- Name: exercise_unit; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise_unit (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by integer NOT NULL,
+    amount double precision NOT NULL,
+    unit character varying(255) NOT NULL,
+    multiplier double precision NOT NULL
+);
+
+
+ALTER TABLE training.exercise_unit OWNER TO postgres;
+
+--
+-- Name: exercise_value_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.exercise_value_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.exercise_value_id_seq OWNER TO postgres;
+
+--
+-- Name: exercise_value_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.exercise_value_id_seq OWNED BY training.exercise_unit.id;
+
+
+--
+-- Name: program; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.program (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE training.program OWNER TO postgres;
+
+--
+-- Name: program_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.program_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.program_id_seq OWNER TO postgres;
+
+--
+-- Name: program_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.program_id_seq OWNED BY training.program.id;
+
+
+--
+-- Name: workout; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.workout (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE training.workout OWNER TO postgres;
+
+--
+-- Name: workout_exercise; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.workout_exercise (
+    workout_id integer NOT NULL,
+    exercise_id integer NOT NULL,
+    notes character varying(255),
+    sets integer NOT NULL,
+    reps integer NOT NULL
+);
+
+
+ALTER TABLE training.workout_exercise OWNER TO postgres;
+
+--
+-- Name: workout_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.workout_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE training.workout_id_seq OWNER TO postgres;
+
+--
+-- Name: workout_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.workout_id_seq OWNED BY training.workout.id;
+
+
+--
+-- Name: entry id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.entry ALTER COLUMN id SET DEFAULT nextval('public."Log_id_seq"'::regclass);
 
-ALTER TABLE ONLY public.exercise ALTER COLUMN id SET DEFAULT nextval('public.exercise_id_seq'::regclass);
 
-ALTER TABLE ONLY public.exercise_category ALTER COLUMN id SET DEFAULT nextval('public.exercise_category_id_seq'::regclass);
-
-ALTER TABLE ONLY public.exercise_entry ALTER COLUMN id SET DEFAULT nextval('public.exercise_entry_id_seq'::regclass);
-
-ALTER TABLE ONLY public.exercise_unit ALTER COLUMN id SET DEFAULT nextval('public.exercise_value_id_seq'::regclass);
+--
+-- Name: food id; Type: DEFAULT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.food ALTER COLUMN id SET DEFAULT nextval('public."Food_id_seq"'::regclass);
 
+
+--
+-- Name: goals id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.goals ALTER COLUMN id SET DEFAULT nextval('public.goals_id_seq'::regclass);
+
+
+--
+-- Name: measurements id; Type: DEFAULT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.measurements ALTER COLUMN id SET DEFAULT nextval('public."Measurement_id_seq"'::regclass);
 
+
+--
+-- Name: note_entry id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.note_entry ALTER COLUMN id SET DEFAULT nextval('public.note_entries_id_seq'::regclass);
+
+
+--
+-- Name: notes id; Type: DEFAULT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.notes ALTER COLUMN id SET DEFAULT nextval('public.notes_id_seq'::regclass);
 
+
+--
+-- Name: servings id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.servings ALTER COLUMN id SET DEFAULT nextval('public."Servings_id_seq"'::regclass);
 
+
+--
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public."User_id_seq"'::regclass);
+
+
+--
+-- Name: exercise id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise ALTER COLUMN id SET DEFAULT nextval('training.exercise_id_seq'::regclass);
+
+
+--
+-- Name: exercise_category id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_category ALTER COLUMN id SET DEFAULT nextval('training.exercise_category_id_seq'::regclass);
+
+
+--
+-- Name: exercise_entry id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_entry ALTER COLUMN id SET DEFAULT nextval('training.exercise_entry_id_seq'::regclass);
+
+
+--
+-- Name: exercise_unit id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_unit ALTER COLUMN id SET DEFAULT nextval('training.exercise_value_id_seq'::regclass);
+
+
+--
+-- Name: program id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.program ALTER COLUMN id SET DEFAULT nextval('training.program_id_seq'::regclass);
+
+
+--
+-- Name: workout id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout ALTER COLUMN id SET DEFAULT nextval('training.workout_id_seq'::regclass);
+
+
+--
+-- Name: food Food_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.food
     ADD CONSTRAINT "Food_pkey" PRIMARY KEY (id);
 
+
+--
+-- Name: entry Log_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Log_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: measurements Measurement_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.measurements
     ADD CONSTRAINT "Measurement_pkey" PRIMARY KEY (id);
 
+
+--
+-- Name: servings Servings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.servings
     ADD CONSTRAINT "Servings_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: users User_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.exercise_category
-    ADD CONSTRAINT exercise_category_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY public.exercise_entry
-    ADD CONSTRAINT exercise_entry_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.exercise_has_category
-    ADD CONSTRAINT exercise_has_category_pkey PRIMARY KEY (exercise_id, category_id);
-
-ALTER TABLE ONLY public.exercise
-    ADD CONSTRAINT exercise_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.exercise_unit
-    ADD CONSTRAINT exercise_value_pkey PRIMARY KEY (id);
+--
+-- Name: goals goals_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.goals
     ADD CONSTRAINT goals_pkey PRIMARY KEY (id);
 
+
+--
+-- Name: note_entry note_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT note_entries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notes notes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
 
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_username_key UNIQUE (username);
 
+
+--
+-- Name: exercise_category exercise_category_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_category
+    ADD CONSTRAINT exercise_category_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: exercise_entry exercise_entry_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_entry
+    ADD CONSTRAINT exercise_entry_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: exercise_has_category exercise_has_category_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_has_category
+    ADD CONSTRAINT exercise_has_category_pkey PRIMARY KEY (exercise_id, category_id);
+
+
+--
+-- Name: exercise exercise_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise
+    ADD CONSTRAINT exercise_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: exercise_unit exercise_value_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_unit
+    ADD CONSTRAINT exercise_value_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: program program_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.program
+    ADD CONSTRAINT program_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workout_exercise workout_exercise_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout_exercise
+    ADD CONSTRAINT workout_exercise_pkey PRIMARY KEY (workout_id, exercise_id);
+
+
+--
+-- Name: workout workout_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout
+    ADD CONSTRAINT workout_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: entry_index_4; Type: INDEX; Schema: public; Owner: postgres
+--
+
 CREATE INDEX entry_index_4 ON public.entry USING btree (created_at);
 
+
+--
+-- Name: idx_entry_food_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
 CREATE INDEX idx_entry_food_id ON public.entry USING btree (food_id);
+
+
+--
+-- Name: notes Created by To User; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT "Created by To User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
 
+
+--
+-- Name: entry Entry to Food; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to Food" FOREIGN KEY (food_id) REFERENCES public.food(id);
+
+
+--
+-- Name: entry Entry to Serving; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to Serving" FOREIGN KEY (serving_id) REFERENCES public.servings(id);
 
+
+--
+-- Name: entry Entry to User; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.entry
     ADD CONSTRAINT "Entry to User" FOREIGN KEY (user_id) REFERENCES public.users(id);
 
+
+--
+-- Name: food Food to User; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.food
-    ADD CONSTRAINT "Food to User" FOREIGN KEY (created_by) REFERENCES public.users(id);
+    ADD CONSTRAINT "Food to User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: measurements Measurement_relation_1; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.measurements
     ADD CONSTRAINT "Measurement_relation_1" FOREIGN KEY (user_id) REFERENCES public.users(id);
 
+
+--
+-- Name: note_entry Note Entries to Note's ID; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT "Note Entries to Note's ID" FOREIGN KEY (id) REFERENCES public.notes(id) ON UPDATE CASCADE;
+
+
+--
+-- Name: note_entry Note Entry to User ID; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.note_entry
     ADD CONSTRAINT "Note Entry to User ID" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
 
-ALTER TABLE ONLY public.servings
-    ADD CONSTRAINT "Servings to Food" FOREIGN KEY (food_id) REFERENCES public.food(id);
+
+--
+-- Name: servings Servings to Food; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.servings
-    ADD CONSTRAINT "Servings to User" FOREIGN KEY (created_by) REFERENCES public.users(id);
+    ADD CONSTRAINT "Servings to Food" FOREIGN KEY (food_id) REFERENCES public.food(id) ON DELETE CASCADE;
 
-ALTER TABLE ONLY public.exercise_category
-    ADD CONSTRAINT exercise_category_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
 
-ALTER TABLE ONLY public.exercise_entry
-    ADD CONSTRAINT exercise_entry_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+--
+-- Name: servings Servings to User; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
-ALTER TABLE ONLY public.exercise_entry
-    ADD CONSTRAINT exercise_entry_relation_2 FOREIGN KEY (exercise_id) REFERENCES public.exercise(id);
+ALTER TABLE ONLY public.servings
+    ADD CONSTRAINT "Servings to User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
-ALTER TABLE ONLY public.exercise_entry
-    ADD CONSTRAINT exercise_entry_relation_3 FOREIGN KEY (unit_id) REFERENCES public.exercise_unit(id);
 
-ALTER TABLE ONLY public.exercise_has_category
-    ADD CONSTRAINT exercise_has_category_relation_1 FOREIGN KEY (exercise_id) REFERENCES public.exercise(id);
-
-ALTER TABLE ONLY public.exercise_has_category
-    ADD CONSTRAINT exercise_has_category_relation_2 FOREIGN KEY (category_id) REFERENCES public.exercise_category(id);
-
-ALTER TABLE ONLY public.exercise
-    ADD CONSTRAINT exercise_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
-
-ALTER TABLE ONLY public.exercise_unit
-    ADD CONSTRAINT exercise_value_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+--
+-- Name: goals goals_relation_1; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
 
 ALTER TABLE ONLY public.goals
     ADD CONSTRAINT goals_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: exercise_category exercise_category_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_category
+    ADD CONSTRAINT exercise_category_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: exercise_entry exercise_entry_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_entry
+    ADD CONSTRAINT exercise_entry_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: exercise_entry exercise_entry_relation_2; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_entry
+    ADD CONSTRAINT exercise_entry_relation_2 FOREIGN KEY (exercise_id) REFERENCES training.exercise(id);
+
+
+--
+-- Name: exercise_entry exercise_entry_relation_3; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_entry
+    ADD CONSTRAINT exercise_entry_relation_3 FOREIGN KEY (unit_id) REFERENCES training.exercise_unit(id);
+
+
+--
+-- Name: exercise_has_category exercise_has_category_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_has_category
+    ADD CONSTRAINT exercise_has_category_relation_1 FOREIGN KEY (exercise_id) REFERENCES training.exercise(id);
+
+
+--
+-- Name: exercise_has_category exercise_has_category_relation_2; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_has_category
+    ADD CONSTRAINT exercise_has_category_relation_2 FOREIGN KEY (category_id) REFERENCES training.exercise_category(id);
+
+
+--
+-- Name: exercise exercise_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise
+    ADD CONSTRAINT exercise_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: exercise_unit exercise_value_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.exercise_unit
+    ADD CONSTRAINT exercise_value_relation_1 FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: workout_exercise workout_exercise_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout_exercise
+    ADD CONSTRAINT workout_exercise_relation_1 FOREIGN KEY (workout_id) REFERENCES training.workout(id);
+
+
+--
+-- Name: workout_exercise workout_exercise_relation_2; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout_exercise
+    ADD CONSTRAINT workout_exercise_relation_2 FOREIGN KEY (exercise_id) REFERENCES training.exercise(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
 

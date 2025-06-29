@@ -10,7 +10,7 @@ const Auth = @import("../models/auth_model.zig").Auth;
 
 const log = std.log.scoped(.auth);
 
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .refresh = true };
     router.*.post("/api/auth", createToken, .{});
     router.*.post("/api/auth/logout", invalidateToken, .{ .data = &RouteData });

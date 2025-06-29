@@ -63,15 +63,30 @@ test "tests:beforeAll" {
     const database = Tests.test_env.database;
 
     const conn = try database.acquire();
-    const row = try conn.row("SELECT current_database();", .{});
+    var row = try conn.row("SELECT current_database();", .{});
     const name = row.?.get([]u8, 0);
+    try row.?.deinit();
+
     if (!std.mem.startsWith(u8, name, "TEST_")) return error.NotRunningOnTestDB;
+
+    // Clear database
+    var clean_db = try conn.row(
+        \\SELECT 'TRUNCATE TABLE ' ||
+        \\string_agg(quote_ident(table_name), ', ') ||
+        \\' RESTART IDENTITY CASCADE;' AS sql_to_run
+        \\FROM information_schema.tables
+        \\WHERE table_schema = 'public' 
+        \\AND table_type = 'BASE TABLE';
+    , .{});
+    const string = row.?.get([]u8, 0);
+    try clean_db.?.deinit();
+
+    _ = try conn.exec(string, .{});
     std.testing.refAllDecls(@This());
 }
 
 test "tests:afterAll" {
     var test_env = Tests.test_env;
+
     defer test_env.deinit();
-    const conn = try test_env.database.acquire();
-    _ = try conn.exec("TRUNCATE TABLE users,food,entry,goals,servings,measurements RESTART IDENTITY CASCADE;", .{});
 }

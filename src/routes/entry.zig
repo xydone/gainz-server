@@ -2,20 +2,28 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const Entry = @import("../models/entry_model.zig").Entry;
+const create = @import("../models/entry_model.zig").create;
+const get = @import("../models/entry_model.zig").get;
+const delete = @import("../models/entry_model.zig").delete;
+const edit = @import("../models/entry_model.zig").edit;
+const getAverage = @import("../models/entry_model.zig").getAverage;
+const getBreakdown = @import("../models/entry_model.zig").getBreakdown;
+const getInRange = @import("../models/entry_model.zig").getInRange;
+const getRecent = @import("../models/entry_model.zig").getRecent;
+
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.entry);
-pub fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
+pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/user/entry", postEntry, .{ .data = &RouteData });
     router.*.get("/api/user/entry/:entry_id", getEntry, .{ .data = &RouteData });
     router.*.delete("/api/user/entry/:entry_id", deleteEntry, .{ .data = &RouteData });
     router.*.put("/api/user/entry/:entry_id", putEntry, .{ .data = &RouteData });
-    router.*.get("/api/user/entry/recent", getRecent, .{ .data = &RouteData });
+    router.*.get("/api/user/entry/recent", getEntryRecent, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats", getEntryAverage, .{ .data = &RouteData });
     router.*.get("/api/user/entry/stats/detailed", getEntryStatsDetailed, .{ .data = &RouteData });
     router.*.get("/api/user/entry", getEntryRange, .{ .data = &RouteData });
@@ -28,7 +36,7 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
     };
     const request: rq.GetEntry = .{ .entry = entry_id };
 
-    const result = Entry.get(ctx.user_id.?, ctx.app.db, request) catch {
+    const result = get(ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -52,7 +60,7 @@ fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
         return;
     };
 
-    Entry.delete(ctx, rq.DeleteEntry{ .id = entry_id }) catch {
+    delete(ctx.app.db, rq.DeleteEntry{ .id = entry_id }) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
@@ -75,14 +83,14 @@ fn putEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
         return;
     };
 
-    Entry.edit(ctx, entry, entry_id) catch {
+    edit(ctx, entry, entry_id) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
     res.status = 200;
 }
 
-fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+fn getEntryRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
 
     const limit = std.fmt.parseInt(u32, query.get("limit") orelse "10", 10) catch {
@@ -91,7 +99,7 @@ fn getRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
     };
     const request: rq.GetEntryRecent = .{ .limit = limit };
 
-    var result = Entry.getRecent(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    var result = getRecent(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -125,7 +133,7 @@ fn getEntryAverage(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
     };
 
     const request: rq.GetEntryBreakdown = .{ .range_start = start, .range_end = end };
-    const result = Entry.getAverage(ctx.user_id.?, ctx.app.db, request) catch {
+    const result = getAverage(ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -145,7 +153,7 @@ fn getEntryStatsDetailed(ctx: *Handler.RequestContext, req: *httpz.Request, res:
     };
 
     const request: rq.GetEntryBreakdown = .{ .range_start = start, .range_end = end };
-    const result = Entry.getBreakdown(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    const result = getBreakdown(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -165,7 +173,7 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
     };
 
     const request: rq.GetEntryRange = .{ .range_start = start, .range_end = end };
-    var result = Entry.getInRange(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    var result = getInRange(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -198,7 +206,7 @@ fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    const result = Entry.create(ctx.user_id.?, ctx.app.db, json) catch {
+    const result = create(ctx.user_id.?, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
