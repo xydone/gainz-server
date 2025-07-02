@@ -660,7 +660,8 @@ ALTER SEQUENCE training.program_id_seq OWNED BY training.program.id;
 CREATE TABLE training.workout (
     id integer NOT NULL,
     name character varying(255) NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by integer
 );
 
 
@@ -929,12 +930,16 @@ ALTER TABLE ONLY training.workout_exercise
     ADD CONSTRAINT workout_exercise_pkey PRIMARY KEY (workout_id, exercise_id);
 
 
+
 --
 -- Name: workout workout_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
 --
 
 ALTER TABLE ONLY training.workout
     ADD CONSTRAINT workout_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY training.workout
+    ADD CONSTRAINT "Created by To User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
 
 
 --
