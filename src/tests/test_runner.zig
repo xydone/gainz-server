@@ -1,4 +1,4 @@
-//! https://gist.github.com/karlseguin/c6bea5b35e4e8d26af6f81c22cb5d76b
+//! Fork of https://gist.github.com/karlseguin/c6bea5b35e4e8d26af6f81c22cb5d76b
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -11,6 +11,20 @@ const BORDER = "=" ** 80;
 // use in custom panic handler
 var current_test: ?[]const u8 = null;
 
+const Config = struct {
+    verbose: bool,
+    fail_first: bool,
+    filter: ?[]const u8,
+
+    pub fn init() Config {
+        return Config{
+            .verbose = false,
+            .fail_first = false,
+            .filter = null,
+        };
+    }
+};
+
 pub fn main() !void {
     var mem: [8192]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&mem);
@@ -18,8 +32,20 @@ pub fn main() !void {
 
     const allocator = fba.allocator();
 
-    const env = Env.init(allocator);
-    defer env.deinit(allocator);
+    var config = Config.init();
+
+    const process_args = try std.process.argsAlloc(allocator);
+    for (process_args) |arg| {
+        if (std.mem.eql(u8, arg, "--verbose")) config.verbose = true;
+        if (std.mem.eql(u8, arg, "--fail-first")) config.fail_first = true;
+        if (std.mem.startsWith(u8, arg, "--filter")) {
+            var tokens = std.mem.tokenizeSequence(u8, arg, "=");
+            //skip "--filter"
+            _ = tokens.next();
+            const filter = tokens.next() orelse return;
+            config.filter = filter;
+        }
+    }
 
     var pass: usize = 0;
     var fail: usize = 0;
@@ -42,7 +68,7 @@ pub fn main() !void {
         }
 
         const is_unnamed_test = isUnnamed(t);
-        if (env.filter) |f| {
+        if (config.filter) |f| {
             if (!is_unnamed_test and std.mem.indexOf(u8, t.name, f) == null) {
                 continue;
             }
@@ -69,7 +95,7 @@ pub fn main() !void {
                     std.debug.dumpStackTrace(trace.*);
                     printer.status(.fail, "{s}\n", .{BORDER});
                 }
-                if (env.fail_first) {
+                if (config.fail_first) {
                     break;
                 }
             },
@@ -94,43 +120,6 @@ pub fn main() !void {
 
     std.posix.exit(if (fail == 0) 0 else 1);
 }
-
-const Env = struct {
-    verbose: bool,
-    fail_first: bool,
-    filter: ?[]const u8,
-
-    fn init(allocator: Allocator) Env {
-        return .{
-            .verbose = readEnvBool(allocator, "TEST_VERBOSE", true),
-            .fail_first = readEnvBool(allocator, "TEST_FAIL_FIRST", false),
-            .filter = readEnv(allocator, "TEST_FILTER"),
-        };
-    }
-
-    fn deinit(self: Env, allocator: Allocator) void {
-        if (self.filter) |f| {
-            allocator.free(f);
-        }
-    }
-
-    fn readEnv(allocator: Allocator, key: []const u8) ?[]const u8 {
-        const v = std.process.getEnvVarOwned(allocator, key) catch |err| {
-            if (err == error.EnvironmentVariableNotFound) {
-                return null;
-            }
-            std.log.warn("failed to get env var {s} due to err {}", .{ key, err });
-            return null;
-        };
-        return v;
-    }
-
-    fn readEnvBool(allocator: Allocator, key: []const u8, deflt: bool) bool {
-        const value = readEnv(allocator, key) orelse return deflt;
-        defer allocator.free(value);
-        return std.ascii.eqlIgnoreCase(value, "true");
-    }
-};
 
 pub const panic = std.debug.FullPanic(struct {
     pub fn panicFn(msg: []const u8, first_trace_addr: ?usize) noreturn {
