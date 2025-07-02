@@ -346,10 +346,10 @@ const Tests = @import("../tests/tests.zig");
 
 const TestSetup = Tests.TestSetup;
 
-test "Food | Create" {
+test "API Food | Create" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
-    const test_name = "Food | Create";
+    const test_name = "API Food | Create";
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
 
@@ -396,12 +396,12 @@ test "Food | Create" {
     }
 }
 
-test "Food | Get" {
+test "API Food | Get" {
     const test_env = Tests.test_env;
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
-    const test_name = "Food | Get";
+    const test_name = "API Food | Get";
 
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
@@ -468,12 +468,12 @@ test "Food | Get" {
     }
 }
 
-test "Food | Search" {
+test "API Food | Search" {
     const test_env = Tests.test_env;
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
-    const test_name = "Food | Search";
+    const test_name = "API Food | Search";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -493,7 +493,7 @@ test "Food | Search" {
         defer benchmark.end();
 
         const search_food = rq.SearchFood{
-            .search_term = test_name[0..10],
+            .search_term = test_name[0..15],
         };
 
         var results = search(allocator, test_env.database, search_food) catch |err| {

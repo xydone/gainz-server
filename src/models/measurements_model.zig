@@ -138,12 +138,12 @@ const SQL_STRINGS = struct {
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
-test "Measurement | Create (with date)" {
+test "API Measurement | Create (with date)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Create (with date)";
+    const test_name = "API Measurements | Create (with date)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -184,12 +184,12 @@ test "Measurement | Create (with date)" {
         };
     }
 }
-test "Measurement | Create (default date)" {
+test "API Measurement | Create (default date)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Create (default date)";
+    const test_name = "API Measurements | Create (default date)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -232,11 +232,11 @@ test "Measurement | Create (default date)" {
     }
 }
 
-test "Measurement | Delete" {
+test "API Measurement | Delete" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Delete";
+    const test_name = "API Measurements | Delete";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -265,12 +265,12 @@ test "Measurement | Delete" {
     }
 }
 
-test "Measurement | Get in range (lower bound)" {
+test "API Measurement | Get in range (lower bound)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Get in range (lower bound)";
+    const test_name = "API Measurements | Get in range (lower bound)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -332,12 +332,12 @@ test "Measurement | Get in range (lower bound)" {
     }
 }
 
-test "Measurement | Get in range (upper bound)" {
+test "API Measurement | Get in range (upper bound)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    const test_name = "Measurement | Get in range (upper bound)";
+    const test_name = "API Measurements | Get in range (upper bound)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -400,12 +400,12 @@ test "Measurement | Get in range (upper bound)" {
     }
 }
 
-test "Measurement | Get in range (overlap)" {
+test "API Measurement | Get in range (overlap)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    const test_name = "Measurement | Get in range (overlap)";
+    const test_name = "API Measurements | Get in range (overlap)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -468,12 +468,12 @@ test "Measurement | Get in range (overlap)" {
     }
 }
 
-test "Measurement | Get in range (multiple)" {
+test "API Measurement | Get in range (multiple)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    const test_name = "Measurement | Get in range (multiple)";
+    const test_name = "API Measurements | Get in range (multiple)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -531,12 +531,12 @@ test "Measurement | Get in range (multiple)" {
     }
 }
 
-test "Measurement | Get in range (empty)" {
+test "API Measurement | Get in range (empty)" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    const test_name = "Measurement | Get in range (empty)";
+    const test_name = "API Measurements | Get in range (empty)";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -578,11 +578,11 @@ test "Measurement | Get in range (empty)" {
     }
 }
 
-test "Measurement | Get by ID" {
+test "API Measurement | Get by ID" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Get by ID";
+    const test_name = "API Measurements | Get by ID";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -635,11 +635,11 @@ test "Measurement | Get by ID" {
     }
 }
 
-test "Measurement | Get recent" {
+test "API Measurement | Get recent" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
-    const test_name = "Measurement | Get recent";
+    const test_name = "API Measurements | Get recent";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 

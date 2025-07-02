@@ -1,9 +1,10 @@
 const std = @import("std");
 const pg = @import("pg");
 const dotenv = @import("../util/dotenv.zig").dotenv;
-const db = @import("../db.zig");
+const Database = @import("../db.zig");
 const redis = @import("../util/redis.zig");
 const rq = @import("../request.zig");
+const Handler = @import("../handler.zig");
 
 pub var test_env: TestEnvironment = undefined;
 
@@ -12,16 +13,42 @@ pub const TestEnvironment = struct {
     env: dotenv,
     redis_client: redis.RedisClient,
 
-    pub fn init() !void {
+    const InitErrors = error{ CouldntInitializeDotenv, CouldntInitializeRedis, CouldntInitializeDB, NotRunningOnTestDB } || anyerror;
+
+    /// Initializes the struct and clears all data from the database *only if* it is the test database
+    pub fn init() InitErrors!void {
         const alloc = std.heap.smp_allocator;
-        const env = try dotenv.init(alloc, ".testing.env");
+        const env = dotenv.init(alloc, ".testing.env") catch return InitErrors.CouldntInitializeDotenv;
 
-        const database = try db.init(alloc, env);
+        const database = Database.init(alloc, env) catch return InitErrors.CouldntInitializeDB;
 
-        const redis_port = try std.fmt.parseInt(u16, env.get("REDIS_PORT").?, 10);
-        const redis_client = try redis.RedisClient.init(alloc, "127.0.0.1", redis_port);
+        const redis_port = std.fmt.parseInt(u16, env.get("REDIS_PORT").?, 10) catch return InitErrors.CouldntInitializeRedis;
+        const redis_client = redis.RedisClient.init(alloc, "127.0.0.1", redis_port) catch return InitErrors.CouldntInitializeRedis;
 
         test_env = TestEnvironment{ .database = database, .env = env, .redis_client = redis_client };
+
+        const conn = try database.acquire();
+        defer conn.release();
+
+        var row = try conn.row("SELECT current_database();", .{});
+        const name = row.?.get([]u8, 0);
+        try row.?.deinit();
+
+        if (!std.mem.startsWith(u8, name, "TEST_")) return InitErrors.NotRunningOnTestDB;
+
+        // Clear database
+        var clean_db = try conn.row(
+            \\SELECT 'TRUNCATE TABLE ' ||
+            \\string_agg(quote_ident(table_name), ', ') ||
+            \\' RESTART IDENTITY CASCADE;' AS sql_to_run
+            \\FROM information_schema.tables
+            \\WHERE table_schema = 'public' 
+            \\AND table_type = 'BASE TABLE';
+        , .{});
+        const string = row.?.get([]u8, 0);
+        try clean_db.?.deinit();
+
+        _ = try conn.exec(string, .{});
     }
     pub fn deinit(self: *TestEnvironment) void {
         self.database.deinit();
@@ -64,6 +91,24 @@ pub const TestSetup = struct {
             request,
         );
         return user;
+    }
+    pub fn createContext(user_id: i32, allocator: std.mem.Allocator, database: *Database.Pool) !Handler.RequestContext {
+        const app = try allocator.create(Handler);
+        app.* = Handler{
+            .allocator = allocator,
+            .env = try dotenv.init(allocator, ".env"),
+            .redis_client = &test_env.redis_client,
+            .db = database,
+        };
+        return Handler.RequestContext{
+            .app = app,
+            .refresh_token = null,
+            .user_id = user_id,
+        };
+    }
+    pub fn deinitContext(allocator: std.mem.Allocator, context: Handler.RequestContext) void {
+        context.app.env.deinit();
+        allocator.destroy(context.app);
     }
     pub fn deinit(self: *TestSetup) void {
         self.user.deinit();

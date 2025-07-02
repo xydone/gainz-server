@@ -63,11 +63,11 @@ const SQL_STRINGS = struct {
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
-test "Goal | Create" {
+test "API Goal | Create" {
     // SETUP
     const test_env = Tests.test_env;
     const Benchmark = @import("../tests/benchmark.zig");
-    const test_name = "Goal | Create";
+    const test_name = "API Goal | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -95,12 +95,12 @@ test "Goal | Create" {
     }
 }
 
-test "Goal | Get" {
+test "API Goal | Get" {
     // SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    const test_name = "Goal | Get";
+    const test_name = "API Goal | Get";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 

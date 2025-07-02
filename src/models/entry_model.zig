@@ -533,14 +533,14 @@ const TestSetup = struct {
     }
 };
 
-test "Entry | Create" {
+test "API Entry | Create" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const createFood = @import("food_model.zig").create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
-    var user = try TestSetup.createUser(test_env.database, "Entry | Create");
+    var user = try TestSetup.createUser(test_env.database, "API Entry | Create");
     defer user.deinit();
 
     const brand = try std.fmt.allocPrint(allocator, "Test brand", .{});
@@ -566,7 +566,7 @@ test "Entry | Create" {
     var entry_id: i32 = undefined;
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Create");
+        var benchmark = Benchmark.start("API Entry | Create");
         defer benchmark.end();
 
         const entry = create(user.id, test_env.database, create_entry) catch |err| {
@@ -594,11 +594,11 @@ test "Entry | Create" {
     }
 }
 
-test "Entry | Get" {
+test "API Entry | Get" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
-    var setup = TestSetup.init(test_env.database, "Entry | Get") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -615,7 +615,7 @@ test "Entry | Get" {
     const get_request = rq.GetEntry{ .entry = @intCast(entry.id) };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get");
+        var benchmark = Benchmark.start("API Entry | Get");
         defer benchmark.end();
 
         const result = get(setup.user.id, test_env.database, get_request) catch |err| {
@@ -650,13 +650,13 @@ test "Entry | Get" {
     }
 }
 
-test "Entry | Get range" {
+test "API Entry | Get range" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    var setup = TestSetup.init(test_env.database, "Entry | Get range") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get range") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -707,7 +707,7 @@ test "Entry | Get range" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get range");
+        var benchmark = Benchmark.start("API Entry | Get range");
         defer benchmark.end();
 
         var entry_list = getInRange(allocator, setup.user.id, test_env.database, get_request) catch |err| {
@@ -749,13 +749,13 @@ test "Entry | Get range" {
         }
     }
 }
-test "Entry | Get range (empty)" {
+test "API Entry | Get range (empty)" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    var setup = TestSetup.init(test_env.database, "Entry | Get range (empty)") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get range (empty)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -807,7 +807,7 @@ test "Entry | Get range (empty)" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get range (empty)");
+        var benchmark = Benchmark.start("API Entry | Get range (empty)");
         defer benchmark.end();
 
         if (getInRange(allocator, setup.user.id, test_env.database, get_request)) |*entry_list| {
@@ -819,13 +819,13 @@ test "Entry | Get range (empty)" {
     }
 }
 
-test "Entry | Get recent (all)" {
+test "API Entry | Get recent (all)" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const zdt = @import("zdt");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    var setup = TestSetup.init(test_env.database, "Entry | Get recent (all)") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get recent (all)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -859,7 +859,7 @@ test "Entry | Get recent (all)" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get recent (all)");
+        var benchmark = Benchmark.start("API Entry | Get recent (all)");
         defer benchmark.end();
 
         var entry_list = getRecent(allocator, setup.user.id, test_env.database, get_entry_recent) catch |err| {
@@ -905,13 +905,13 @@ test "Entry | Get recent (all)" {
     }
 }
 
-test "Entry | Get recent (partial)" {
+test "API Entry | Get recent (partial)" {
     //SETUP
     const zdt = @import("zdt");
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    var setup = TestSetup.init(test_env.database, "Entry | Get recent (partial)") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get recent (partial)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -946,7 +946,7 @@ test "Entry | Get recent (partial)" {
     const inserted_entries = [_]Entry{ entry_2, entry_1 };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get recent (partial)");
+        var benchmark = Benchmark.start("API Entry | Get recent (partial)");
         defer benchmark.end();
 
         var entry_list = getRecent(allocator, setup.user.id, test_env.database, get_entry_recent) catch |err| {
@@ -988,13 +988,13 @@ test "Entry | Get recent (partial)" {
     }
 }
 
-test "Entry | Get recent (empty)" {
+test "API Entry | Get recent (empty)" {
     //SETUP
     const zdt = @import("zdt");
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    var setup = TestSetup.init(test_env.database, "Entry | Get recent (empty)") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get recent (empty)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -1027,7 +1027,7 @@ test "Entry | Get recent (empty)" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get recent (empty)");
+        var benchmark = Benchmark.start("API Entry | Get recent (empty)");
         defer benchmark.end();
 
         if (getRecent(allocator, setup.user.id, test_env.database, get_entry_recent)) |*entry_list| {
@@ -1039,13 +1039,13 @@ test "Entry | Get recent (empty)" {
     }
 }
 
-test "Entry | Get average" {
+test "API Entry | Get average" {
     // SETUP
     const zdt = @import("zdt");
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    var setup = TestSetup.init(test_env.database, "Entry | Get average") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get average") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -1108,7 +1108,7 @@ test "Entry | Get average" {
     }
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get average");
+        var benchmark = Benchmark.start("API Entry | Get average");
         defer benchmark.end();
 
         const average = getAverage(setup.user.id, test_env.database, get_entry_breakdown) catch |err| {
@@ -1127,13 +1127,13 @@ test "Entry | Get average" {
     }
 }
 
-test "Entry | Get breakdown" {
+test "API Entry | Get breakdown" {
     // SETUP
     const zdt = @import("zdt");
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
-    var setup = TestSetup.init(test_env.database, "Entry | Get breakdown") catch return error.TestSetupFailed;
+    var setup = TestSetup.init(test_env.database, "API Entry | Get breakdown") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
         setup.user.deinit();
@@ -1197,7 +1197,7 @@ test "Entry | Get breakdown" {
 
     // TEST
     {
-        var benchmark = Benchmark.start("Entry | Get breakdown");
+        var benchmark = Benchmark.start("API Entry | Get breakdown");
         defer benchmark.end();
 
         var breakdown = getBreakdown(allocator, setup.user.id, test_env.database, get_entry_breakdown) catch |err| {

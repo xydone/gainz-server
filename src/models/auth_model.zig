@@ -111,13 +111,13 @@ const SQL_STRINGS = struct {
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
-test "Auth | Create" {
+test "API Auth | Create" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
     const jwt = @import("jwt");
     var test_env = Tests.test_env;
-    const test_name = "Auth | Create";
+    const test_name = "API Auth | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -167,13 +167,13 @@ test "Auth | Create" {
     }
 }
 
-test "Auth | Refresh" {
+test "API Auth | Refresh" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;
-    const test_name = "Auth | Refresh";
+    const test_name = "API Auth | Refresh";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 
@@ -227,13 +227,13 @@ test "Auth | Refresh" {
     }
 }
 
-test "Auth | Invalidate" {
+test "API Auth | Invalidate" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;
-    const test_name = "Auth | Invalidate";
+    const test_name = "API Auth | Invalidate";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit();
 

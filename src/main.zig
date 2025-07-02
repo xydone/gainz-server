@@ -60,28 +60,7 @@ const Tests = @import("tests/tests.zig");
 test "tests:beforeAll" {
     //Guarantee that this is only ran in a test environment
     try Tests.TestEnvironment.init();
-    const database = Tests.test_env.database;
 
-    const conn = try database.acquire();
-    var row = try conn.row("SELECT current_database();", .{});
-    const name = row.?.get([]u8, 0);
-    try row.?.deinit();
-
-    if (!std.mem.startsWith(u8, name, "TEST_")) return error.NotRunningOnTestDB;
-
-    // Clear database
-    var clean_db = try conn.row(
-        \\SELECT 'TRUNCATE TABLE ' ||
-        \\string_agg(quote_ident(table_name), ', ') ||
-        \\' RESTART IDENTITY CASCADE;' AS sql_to_run
-        \\FROM information_schema.tables
-        \\WHERE table_schema = 'public' 
-        \\AND table_type = 'BASE TABLE';
-    , .{});
-    const string = row.?.get([]u8, 0);
-    try clean_db.?.deinit();
-
-    _ = try conn.exec(string, .{});
     std.testing.refAllDecls(@This());
 }
 

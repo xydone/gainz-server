@@ -77,9 +77,9 @@ const SQL_STRINGS = struct {
 // TESTS
 const Tests = @import("../tests/tests.zig");
 
-test "User | Create" {
+test "API User | Create" {
     // SETUP
-    const test_name = "User | Create";
+    const test_name = "API User | Create";
     const test_env = Tests.test_env;
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
@@ -121,9 +121,9 @@ test "User | Create" {
     }
 }
 
-test "User | Duplicate" {
+test "API User | Duplicate" {
     // SETUP
-    const test_name = "User | Duplicate";
+    const test_name = "API User | Duplicate";
     const test_env = Tests.test_env;
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;

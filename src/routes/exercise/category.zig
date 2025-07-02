@@ -6,7 +6,8 @@ const Handler = @import("../../handler.zig");
 const rq = @import("../../request.zig");
 const rs = @import("../../response.zig");
 const types = @import("../../types.zig");
-const Category = @import("../../models/exercise/category.zig");
+const Create = @import("../../models/exercise/category.zig").Create;
+const Get = @import("../../models/exercise/category.zig").Get;
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
@@ -16,7 +17,7 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 pub fn getCategories(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
-    const categories = Category.get(ctx) catch {
+    const categories = Get.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -29,11 +30,11 @@ pub fn createCategory(ctx: *Handler.RequestContext, req: *httpz.Request, res: *h
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const category = std.json.parseFromSliceLeaky(rq.PostCategory, ctx.app.allocator, body, .{}) catch {
+    const category = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    Category.create(ctx, category) catch {
+    _ = Create.call(ctx.user_id.?, ctx.app.db, category) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
