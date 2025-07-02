@@ -25,6 +25,87 @@ const Config = struct {
     }
 };
 
+const TestStats = struct {
+    pass: u64,
+    fail: u64,
+    skip: u64,
+    leak: u64,
+    setup_teardown: u64,
+
+    pub fn init() TestStats {
+        return TestStats{
+            .pass = 0,
+            .fail = 0,
+            .skip = 0,
+            .leak = 0,
+            .setup_teardown = 0,
+        };
+    }
+};
+
+const TestList = struct {
+    test_functions: *std.ArrayList(std.builtin.TestFn),
+    callback: *const fn (CallbackParams) anyerror!void,
+
+    pub const CallbackType = enum { basic, @"test" };
+    pub const CallbackParams = struct { t: std.builtin.TestFn, config: Config, printer: Printer, test_stats: *TestStats };
+
+    pub fn init(allocator: std.mem.Allocator, callback_type: CallbackType) TestList {
+        const list = allocator.create(std.ArrayList(std.builtin.TestFn)) catch @panic("cannot allocate arraylist");
+        list.* = std.ArrayList(std.builtin.TestFn).init(allocator);
+        return TestList{
+            .test_functions = list,
+            .callback = switch (callback_type) {
+                .basic => basic_callback,
+                .@"test" => test_callback,
+            },
+        };
+    }
+
+    pub fn deinit(self: TestList, allocator: std.mem.Allocator) void {
+        self.test_functions.deinit();
+        allocator.destroy(self.test_functions);
+    }
+
+    pub fn basic_callback(params: CallbackParams) !void {
+        params.t.func() catch |err| {
+            return err;
+        };
+    }
+    pub fn test_callback(params: CallbackParams) !void {
+        const is_unnamed_test = isUnnamed(params.t);
+        if (params.config.filter) |f| {
+            if (!is_unnamed_test and std.mem.indexOf(u8, params.t.name, f) == null) {
+                // continue;
+                return;
+            }
+        }
+
+        std.testing.allocator_instance = .{};
+        const result = params.t.func();
+
+        if (std.testing.allocator_instance.deinit() == .leak) {
+            params.test_stats.leak += 1;
+        }
+
+        if (result) |_| {
+            params.test_stats.pass += 1;
+        } else |err| switch (err) {
+            error.SkipZigTest => {
+                params.test_stats.skip += 1;
+            },
+            else => {
+                params.test_stats.fail += 1;
+                if (@errorReturnTrace()) |trace| {
+                    params.printer.status(.fail, "{s}\n", .{BORDER});
+                    params.printer.status(.fail, "TRACE:\n", .{});
+                    std.debug.dumpStackTrace(trace.*);
+                    params.printer.status(.fail, "{s}\n", .{BORDER});
+                }
+            },
+        }
+    }
+};
 pub fn main() !void {
     var mem: [8192]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&mem);
@@ -47,78 +128,61 @@ pub fn main() !void {
         }
     }
 
-    var pass: usize = 0;
-    var fail: usize = 0;
-    var skip: usize = 0;
-    var leak: usize = 0;
-    var setup_teardown: usize = 0;
+    var test_stats = TestStats.init();
+
+    const setup_queue = TestList.init(allocator, .basic);
+    defer setup_queue.deinit(allocator);
+    const teardown_queue = TestList.init(allocator, .basic);
+    defer teardown_queue.deinit(allocator);
+    const endpoint_queue = TestList.init(allocator, .@"test");
+    defer endpoint_queue.deinit(allocator);
+    const api_queue = TestList.init(allocator, .@"test");
+    defer api_queue.deinit(allocator);
 
     for (builtin.test_functions) |t| {
-        if (isSetup(t)) {
-            t.func() catch |err| {
-                return err;
-            };
-        }
-    }
-
-    for (builtin.test_functions) |t| {
-        if (isSetup(t) or isTeardown(t)) {
-            setup_teardown += 1;
+        const name = makeNameFriendly(t.name);
+        if (isEndpoint(name)) {
+            try endpoint_queue.test_functions.append(t);
             continue;
         }
-
-        const is_unnamed_test = isUnnamed(t);
-        if (config.filter) |f| {
-            if (!is_unnamed_test and std.mem.indexOf(u8, t.name, f) == null) {
-                continue;
-            }
+        if (isAPI(name)) {
+            try api_queue.test_functions.append(t);
+            continue;
         }
-
-        std.testing.allocator_instance = .{};
-        const result = t.func();
-
-        if (std.testing.allocator_instance.deinit() == .leak) {
-            leak += 1;
+        if (isSetup(name)) {
+            try setup_queue.test_functions.append(t);
+            test_stats.setup_teardown += 1;
+            continue;
         }
-
-        if (result) |_| {
-            pass += 1;
-        } else |err| switch (err) {
-            error.SkipZigTest => {
-                skip += 1;
-            },
-            else => {
-                fail += 1;
-                if (@errorReturnTrace()) |trace| {
-                    printer.status(.fail, "{s}\n", .{BORDER});
-                    printer.status(.fail, "TRACE:\n", .{});
-                    std.debug.dumpStackTrace(trace.*);
-                    printer.status(.fail, "{s}\n", .{BORDER});
-                }
-                if (config.fail_first) {
-                    break;
-                }
-            },
+        if (isTeardown(name)) {
+            try teardown_queue.test_functions.append(t);
+            test_stats.setup_teardown += 1;
+            continue;
         }
     }
 
-    for (builtin.test_functions) |t| {
-        if (isTeardown(t)) {
-            t.func() catch |err| {
-                return err;
-            };
+    // Order is:
+    // 1. Setup
+    // 2. API
+    // 3. Endpoint
+    // 4. Teardown
+    const test_run_order = [_]TestList{ setup_queue, api_queue, endpoint_queue, teardown_queue };
+    for (test_run_order) |list| {
+        for (list.test_functions.items) |t| {
+            const params = TestList.CallbackParams{ .config = config, .printer = printer, .test_stats = &test_stats, .t = t };
+            try list.callback(params);
         }
     }
 
-    const total_tests = builtin.test_functions.len - setup_teardown;
-    const total_tests_executed = pass + fail;
+    const total_tests = builtin.test_functions.len - test_stats.setup_teardown;
+    const total_tests_executed = test_stats.pass + test_stats.fail;
     const not_executed = total_tests - total_tests_executed;
     printer.status(.text, "{s: <15}: {d}\n", .{ "TOTAL EXECUTED", total_tests_executed });
-    printer.status(.pass, "{s: <15}: {d}\n", .{ "PASS", pass });
-    printer.status(.fail, "{s: <15}: {d}\n", .{ "FAILED", fail });
+    printer.status(.pass, "{s: <15}: {d}\n", .{ "PASS", test_stats.pass });
+    printer.status(.fail, "{s: <15}: {d}\n", .{ "FAILED", test_stats.fail });
     if (not_executed > 0) printer.status(.fail, "{s: <15}: {d}\n", .{ "NOT EXECUTED", not_executed });
 
-    std.posix.exit(if (fail == 0) 0 else 1);
+    std.posix.exit(if (test_stats.fail == 0) 0 else 1);
 }
 
 pub const panic = std.debug.FullPanic(struct {
@@ -130,6 +194,17 @@ pub const panic = std.debug.FullPanic(struct {
     }
 }.panicFn);
 
+fn makeNameFriendly(name: []const u8) []const u8 {
+    var it = std.mem.splitScalar(u8, name, '.');
+    while (it.next()) |value| {
+        if (std.mem.eql(u8, value, "test")) {
+            const rest = it.rest();
+            return if (rest.len > 0) rest else name;
+        }
+    }
+    return name;
+}
+
 fn isUnnamed(t: std.builtin.TestFn) bool {
     const marker = ".test_";
     const test_name = t.name;
@@ -138,14 +213,62 @@ fn isUnnamed(t: std.builtin.TestFn) bool {
     return true;
 }
 
-fn isSetup(t: std.builtin.TestFn) bool {
-    return std.mem.endsWith(u8, t.name, "tests:beforeAll");
+fn isSetup(test_name: []const u8) bool {
+    return std.mem.endsWith(u8, test_name, "tests:beforeAll");
 }
 
-fn isTeardown(t: std.builtin.TestFn) bool {
-    return std.mem.endsWith(u8, t.name, "tests:afterAll");
+fn isTeardown(test_name: []const u8) bool {
+    return std.mem.endsWith(u8, test_name, "tests:afterAll");
 }
 
-fn isNotTimed(t: std.builtin.TestFn) bool {
-    return std.mem.endsWith(u8, t.name, "tests:noTime");
+fn isNotTimed(test_name: []const u8) bool {
+    return std.mem.endsWith(u8, test_name, "tests:noTime");
+}
+fn isAPI(test_name: []const u8) bool {
+    return std.mem.startsWith(u8, test_name, "API");
+}
+fn isEndpoint(test_name: []const u8) bool {
+    return std.mem.startsWith(u8, test_name, "Endpoint");
+}
+
+fn runTest(
+    t: std.builtin.TestFn,
+    config: Config,
+    printer: Printer,
+    test_stats: *TestStats,
+) !void {
+    const is_unnamed_test = isUnnamed(t);
+    if (config.filter) |f| {
+        if (!is_unnamed_test and std.mem.indexOf(u8, t.name, f) == null) {
+            // continue;
+            return;
+        }
+    }
+
+    std.testing.allocator_instance = .{};
+    const result = t.func();
+
+    if (std.testing.allocator_instance.deinit() == .leak) {
+        test_stats.leak += 1;
+    }
+
+    if (result) |_| {
+        test_stats.pass += 1;
+    } else |err| switch (err) {
+        error.SkipZigTest => {
+            test_stats.skip += 1;
+        },
+        else => {
+            test_stats.fail += 1;
+            if (@errorReturnTrace()) |trace| {
+                printer.status(.fail, "{s}\n", .{BORDER});
+                printer.status(.fail, "TRACE:\n", .{});
+                std.debug.dumpStackTrace(trace.*);
+                printer.status(.fail, "{s}\n", .{BORDER});
+            }
+            if (config.fail_first) {
+                // break;
+            }
+        },
+    }
 }
