@@ -70,7 +70,7 @@ test "Endpoint Workout | Create" {
     const allocator = std.testing.allocator;
 
     var user = try TestSetup.createUser(test_env.database, test_name);
-    defer user.deinit();
+    defer user.deinit(allocator);
 
     const body = Create.Request{ .name = test_name };
     const body_string = try std.json.stringifyAlloc(allocator, body, .{});
@@ -127,7 +127,7 @@ test "Endpoint Workout | Add Exercise" {
     const allocator = std.testing.allocator;
 
     var user = try TestSetup.createUser(test_env.database, test_name);
-    defer user.deinit();
+    defer user.deinit(allocator);
 
     // Create workout
     const workout = try Create.call(user.id, test_env.database, .{ .name = test_name });
@@ -221,7 +221,7 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     const allocator = std.testing.allocator;
 
     var user = try TestSetup.createUser(test_env.database, test_name);
-    defer user.deinit();
+    defer user.deinit(allocator);
 
     // Create workout
     const workout = try Create.call(user.id, test_env.database, .{ .name = test_name });

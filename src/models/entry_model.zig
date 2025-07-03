@@ -506,22 +506,22 @@ const TestSetup = struct {
     user: User,
     food: Food,
 
-    const User = @import("users_model.zig").User;
+    const User = @import("users_model.zig").Create.Response;
     pub fn init(database: *pg.Pool, unique_name: []const u8) !TestSetup {
-        const createFood = @import("food_model.zig").create;
+        const Create = @import("food_model.zig").Create;
         const allocator = std.testing.allocator;
 
         // User insert
         const user = try createUser(database, unique_name);
 
-        const create_food = rq.PostFood{
+        const create_food = Create.Request{
             .brand_name = unique_name,
             .food_name = "Test food name",
             .food_grams = 100,
             .nutrients = types.Nutrients{ .calories = 350 },
         };
 
-        return TestSetup{ .user = user, .food = try createFood(user.id, allocator, database, create_food) };
+        return TestSetup{ .user = user, .food = try Create.call(user.id, allocator, database, create_food) };
     }
 
     pub fn createUser(database: *pg.Pool, name: []const u8) !User {
@@ -536,25 +536,25 @@ const TestSetup = struct {
 test "API Entry | Create" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
-    const createFood = @import("food_model.zig").create;
+    const Create = @import("food_model.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
     var user = try TestSetup.createUser(test_env.database, "API Entry | Create");
-    defer user.deinit();
+    defer user.deinit(allocator);
 
     const brand = try std.fmt.allocPrint(allocator, "Test brand", .{});
     defer allocator.free(brand);
     const food_name = try std.fmt.allocPrint(allocator, "Test food name", .{});
     defer allocator.free(food_name);
 
-    const create_food = rq.PostFood{
+    const create_food = Create.Request{
         .brand_name = brand,
         .food_name = food_name,
         .food_grams = 100,
         .nutrients = types.Nutrients{ .calories = 350 },
     };
-    var food = try createFood(user.id, allocator, test_env.database, create_food);
+    var food = try Create.call(user.id, allocator, test_env.database, create_food);
     defer food.deinit();
 
     const create_entry = rq.PostEntry{
@@ -598,10 +598,11 @@ test "API Entry | Get" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const create_entry = rq.PostEntry{
@@ -659,7 +660,7 @@ test "API Entry | Get range" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get range") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -758,7 +759,7 @@ test "API Entry | Get range (empty)" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get range (empty)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -828,7 +829,7 @@ test "API Entry | Get recent (all)" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (all)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -914,7 +915,7 @@ test "API Entry | Get recent (partial)" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (partial)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -997,7 +998,7 @@ test "API Entry | Get recent (empty)" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (empty)") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -1048,7 +1049,7 @@ test "API Entry | Get average" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get average") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);
@@ -1136,7 +1137,7 @@ test "API Entry | Get breakdown" {
     var setup = TestSetup.init(test_env.database, "API Entry | Get breakdown") catch return error.TestSetupFailed;
     defer {
         setup.food.deinit();
-        setup.user.deinit();
+        setup.user.deinit(allocator);
     }
 
     const now = try zdt.Datetime.now(null);

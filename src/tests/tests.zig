@@ -60,7 +60,7 @@ pub const TestEnvironment = struct {
 pub const TestSetup = struct {
     user: User,
 
-    const User = @import("../models/users_model.zig").User;
+    const User = @import("../models/users_model.zig").Create.Response;
     pub fn init(database: *pg.Pool, unique_name: []const u8) !TestSetup {
         const user = try createUser(database, unique_name);
 
@@ -71,7 +71,7 @@ pub const TestSetup = struct {
 
     pub fn createUser(database: *pg.Pool, name: []const u8) !User {
         const allocator = std.testing.allocator;
-        const innerCreate = @import("../models/users_model.zig").create;
+        const Create = @import("../models/users_model.zig").Create;
 
         const username = try std.fmt.allocPrint(allocator, "{s}", .{name});
         defer allocator.free(username);
@@ -80,19 +80,19 @@ pub const TestSetup = struct {
         const password = try std.fmt.allocPrint(allocator, "Testing password", .{});
         defer allocator.free(password);
 
-        const request = rq.PostUser{
+        const request = Create.Request{
             .display_name = display_name,
             .username = username,
             .password = password,
         };
-        const user = try innerCreate(
+        const user = try Create.call(
             database,
             allocator,
             request,
         );
         return user;
     }
-    pub fn createContext(user_id: i32, allocator: std.mem.Allocator, database: *Database.Pool) !Handler.RequestContext {
+    pub fn createContext(user_id: ?i32, allocator: std.mem.Allocator, database: *Database.Pool) !Handler.RequestContext {
         const app = try allocator.create(Handler);
         app.* = Handler{
             .allocator = allocator,
@@ -110,7 +110,7 @@ pub const TestSetup = struct {
         context.app.env.deinit();
         allocator.destroy(context.app);
     }
-    pub fn deinit(self: *TestSetup) void {
-        self.user.deinit();
+    pub fn deinit(self: *TestSetup, allocator: std.mem.Allocator) void {
+        self.user.deinit(allocator);
     }
 };

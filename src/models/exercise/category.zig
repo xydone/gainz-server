@@ -92,8 +92,9 @@ test "API Exercise Category | Create" {
     //SETUP
     const Benchmark = @import("../../tests/benchmark.zig");
     const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     // TEST
     {

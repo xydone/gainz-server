@@ -145,7 +145,8 @@ test "API Measurement | Create (with date)" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Create (with date)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     const test_date = "2024-01-01";
     const provided_date = try zdt.Datetime.fromString(test_date, "%Y-%m-%d");
@@ -191,7 +192,8 @@ test "API Measurement | Create (default date)" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Create (default date)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     const now_timestamp = try zdt.Datetime.now(null);
     const now_date = try now_timestamp.floorTo(.day);
@@ -238,7 +240,8 @@ test "API Measurement | Delete" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Delete";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     const create_request = rq.PostMeasurement{
         .date = null,
@@ -272,7 +275,7 @@ test "API Measurement | Get in range (lower bound)" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get in range (lower bound)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -339,7 +342,7 @@ test "API Measurement | Get in range (upper bound)" {
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (upper bound)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -407,7 +410,7 @@ test "API Measurement | Get in range (overlap)" {
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (overlap)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -475,7 +478,7 @@ test "API Measurement | Get in range (multiple)" {
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (multiple)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -538,7 +541,7 @@ test "API Measurement | Get in range (empty)" {
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (empty)";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -584,7 +587,8 @@ test "API Measurement | Get by ID" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get by ID";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",
@@ -641,7 +645,8 @@ test "API Measurement | Get recent" {
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get recent";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     var create_request = rq.PostMeasurement{
         .date = "2025-01-01",

@@ -69,7 +69,8 @@ test "API Goal | Create" {
     const Benchmark = @import("../tests/benchmark.zig");
     const test_name = "API Goal | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     const create_goal = rq.PostGoal{
         .target = .weight,
@@ -102,7 +103,7 @@ test "API Goal | Get" {
     const test_env = Tests.test_env;
     const test_name = "API Goal | Get";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     const create_goal = rq.PostGoal{
         .target = .weight,

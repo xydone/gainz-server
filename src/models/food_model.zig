@@ -1,6 +1,9 @@
 const std = @import("std");
 
 const pg = @import("pg");
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
 
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
@@ -64,73 +67,32 @@ pub const Food = struct {
         }
     }
 };
-/// Have to call .deinit() to free memory after usage
-pub fn get(allocator: std.mem.Allocator, database: *pg.Pool, request: rq.GetFood) anyerror!Food {
-    var conn = try database.acquire();
-    defer conn.release();
-    var row = conn.rowOpts(SQL_STRINGS.get, //
-        .{request.food_id}, .{ .column_names = true }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    } orelse return error.NotFound;
-    defer row.deinit() catch {};
 
-    const id = row.get(i32, 0);
-    const created_at = row.getCol(i64, "created_at");
-    const food_name = row.getCol([]u8, "food_name");
-    const brand_name = row.getCol([]u8, "brand_name");
-    const nutrients = types.Nutrients{
-        .calories = row.getCol(f64, "calories"),
-        .fat = row.getCol(?f64, "fat"),
-        .sat_fat = row.getCol(?f64, "sat_fat"),
-        .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
-        .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
-        .trans_fat = row.getCol(?f64, "trans_fat"),
-        .cholesterol = row.getCol(?f64, "cholesterol"),
-        .sodium = row.getCol(?f64, "sodium"),
-        .potassium = row.getCol(?f64, "potassium"),
-        .carbs = row.getCol(?f64, "carbs"),
-        .fiber = row.getCol(?f64, "fiber"),
-        .sugar = row.getCol(?f64, "sugar"),
-        .protein = row.getCol(?f64, "protein"),
-        .vitamin_a = row.getCol(?f64, "vitamin_a"),
-        .vitamin_c = row.getCol(?f64, "vitamin_c"),
-        .calcium = row.getCol(?f64, "calcium"),
-        .iron = row.getCol(?f64, "iron"),
+pub const Get = struct {
+    pub const Request = struct {
+        food_id: u32,
     };
-    const servings_unparsed = row.getCol([]u8, "servings");
-    const servings = std.json.parseFromSliceLeaky([]types.Servings, allocator, servings_unparsed, .{}) catch |err| {
-        log.err("Error parsing servings JSON within search query. Error: {}", .{err});
-        return err;
-    };
+    pub const Response = Food;
+    pub const Errors = error{
+        CannotGet,
+        FoodNotFound,
+        ServingsParsingError,
+        OutOfMemory,
+    } || DatabaseErrors;
+    /// Have to call .deinit() to free memory after usage
+    pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Get.Request) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var row = conn.rowOpts(query_string, //
+            .{request.food_id}, .{ .column_names = true }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
 
-    return Food{
-        .allocator = allocator,
-        .id = id,
-        .created_at = created_at,
-        .food_name = try allocator.dupe(u8, food_name),
-        .brand_name = try allocator.dupe(u8, brand_name),
-        .nutrients = nutrients,
-        .servings = servings,
-    };
-}
+            return error.CannotGet;
+        } orelse return error.FoodNotFound;
+        defer row.deinit() catch {};
 
-/// Have to call .deinit() to free memory after usage
-pub fn search(allocator: std.mem.Allocator, database: *pg.Pool, request: rq.SearchFood) anyerror!FoodList {
-    var conn = try database.acquire();
-    defer conn.release();
-    var result = conn.queryOpts(SQL_STRINGS.search, //
-        .{request.search_term}, .{ .column_names = true, .allocator = allocator }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    };
-    defer result.deinit();
-    var response = std.ArrayList(Food).init(allocator);
-    while (try result.next()) |row| {
         const id = row.get(i32, 0);
         const created_at = row.getCol(i64, "created_at");
         const food_name = row.getCol([]u8, "food_name");
@@ -153,93 +115,24 @@ pub fn search(allocator: std.mem.Allocator, database: *pg.Pool, request: rq.Sear
             .vitamin_c = row.getCol(?f64, "vitamin_c"),
             .calcium = row.getCol(?f64, "calcium"),
             .iron = row.getCol(?f64, "iron"),
-            .added_sugars = row.getCol(?f64, "added_sugars"),
-            .vitamin_d = row.getCol(?f64, "vitamin_d"),
-            .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
         };
         const servings_unparsed = row.getCol([]u8, "servings");
         const servings = std.json.parseFromSliceLeaky([]types.Servings, allocator, servings_unparsed, .{}) catch |err| {
             log.err("Error parsing servings JSON within search query. Error: {}", .{err});
-            return err;
+            return error.ServingsParsingError;
         };
 
-        try response.append(Food{
+        return Response{
             .allocator = allocator,
             .id = id,
             .created_at = created_at,
-            .food_name = try allocator.dupe(u8, food_name),
-            .brand_name = try allocator.dupe(u8, brand_name),
+            .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
+            .brand_name = allocator.dupe(u8, brand_name) catch return error.OutOfMemory,
             .nutrients = nutrients,
             .servings = servings,
-        });
+        };
     }
-    return FoodList{ .list = try response.toOwnedSlice(), .allocator = allocator };
-}
-
-pub fn create(user_id: i32, allocator: std.mem.Allocator, database: *pg.Pool, request: rq.PostFood) anyerror!Food {
-    var conn = try database.acquire();
-    defer conn.release();
-
-    var row = try conn.rowOpts(SQL_STRINGS.create, //
-        .{ user_id, request.brand_name, request.food_name, request.food_grams, request.nutrients.calories, request.nutrients.fat, request.nutrients.sat_fat, request.nutrients.polyunsat_fat, request.nutrients.monounsat_fat, request.nutrients.trans_fat, request.nutrients.cholesterol, request.nutrients.sodium, request.nutrients.potassium, request.nutrients.carbs, request.nutrients.fiber, request.nutrients.sugar, request.nutrients.protein, request.nutrients.vitamin_a, request.nutrients.vitamin_c, request.nutrients.calcium, request.nutrients.iron } //
-        , .{ .column_names = true, .allocator = allocator }) orelse return error.FoodNotFound;
-    defer row.deinit() catch {};
-
-    const id = row.getCol(i32, "id");
-    const created_at = row.getCol(i64, "created_at");
-    const food_name = row.getCol([]u8, "food_name");
-    const brand_name = row.getCol([]u8, "brand_name");
-    const nutrients = types.Nutrients{
-        .calories = row.getCol(f64, "calories"),
-        .fat = row.getCol(?f64, "fat"),
-        .sat_fat = row.getCol(?f64, "sat_fat"),
-        .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
-        .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
-        .trans_fat = row.getCol(?f64, "trans_fat"),
-        .cholesterol = row.getCol(?f64, "cholesterol"),
-        .sodium = row.getCol(?f64, "sodium"),
-        .potassium = row.getCol(?f64, "potassium"),
-        .carbs = row.getCol(?f64, "carbs"),
-        .fiber = row.getCol(?f64, "fiber"),
-        .sugar = row.getCol(?f64, "sugar"),
-        .protein = row.getCol(?f64, "protein"),
-        .vitamin_a = row.getCol(?f64, "vitamin_a"),
-        .vitamin_c = row.getCol(?f64, "vitamin_c"),
-        .calcium = row.getCol(?f64, "calcium"),
-        .iron = row.getCol(?f64, "iron"),
-    };
-
-    const servings = try allocator.alloc(types.Servings, 1);
-    servings[0] = types.Servings{
-        .amount = row.getCol(f64, "serving_amount"),
-        .id = row.getCol(i32, "serving_id"),
-        .multiplier = row.getCol(f64, "serving_multiplier"),
-        .unit = try allocator.dupe(u8, row.getCol([]u8, "serving_unit")),
-    };
-
-    return Food{
-        .allocator = allocator,
-        .id = id,
-        .created_at = created_at,
-        .food_name = try allocator.dupe(u8, food_name),
-        .brand_name = try allocator.dupe(u8, brand_name),
-        .nutrients = nutrients,
-        .servings = servings,
-    };
-}
-
-pub fn delete(user_id: i32, database: *pg.Pool, request: rq.DeleteFood) !bool {
-    var conn = try database.acquire();
-    defer conn.release();
-
-    const amount_deleted = try conn.exec(SQL_STRINGS.delete, //
-        .{ user_id, request.id } //
-    ) orelse return error.FoodNotFound;
-    return amount_deleted == 1;
-}
-
-const SQL_STRINGS = struct {
-    pub const get =
+    const query_string =
         \\SELECT
         \\f.*,
         \\JSON_AGG(
@@ -264,7 +157,78 @@ const SQL_STRINGS = struct {
         \\f.id = $1
         \\GROUP BY f.id;
     ;
-    pub const search =
+};
+
+pub const Search = struct {
+    pub const Request = struct {
+        search_term: []const u8,
+    };
+    pub const Response = FoodList;
+    pub const Errors = error{
+        CannotSearch,
+        ServingsParsingError,
+        OutOfMemory,
+    } || DatabaseErrors;
+    /// Have to call .deinit() to free memory after usage
+    pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Request) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var result = conn.queryOpts(query_string, //
+            .{request.search_term}, .{ .column_names = true, .allocator = allocator }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotSearch;
+        };
+        defer result.deinit();
+        var response = std.ArrayList(Food).init(allocator);
+        while (result.next() catch return error.CannotSearch) |row| {
+            const id = row.get(i32, 0);
+            const created_at = row.getCol(i64, "created_at");
+            const food_name = row.getCol([]u8, "food_name");
+            const brand_name = row.getCol([]u8, "brand_name");
+            const nutrients = types.Nutrients{
+                .calories = row.getCol(f64, "calories"),
+                .fat = row.getCol(?f64, "fat"),
+                .sat_fat = row.getCol(?f64, "sat_fat"),
+                .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
+                .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
+                .trans_fat = row.getCol(?f64, "trans_fat"),
+                .cholesterol = row.getCol(?f64, "cholesterol"),
+                .sodium = row.getCol(?f64, "sodium"),
+                .potassium = row.getCol(?f64, "potassium"),
+                .carbs = row.getCol(?f64, "carbs"),
+                .fiber = row.getCol(?f64, "fiber"),
+                .sugar = row.getCol(?f64, "sugar"),
+                .protein = row.getCol(?f64, "protein"),
+                .vitamin_a = row.getCol(?f64, "vitamin_a"),
+                .vitamin_c = row.getCol(?f64, "vitamin_c"),
+                .calcium = row.getCol(?f64, "calcium"),
+                .iron = row.getCol(?f64, "iron"),
+                .added_sugars = row.getCol(?f64, "added_sugars"),
+                .vitamin_d = row.getCol(?f64, "vitamin_d"),
+                .sugar_alcohols = row.getCol(?f64, "sugar_alcohols"),
+            };
+            const servings_unparsed = row.getCol([]u8, "servings");
+            const servings = std.json.parseFromSliceLeaky([]types.Servings, allocator, servings_unparsed, .{}) catch |err| {
+                log.err("Error parsing servings JSON within search query. Error: {}", .{err});
+                return error.ServingsParsingError;
+            };
+
+            try response.append(Food{
+                .allocator = allocator,
+                .id = id,
+                .created_at = created_at,
+                .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
+                .brand_name = allocator.dupe(u8, brand_name) catch return error.OutOfMemory,
+                .nutrients = nutrients,
+                .servings = servings,
+            });
+        }
+        return Response{ .list = try response.toOwnedSlice(), .allocator = allocator };
+    }
+
+    const query_string =
         \\SELECT
         \\  f.*,
         \\  JSON_AGG(
@@ -291,7 +255,79 @@ const SQL_STRINGS = struct {
         \\GROUP BY
         \\  f.id
     ;
-    pub const create =
+};
+
+pub const Create = struct {
+    pub const Request = struct {
+        brand_name: ?[]const u8,
+        food_name: ?[]const u8,
+        food_grams: f64,
+        nutrients: types.Nutrients,
+    };
+    pub const Response = Food;
+    pub const Errors = error{
+        CannotCreate,
+        OutOfMemory,
+    } || DatabaseErrors;
+    /// Have to call .deinit() to free memory after usage
+    pub fn call(user_id: i32, allocator: std.mem.Allocator, database: *Pool, request: Request) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+
+        var row = conn.rowOpts(query_string, //
+            .{ user_id, request.brand_name, request.food_name, request.food_grams, request.nutrients.calories, request.nutrients.fat, request.nutrients.sat_fat, request.nutrients.polyunsat_fat, request.nutrients.monounsat_fat, request.nutrients.trans_fat, request.nutrients.cholesterol, request.nutrients.sodium, request.nutrients.potassium, request.nutrients.carbs, request.nutrients.fiber, request.nutrients.sugar, request.nutrients.protein, request.nutrients.vitamin_a, request.nutrients.vitamin_c, request.nutrients.calcium, request.nutrients.iron } //
+            , .{ .column_names = true, .allocator = allocator }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotCreate;
+        } orelse return error.CannotCreate;
+        defer row.deinit() catch {};
+
+        const id = row.getCol(i32, "id");
+        const created_at = row.getCol(i64, "created_at");
+        const food_name = row.getCol([]u8, "food_name");
+        const brand_name = row.getCol([]u8, "brand_name");
+        const nutrients = types.Nutrients{
+            .calories = row.getCol(f64, "calories"),
+            .fat = row.getCol(?f64, "fat"),
+            .sat_fat = row.getCol(?f64, "sat_fat"),
+            .polyunsat_fat = row.getCol(?f64, "polyunsat_fat"),
+            .monounsat_fat = row.getCol(?f64, "monounsat_fat"),
+            .trans_fat = row.getCol(?f64, "trans_fat"),
+            .cholesterol = row.getCol(?f64, "cholesterol"),
+            .sodium = row.getCol(?f64, "sodium"),
+            .potassium = row.getCol(?f64, "potassium"),
+            .carbs = row.getCol(?f64, "carbs"),
+            .fiber = row.getCol(?f64, "fiber"),
+            .sugar = row.getCol(?f64, "sugar"),
+            .protein = row.getCol(?f64, "protein"),
+            .vitamin_a = row.getCol(?f64, "vitamin_a"),
+            .vitamin_c = row.getCol(?f64, "vitamin_c"),
+            .calcium = row.getCol(?f64, "calcium"),
+            .iron = row.getCol(?f64, "iron"),
+        };
+
+        const servings = allocator.alloc(types.Servings, 1) catch return error.OutOfMemory;
+        servings[0] = types.Servings{
+            .amount = row.getCol(f64, "serving_amount"),
+            .id = row.getCol(i32, "serving_id"),
+            .multiplier = row.getCol(f64, "serving_multiplier"),
+            .unit = allocator.dupe(u8, row.getCol([]u8, "serving_unit")) catch return error.OutOfMemory,
+        };
+
+        return Response{
+            .allocator = allocator,
+            .id = id,
+            .created_at = created_at,
+            .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
+            .brand_name = allocator.dupe(u8, brand_name) catch return error.OutOfMemory,
+            .nutrients = nutrients,
+            .servings = servings,
+        };
+    }
+
+    const query_string =
         \\WITH inserted_food AS (
         \\ insert into
         \\  food (
@@ -338,8 +374,33 @@ const SQL_STRINGS = struct {
         \\LEFT JOIN
         \\inserted_serving iss ON ifs.id = iss.food_id;
     ;
+};
 
-    pub const delete = "DELETE FROM food WHERE created_by = $1 AND id = $2";
+pub const Delete = struct {
+    pub const Request = struct {
+        id: u32,
+    };
+    pub const Response = Food;
+    pub const Errors = error{
+        CannotDelete,
+        OutOfMemory,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!bool {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+
+        const amount_deleted = conn.exec(query_string, //
+            .{ user_id, request.id } //
+        ) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotDelete;
+        } orelse return error.CannotDelete;
+        return amount_deleted == 1;
+    }
+
+    const query_string = "DELETE FROM food WHERE created_by = $1 AND id = $2";
 };
 
 const Tests = @import("../tests/tests.zig");
@@ -354,9 +415,9 @@ test "API Food | Create" {
     const test_env = Tests.test_env;
 
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
-    const create_request = rq.PostFood{
+    const create_request = Create.Request{
         .food_name = test_name,
         .brand_name = "Brand " ++ test_name,
         .food_grams = 100,
@@ -367,7 +428,7 @@ test "API Food | Create" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var food = create(setup.user.id, allocator, test_env.database, create_request) catch |err| {
+        var food = Create.call(setup.user.id, allocator, test_env.database, create_request) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -404,19 +465,19 @@ test "API Food | Get" {
     const test_name = "API Food | Get";
 
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     //insert food
-    const create_request = rq.PostFood{
+    const create_request = Create.Request{
         .food_name = test_name,
         .brand_name = "Brand " ++ test_name,
         .food_grams = 100,
         .nutrients = types.Nutrients{ .calories = 350 },
     };
-    var food = try create(setup.user.id, allocator, test_env.database, create_request);
+    var food = try Create.call(setup.user.id, allocator, test_env.database, create_request);
     defer food.deinit();
 
-    const get_request = rq.GetFood{
+    const get_request = Get.Request{
         .food_id = @intCast(food.id),
     };
     // TEST
@@ -424,7 +485,7 @@ test "API Food | Get" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var response = get(allocator, test_env.database, get_request) catch |err| {
+        var response = Get.call(allocator, test_env.database, get_request) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -475,16 +536,16 @@ test "API Food | Search" {
     const allocator = std.testing.allocator;
     const test_name = "API Food | Search";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     //insert food
-    const create_request = rq.PostFood{
+    const create_request = Create.Request{
         .food_name = test_name,
         .brand_name = "Brand " ++ test_name,
         .food_grams = 100,
         .nutrients = types.Nutrients{ .calories = 350 },
     };
-    var inserted_food = try create(setup.user.id, allocator, test_env.database, create_request);
+    var inserted_food = try Create.call(setup.user.id, allocator, test_env.database, create_request);
     defer inserted_food.deinit();
 
     // TEST
@@ -492,11 +553,11 @@ test "API Food | Search" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const search_food = rq.SearchFood{
+        const search_food = Search.Request{
             .search_term = test_name[0..15],
         };
 
-        var results = search(allocator, test_env.database, search_food) catch |err| {
+        var results = Search.call(allocator, test_env.database, search_food) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -539,3 +600,5 @@ test "API Food | Search" {
         };
     }
 }
+
+// TODO: test for delete

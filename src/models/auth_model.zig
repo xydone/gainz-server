@@ -1,6 +1,8 @@
 const std = @import("std");
 
-const pg = @import("pg");
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
 
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
@@ -13,33 +15,44 @@ const log = std.log.scoped(.auth_model);
 const ACCESS_TOKEN_EXPIRY = 15 * 60;
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 
-pub const Auth = struct {
-    allocator: std.mem.Allocator,
-    access_token: []const u8,
-    refresh_token: []const u8,
-    expires_in: i32,
+pub const Create = struct {
+    pub const Request = struct {
+        username: []const u8,
+        password: []const u8,
+    };
+    pub const Response = struct {
+        access_token: []const u8,
+        refresh_token: []const u8,
+        expires_in: i32,
 
-    pub fn deinit(self: *Auth) void {
-        self.allocator.free(self.access_token);
-        self.allocator.free(self.refresh_token);
-    }
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.access_token);
+            allocator.free(self.refresh_token);
+        }
+    };
 
-    pub const CreateProps = struct {
+    pub const Props = struct {
         allocator: std.mem.Allocator,
-        database: *pg.Pool,
+        database: *Pool,
         jwt_secret: []const u8,
         redis_client: *redis.RedisClient,
     };
-    pub fn create(props: CreateProps, request: rq.PostAuth) anyerror!Auth {
+
+    pub const Errors = error{ CannotCreate, UserNotFound } || DatabaseErrors;
+    pub fn call(props: Props, request: Request) anyerror!Response {
         var conn = try props.database.acquire();
         defer conn.release();
-        var row = conn.row(SQL_STRINGS.create, //
+        const error_handler = ErrorHandler{ .conn = conn };
+
+        var row = conn.row(query_string, //
             .{request.username}) catch |err| {
-            if (conn.err) |pg_err| {
-                log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| {
+                ErrorHandler.printErr(data);
             }
+
             return err;
-        } orelse return error.NotFound;
+        } orelse return error.CannotCreate;
         defer row.deinit() catch {};
         const user_id = row.get(i32, 0);
         const hash = row.get([]u8, 1);
@@ -56,27 +69,61 @@ pub const Auth = struct {
 
         _ = try props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY);
 
-        return Auth{ .allocator = props.allocator, .access_token = access_token, .refresh_token = refresh_token, .expires_in = ACCESS_TOKEN_EXPIRY };
+        return Response{
+            .access_token = access_token,
+            .refresh_token = refresh_token,
+            .expires_in = ACCESS_TOKEN_EXPIRY,
+        };
     }
 
-    pub const RefreshProps = struct {
+    const query_string = "SELECT id, password FROM users WHERE username=$1;";
+};
+
+pub const Refresh = struct {
+    pub const Props = struct {
         allocator: std.mem.Allocator,
         redis_client: *redis.RedisClient,
         refresh_token: []const u8,
         jwt_secret: []const u8,
     };
+    pub const Response = struct {
+        access_token: []const u8,
+        refresh_token: []const u8,
+        expires_in: i32,
 
-    pub fn refresh(props: RefreshProps) anyerror!Auth {
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.access_token);
+        }
+    };
+
+    pub const Errors = error{ CannotCreateJWT, UserNotFound, RedisError, ParseError };
+    pub fn call(props: Props) Errors!Response {
         const result = props.redis_client.get(props.refresh_token) catch |err| switch (err) {
-            error.KeyValuePairNotFound => return error.NotFound,
-            else => return error.MiscError,
+            error.KeyValuePairNotFound => return error.UserNotFound,
+            else => return error.RedisError,
         };
-        const number = try std.fmt.parseInt(i32, result, 10);
+        const number = std.fmt.parseInt(i32, result, 10) catch return error.ParseError;
         const claims = auth.JWTClaims{ .user_id = number, .exp = std.time.milliTimestamp() + ACCESS_TOKEN_EXPIRY };
 
-        const access_token = try auth.createJWT(props.allocator, claims, props.jwt_secret);
+        const access_token = auth.createJWT(props.allocator, claims, props.jwt_secret) catch return error.CannotCreateJWT;
 
-        return Auth{ .allocator = props.allocator, .access_token = access_token, .expires_in = ACCESS_TOKEN_EXPIRY, .refresh_token = props.refresh_token };
+        return Response{
+            .access_token = access_token,
+            .refresh_token = props.refresh_token,
+            .expires_in = ACCESS_TOKEN_EXPIRY,
+        };
+    }
+};
+
+pub const Auth = struct {
+    allocator: std.mem.Allocator,
+    access_token: []const u8,
+    refresh_token: []const u8,
+    expires_in: i32,
+
+    pub fn deinit(self: *Auth) void {
+        self.allocator.free(self.access_token);
+        self.allocator.free(self.refresh_token);
     }
 
     pub const InvalidateProps = struct {
@@ -104,10 +151,6 @@ pub const Auth = struct {
     }
 };
 
-const SQL_STRINGS = struct {
-    pub const create = "SELECT id, password FROM users WHERE username=$1;";
-};
-
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -119,10 +162,10 @@ test "API Auth | Create" {
     var test_env = Tests.test_env;
     const test_name = "API Auth | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     const jwt_secret = test_env.env.get("JWT_SECRET").?;
-    const props = Auth.CreateProps{
+    const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,
         .jwt_secret = jwt_secret,
@@ -145,14 +188,14 @@ test "API Auth | Create" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var create_response = Auth.create(props, .{
+        var create_response = Create.call(props, .{
             .username = test_name,
             .password = password,
         }) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer create_response.deinit();
+        defer create_response.deinit(allocator);
 
         access_token = try allocator.dupe(u8, create_response.access_token);
         refresh_token = try allocator.dupe(u8, create_response.refresh_token);
@@ -175,22 +218,23 @@ test "API Auth | Refresh" {
     var test_env = Tests.test_env;
     const test_name = "API Auth | Refresh";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     const password = try std.fmt.allocPrint(allocator, "Testing password", .{});
     defer allocator.free(password);
     const jwt_secret = test_env.env.get("JWT_SECRET").?;
-    const props = Auth.CreateProps{
+    const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,
         .jwt_secret = jwt_secret,
         .redis_client = &test_env.redis_client,
     };
-    var create = try Auth.create(props, .{
+    var create = try Create.call(props, .{
         .username = test_name,
         .password = password,
     });
-    defer create.deinit();
+    defer create.deinit(allocator);
+
     const access_token = try allocator.dupe(u8, create.access_token);
     defer allocator.free(access_token);
     const refresh_token = try allocator.dupe(u8, create.refresh_token);
@@ -201,18 +245,20 @@ test "API Auth | Refresh" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const refresh_props = Auth.RefreshProps{
+        const refresh_props = Refresh.Props{
             .allocator = allocator,
             .jwt_secret = jwt_secret,
             .redis_client = &test_env.redis_client,
             // duping here as the response.deinit() frees
             .refresh_token = try allocator.dupe(u8, refresh_token),
         };
-        var refresh_response = Auth.refresh(refresh_props) catch |err| {
+        defer allocator.free(refresh_props.refresh_token);
+
+        const refresh_response = Refresh.call(refresh_props) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer refresh_response.deinit();
+        defer refresh_response.deinit(allocator);
 
         std.testing.expectEqualStrings(refresh_response.refresh_token, refresh_token) catch |err| {
             benchmark.fail(err);
@@ -235,22 +281,23 @@ test "API Auth | Invalidate" {
     var test_env = Tests.test_env;
     const test_name = "API Auth | Invalidate";
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     const password = try std.fmt.allocPrint(allocator, "Testing password", .{});
     defer allocator.free(password);
     const jwt_secret = test_env.env.get("JWT_SECRET").?;
-    const props = Auth.CreateProps{
+    const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,
         .jwt_secret = jwt_secret,
         .redis_client = &test_env.redis_client,
     };
-    var create = try Auth.create(props, .{
+    var create = try Create.call(props, .{
         .username = test_name,
         .password = password,
     });
-    defer create.deinit();
+    defer create.deinit(allocator);
+
     const access_token = try allocator.dupe(u8, create.access_token);
     defer allocator.free(access_token);
     const refresh_token = try allocator.dupe(u8, create.refresh_token);

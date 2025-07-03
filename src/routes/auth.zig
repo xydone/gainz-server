@@ -7,6 +7,8 @@ const rq = @import("../request.zig");
 const rs = @import("../response.zig");
 const types = @import("../types.zig");
 const Auth = @import("../models/auth_model.zig").Auth;
+const Create = @import("../models/auth_model.zig").Create;
+const Refresh = @import("../models/auth_model.zig").Refresh;
 
 const log = std.log.scoped(.auth);
 
@@ -23,17 +25,17 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const json = std.json.parseFromSliceLeaky(rq.PostAuth, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    const create_props = Auth.CreateProps{
+    const create_props = Create.Props{
         .allocator = ctx.app.allocator,
         .database = ctx.app.db,
         .jwt_secret = jwt_secret,
         .redis_client = ctx.app.redis_client,
     };
-    var result = Auth.create(create_props, json) catch |err| switch (err) {
+    var result = Create.call(create_props, json) catch |err| switch (err) {
         error.NotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;
@@ -44,7 +46,7 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
             return;
         },
     };
-    defer result.deinit();
+    defer result.deinit(ctx.app.allocator);
     res.status = 200;
 
     const response = rs.CreateToken{
@@ -59,14 +61,14 @@ pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *htt
     _ = req; // autofix
     const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
 
-    const refresh_props = Auth.RefreshProps{
+    const refresh_props = Refresh.Props{
         .allocator = ctx.app.allocator,
         .jwt_secret = jwt_secret,
         .redis_client = ctx.app.redis_client,
         .refresh_token = ctx.refresh_token.?,
     };
-    var result = Auth.refresh(refresh_props) catch |err| switch (err) {
-        error.NotFound => {
+    const result = Refresh.call(refresh_props) catch |err| switch (err) {
+        Refresh.Errors.UserNotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;
         },
@@ -76,7 +78,7 @@ pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *htt
             return;
         },
     };
-    defer result.deinit();
+    defer result.deinit(ctx.app.allocator);
     res.status = 200;
 
     const response = rs.RefreshToken{ .access_token = result.access_token, .expires_in = result.expires_in, .refresh_token = result.refresh_token };
@@ -96,4 +98,117 @@ pub fn invalidateToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *
         return;
     }
     res.status = 200;
+}
+
+const Tests = @import("../tests/tests.zig");
+const TestSetup = Tests.TestSetup;
+
+// NOTE: only checks for 200 status
+test "Endpoint Auth | Create" {
+    // SETUP
+    const test_name = "Endpoint Auth | Create";
+    const ht = @import("httpz").testing;
+    const Benchmark = @import("../tests/benchmark.zig");
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+
+    const user = try TestSetup.createUser(test_env.database, test_name);
+    defer user.deinit(allocator);
+
+    const body = Create.Request{
+        .username = user.username,
+        .password = "Testing password",
+    };
+    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    defer allocator.free(body_string);
+
+    var context = try TestSetup.createContext(null, allocator, test_env.database);
+    defer TestSetup.deinitContext(allocator, context);
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        var web_test = ht.init(.{});
+        defer web_test.deinit();
+
+        web_test.body(body_string);
+
+        createToken(&context, web_test.req, web_test.res) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        web_test.expectStatus(200) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
+}
+
+test "Endpoint Auth | Refresh" {
+    // SETUP
+    const test_name = "Endpoint Auth | Refresh";
+    const ht = @import("httpz").testing;
+    const Benchmark = @import("../tests/benchmark.zig");
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+
+    const user = try TestSetup.createUser(test_env.database, test_name);
+    defer user.deinit(allocator);
+
+    const body = Create.Request{
+        .username = user.username,
+        .password = "Testing password",
+    };
+    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    defer allocator.free(body_string);
+
+    var context = try TestSetup.createContext(null, allocator, test_env.database);
+    defer TestSetup.deinitContext(allocator, context);
+
+    // Create tokens
+    var create_token_web = ht.init(.{});
+    defer create_token_web.deinit();
+    create_token_web.body(body_string);
+    try createToken(&context, create_token_web.req, create_token_web.res);
+
+    const create_token_body = try create_token_web.getBody();
+
+    const create_token_response = try std.json.parseFromSlice(Create.Response, allocator, create_token_body, .{});
+    defer create_token_response.deinit();
+
+    context.refresh_token = create_token_response.value.refresh_token;
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        var web_test = ht.init(.{});
+        defer web_test.deinit();
+
+        refreshToken(&context, web_test.req, web_test.res) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(Refresh.Response, allocator, response_body, .{});
+        defer response.deinit();
+
+        web_test.expectStatus(200) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+
+        // The access tokens should be different
+        if (std.mem.eql(u8, create_token_response.value.access_token, response.value.access_token)) {
+            const err = error.SameRefreshTokens;
+            benchmark.fail(err);
+            return err;
+        }
+
+        // The refresh tokens should be the same
+        std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
 }

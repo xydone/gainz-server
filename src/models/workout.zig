@@ -111,10 +111,9 @@ test "API Workout | Create" {
     //SETUP
     const Benchmark = @import("../tests/benchmark.zig");
     const allocator = std.testing.allocator;
-    _ = allocator; // autofix
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     // TEST
     {
@@ -145,10 +144,9 @@ test "API Workout | Add Exercise" {
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
     const allocator = std.testing.allocator;
-    _ = allocator; // autofix
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    defer setup.deinit(allocator);
 
     const workout = try Create.call(setup.user.id, test_env.database, .{ .name = test_name });
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{

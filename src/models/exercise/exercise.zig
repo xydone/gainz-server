@@ -133,7 +133,8 @@ test "API Exercise | Create" {
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
-    defer setup.deinit();
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
 
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",

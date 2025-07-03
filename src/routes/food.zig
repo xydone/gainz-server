@@ -2,9 +2,9 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const get = @import("../models/food_model.zig").get;
-const create = @import("../models/food_model.zig").create;
-const search = @import("../models/food_model.zig").search;
+const Get = @import("../models/food_model.zig").Get;
+const Search = @import("../models/food_model.zig").Search;
+const Create = @import("../models/food_model.zig").Create;
 
 const ServingsModel = @import("../models/servings_model.zig");
 const Handler = @import("../handler.zig");
@@ -29,9 +29,9 @@ fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respon
         try rs.handleResponse(res, rs.ResponseError.bad_request, "Food ID not valid integer!");
         return;
     };
-    const request: rq.GetFood = .{ .food_id = food_id };
+    const request: Get.Request = .{ .food_id = food_id };
 
-    var result = get(ctx.app.allocator, ctx.app.db, request) catch {
+    var result = Get.call(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -54,12 +54,12 @@ pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const json = std.json.parseFromSliceLeaky(rq.PostFood, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
 
-    const food_id = create(ctx.user_id.?, ctx.app.allocator, ctx.app.db, json) catch {
+    const food_id = Create.call(ctx.user_id.?, ctx.app.allocator, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -77,8 +77,8 @@ pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     }
-    const request: rq.SearchFood = .{ .search_term = search_term };
-    const result = search(ctx.app.allocator, ctx.app.db, request) catch {
+    const request: Search.Request = .{ .search_term = search_term };
+    const result = Search.call(ctx.app.allocator, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
@@ -133,3 +133,5 @@ pub fn getServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
     res.status = 200;
     try res.json(result, .{});
 }
+
+// TODO: test routes
