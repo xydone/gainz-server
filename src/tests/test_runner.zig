@@ -177,10 +177,12 @@ pub fn main() !void {
     const total_tests = builtin.test_functions.len - test_stats.setup_teardown;
     const total_tests_executed = test_stats.pass + test_stats.fail;
     const not_executed = total_tests - total_tests_executed;
+    const has_leaked = test_stats.leak != 0;
     printer.status(.text, "{s: <15}: {d}\n", .{ "TOTAL EXECUTED", total_tests_executed });
     printer.status(.pass, "{s: <15}: {d}\n", .{ "PASS", test_stats.pass });
     printer.status(.fail, "{s: <15}: {d}\n", .{ "FAILED", test_stats.fail });
     if (not_executed > 0) printer.status(.fail, "{s: <15}: {d}\n", .{ "NOT EXECUTED", not_executed });
+    if (has_leaked) printer.status(.fail, "{s: <15}: {d}\n", .{ "LEAKED", test_stats.leak });
 
     std.posix.exit(if (test_stats.fail == 0) 0 else 1);
 }
