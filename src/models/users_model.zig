@@ -80,7 +80,7 @@ pub const Delete = struct {
         } orelse return error.NoUser;
         if (rows != 1) return error.NoUser;
     }
-    pub const query_string = "DELETE FROM users WHERE id=$1";
+    const query_string = "DELETE FROM users WHERE id=$1";
 };
 
 // TESTS

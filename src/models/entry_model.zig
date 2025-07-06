@@ -177,7 +177,6 @@ pub fn getRecent(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool,
             .amount = amount,
             .category = types.MealCategory.breakfast,
             .food = Food{
-                .allocator = allocator,
                 .brand_name = brand_name,
                 .food_name = food_name,
                 .created_at = food_created_at,
@@ -226,7 +225,6 @@ pub fn getInRange(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool
             .amount = amount,
             .food = Food{
                 .id = food_id,
-                .allocator = allocator,
                 .brand_name = brand_name_duped,
                 .food_name = food_name_duped,
                 .nutrients = nutrients,
@@ -555,7 +553,7 @@ test "API Entry | Create" {
         .nutrients = types.Nutrients{ .calories = 350 },
     };
     var food = try Create.call(user.id, allocator, test_env.database, create_food);
-    defer food.deinit();
+    defer food.deinit(allocator);
 
     const create_entry = rq.PostEntry{
         .food_id = food.id,
@@ -601,7 +599,7 @@ test "API Entry | Get" {
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -659,7 +657,7 @@ test "API Entry | Get range" {
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get range") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -758,7 +756,7 @@ test "API Entry | Get range (empty)" {
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get range (empty)") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -828,7 +826,7 @@ test "API Entry | Get recent (all)" {
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (all)") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -914,7 +912,7 @@ test "API Entry | Get recent (partial)" {
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (partial)") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -997,7 +995,7 @@ test "API Entry | Get recent (empty)" {
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (empty)") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -1048,7 +1046,7 @@ test "API Entry | Get average" {
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get average") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 
@@ -1136,7 +1134,7 @@ test "API Entry | Get breakdown" {
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get breakdown") catch return error.TestSetupFailed;
     defer {
-        setup.food.deinit();
+        setup.food.deinit(allocator);
         setup.user.deinit(allocator);
     }
 

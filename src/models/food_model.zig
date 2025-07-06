@@ -16,19 +16,17 @@ const log = std.log.scoped(.food_model);
 /// Have to call .deinit() to free memory after usage
 pub const FoodList = struct {
     list: []Food,
-    allocator: std.mem.Allocator,
 
-    pub fn deinit(self: FoodList) void {
+    pub fn deinit(self: FoodList, allocator: std.mem.Allocator) void {
         for (self.list) |*food| {
-            food.deinit();
+            food.deinit(allocator);
         }
 
-        self.allocator.free(self.list);
+        allocator.free(self.list);
     }
 };
 
 pub const Food = struct {
-    allocator: std.mem.Allocator,
     id: i32,
     created_at: i64,
     food_name: ?[]const u8,
@@ -56,13 +54,13 @@ pub const Food = struct {
         try writer.writeAll(" }");
     }
 
-    pub fn deinit(self: *Food) void {
-        if (self.brand_name) |name| self.allocator.free(name);
-        if (self.food_name) |name| self.allocator.free(name);
+    pub fn deinit(self: *Food, allocator: std.mem.Allocator) void {
+        if (self.brand_name) |name| allocator.free(name);
+        if (self.food_name) |name| allocator.free(name);
         if (self.servings) |servings| {
-            defer self.allocator.free(servings);
+            defer allocator.free(servings);
             for (servings) |serving| {
-                self.allocator.free(serving.unit);
+                allocator.free(serving.unit);
             }
         }
     }
@@ -123,7 +121,6 @@ pub const Get = struct {
         };
 
         return Response{
-            .allocator = allocator,
             .id = id,
             .created_at = created_at,
             .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
@@ -163,13 +160,13 @@ pub const Search = struct {
     pub const Request = struct {
         search_term: []const u8,
     };
-    pub const Response = FoodList;
+    pub const Response = []Food;
     pub const Errors = error{
         CannotSearch,
         ServingsParsingError,
         OutOfMemory,
     } || DatabaseErrors;
-    /// Have to call .deinit() to free memory after usage
+    /// Caller must free slice
     pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
@@ -216,7 +213,6 @@ pub const Search = struct {
             };
 
             try response.append(Food{
-                .allocator = allocator,
                 .id = id,
                 .created_at = created_at,
                 .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
@@ -225,7 +221,7 @@ pub const Search = struct {
                 .servings = servings,
             });
         }
-        return Response{ .list = try response.toOwnedSlice(), .allocator = allocator };
+        return try response.toOwnedSlice();
     }
 
     const query_string =
@@ -317,7 +313,6 @@ pub const Create = struct {
         };
 
         return Response{
-            .allocator = allocator,
             .id = id,
             .created_at = created_at,
             .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
@@ -432,7 +427,7 @@ test "API Food | Create" {
             benchmark.fail(err);
             return err;
         };
-        defer food.deinit();
+        defer food.deinit(allocator);
 
         std.testing.expectEqualStrings(create_request.brand_name.?, food.brand_name.?) catch |err| {
             benchmark.fail(err);
@@ -475,7 +470,7 @@ test "API Food | Get" {
         .nutrients = types.Nutrients{ .calories = 350 },
     };
     var food = try Create.call(setup.user.id, allocator, test_env.database, create_request);
-    defer food.deinit();
+    defer food.deinit(allocator);
 
     const get_request = Get.Request{
         .food_id = @intCast(food.id),
@@ -489,7 +484,7 @@ test "API Food | Get" {
             benchmark.fail(err);
             return err;
         };
-        defer response.deinit();
+        defer response.deinit(allocator);
 
         std.testing.expectEqual(food.id, response.id) catch |err| {
             benchmark.fail(err);
@@ -546,7 +541,7 @@ test "API Food | Search" {
         .nutrients = types.Nutrients{ .calories = 350 },
     };
     var inserted_food = try Create.call(setup.user.id, allocator, test_env.database, create_request);
-    defer inserted_food.deinit();
+    defer inserted_food.deinit(allocator);
 
     // TEST
     {
@@ -557,15 +552,20 @@ test "API Food | Search" {
             .search_term = test_name[0..15],
         };
 
-        var results = Search.call(allocator, test_env.database, search_food) catch |err| {
+        const results = Search.call(allocator, test_env.database, search_food) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer results.deinit();
+        defer {
+            for (results) |*food| {
+                food.deinit(allocator);
+            }
+            allocator.free(results);
+        }
 
-        if (results.list.len == 0) return error.FoodNotFoundViaSearch;
+        if (results.len == 0) return error.FoodNotFoundViaSearch;
 
-        const result = results.list[0];
+        const result = results[0];
         std.testing.expectEqual(inserted_food.id, result.id) catch |err| {
             benchmark.fail(err);
             return err;

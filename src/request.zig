@@ -66,17 +66,6 @@ pub const GetEntryBreakdown = struct {
     range_end: []const u8,
 };
 
-pub const PostServings = struct {
-    food_id: i32,
-    amount: f64,
-    unit: []const u8,
-    multiplier: f64,
-};
-
-pub const GetServings = struct {
-    food_id: i32,
-};
-
 pub const PostNote = struct {
     title: []const u8,
     description: ?[]const u8,

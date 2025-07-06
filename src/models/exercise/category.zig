@@ -35,7 +35,7 @@ pub const Create = struct {
         const response = row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
         return response;
     }
-    pub const query_string =
+    const query_string =
         \\INSERT INTO
         \\training.exercise_category (created_by, name, description)
         \\VALUES

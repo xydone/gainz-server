@@ -108,10 +108,6 @@ pub const SearchFood = struct {
     servings: []types.Servings,
 };
 
-pub const PostServing = types.Servings;
-
-pub const GetServing = types.Servings;
-
 pub const GetEntryRange = struct {
     entry_id: i32,
     food_id: i32,
