@@ -38,9 +38,14 @@ pub const Create = struct {
         redis_client: *redis.RedisClient,
     };
 
-    pub const Errors = error{ CannotCreate, UserNotFound } || DatabaseErrors;
-    pub fn call(props: Props, request: Request) anyerror!Response {
-        var conn = try props.database.acquire();
+    pub const Errors = error{
+        CannotCreate,
+        RedisError,
+        UserNotFound,
+        OutOfMemory,
+    } || DatabaseErrors;
+    pub fn call(props: Props, request: Request) Errors!Response {
+        var conn = props.database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         const error_handler = ErrorHandler{ .conn = conn };
 
@@ -51,23 +56,23 @@ pub const Create = struct {
                 ErrorHandler.printErr(data);
             }
 
-            return err;
-        } orelse return error.CannotCreate;
+            return error.CannotCreate;
+        } orelse return error.UserNotFound;
         defer row.deinit() catch {};
         const user_id = row.get(i32, 0);
         const hash = row.get([]u8, 1);
-        const isValidPassword = try auth.verifyPassword(props.allocator, hash, request.password);
+        const isValidPassword = auth.verifyPassword(props.allocator, hash, request.password) catch return error.CannotCreate;
         const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.milliTimestamp() + ACCESS_TOKEN_EXPIRY };
 
-        if (!isValidPassword) return error.NotFound;
-        const access_token = try auth.createJWT(props.allocator, claims, props.jwt_secret);
+        if (!isValidPassword) return error.CannotCreate;
+        const access_token = auth.createJWT(props.allocator, claims, props.jwt_secret) catch return error.CannotCreate;
 
-        const refresh_token = try auth.createSessionToken(props.allocator);
+        const refresh_token = auth.createSessionToken(props.allocator) catch return error.CannotCreate;
 
-        const value = try std.fmt.allocPrint(props.allocator, "{}", .{user_id});
+        const value = std.fmt.allocPrint(props.allocator, "{}", .{user_id}) catch return error.OutOfMemory;
         defer props.allocator.free(value);
 
-        _ = try props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY);
+        _ = props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY) catch return error.RedisError;
 
         return Response{
             .access_token = access_token,

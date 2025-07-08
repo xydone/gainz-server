@@ -36,7 +36,7 @@ pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
         .redis_client = ctx.app.redis_client,
     };
     var result = Create.call(create_props, json) catch |err| switch (err) {
-        error.NotFound => {
+        Create.Errors.UserNotFound => {
             try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
             return;
         },

@@ -99,7 +99,7 @@ pub const GetAll = struct {
         }
         return ExerciseList{ .list = try response.toOwnedSlice(), .allocator = allocator };
     }
-    const query_string = "SELECT id,name, description FROM exercise WHERE created_by = $1";
+    const query_string = "SELECT id,name, description FROM training.exercise WHERE created_by = $1";
 };
 
 pub const LogExercise = struct {
