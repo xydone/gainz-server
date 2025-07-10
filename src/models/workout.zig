@@ -44,6 +44,46 @@ pub const Create = struct {
     ;
 };
 
+pub const Get = struct {
+    pub const Request = struct {};
+    pub const Response = struct {
+        id: i32,
+        name: []const u8,
+        created_at: i64,
+        created_by: i32,
+    };
+    pub const Errors = error{
+        CannotGet,
+        CannotParseResult,
+        OutOfMemory,
+    } || DatabaseErrors;
+
+    /// Caller must free slice
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        const error_handler = ErrorHandler{ .conn = conn };
+
+        var query = conn.query(query_string, .{user_id}) catch |err| {
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotGet;
+        };
+        defer query.deinit();
+
+        var response = std.ArrayList(Response).init(allocator);
+
+        while (query.next() catch return error.CannotGet) |result| {
+            response.append(result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+        }
+        return response.toOwnedSlice();
+    }
+
+    const query_string =
+        \\SELECT * FROM training.workout WHERE created_by = $1
+    ;
+};
+
 pub const AddExercise = struct {
     pub const Request = struct {
         exercise_id: i32,
@@ -152,6 +192,54 @@ test "API Workout | Create" {
         };
     }
 }
+
+test "API Workout | Get" {
+    const test_name = "API Workout | Get";
+    //SETUP
+    const Benchmark = @import("../tests/benchmark.zig");
+    const allocator = std.testing.allocator;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit(allocator);
+    const create = try Create.call(
+        setup.user.id,
+        test_env.database,
+        .{ .name = test_name },
+    );
+
+    const create_responses = [_]Create.Response{create};
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const response = Get.call(allocator, setup.user.id, test_env.database) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer allocator.free(response);
+
+        for (create_responses, response) |created, res| {
+            std.testing.expectEqual(created.id, res.id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.created_by, res.created_by) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.created_at, res.created_at) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqualStrings(created.name, res.name) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
+    }
+}
+
 test "API Workout | Add Exercise" {
     const test_name = "API Workout | Add Exercise";
     //SETUP
