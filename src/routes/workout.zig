@@ -10,7 +10,8 @@ const AddExercise = @import("../models/workout.zig").AddExercise;
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/workout", createWorkout, .{ .data = &RouteData });
-    router.*.post("/api/workout/:id/exercises", addExercise, .{ .data = &RouteData });
+    //TODO: currently this route allows anyone to modify any workout by adding exercises to it. This should be addressed in the future.
+    router.*.post("/api/workout/exercises", addExercises, .{ .data = &RouteData });
 }
 
 fn createWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -30,7 +31,7 @@ fn createWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
     try res.json(response, .{});
 }
 
-fn addExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+fn addExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const id_param = req.param("id") orelse return error.NoIDParam;
     const workout_id = try std.fmt.parseInt(i32, id_param, 10);
     const body = req.body() orelse {
@@ -38,12 +39,13 @@ fn addExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
         return;
     };
 
-    const workout = std.json.parseFromSliceLeaky(AddExercise.Request, ctx.app.allocator, body, .{}) catch {
+    const workout = std.json.parseFromSliceLeaky([]AddExercise.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
+    defer ctx.app.allocator.free(workout);
 
-    const response = AddExercise.call(ctx.user_id.?, workout_id, ctx.app.db, workout) catch |err| {
+    const response = AddExercise.call(ctx.app.allocator, workout_id, ctx.app.db, workout) catch |err| {
         switch (err) {
             AddExercise.Errors.InvalidExerciseID => {
                 try rs.handleResponse(res, rs.ResponseError.not_found, "Invalid exercise ID!");
@@ -54,6 +56,8 @@ fn addExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
         }
         return;
     };
+    defer ctx.app.allocator.free(response);
+
     res.status = 200;
     try res.json(response, .{});
 }
@@ -116,9 +120,9 @@ test "Endpoint Workout | Create" {
     }
 }
 
-test "Endpoint Workout | Add Exercise" {
+test "Endpoint Workout | Add Exercises" {
     // SETUP
-    const test_name = "Endpoint Workout | Add Exercise";
+    const test_name = "Endpoint Workout | Add Exercises";
     const ht = @import("httpz").testing;
     const Benchmark = @import("../tests/benchmark.zig");
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
@@ -143,11 +147,13 @@ test "Endpoint Workout | Add Exercise" {
         .base_unit = "kg",
     });
 
-    const body = AddExercise.Request{
-        .exercise_id = exercise.id,
-        .notes = test_name ++ "'s notes!",
-        .reps = 8,
-        .sets = 3,
+    const body = [_]AddExercise.Request{
+        AddExercise.Request{
+            .exercise_id = exercise.id,
+            .notes = test_name ++ "'s notes!",
+            .reps = 8,
+            .sets = 3,
+        },
     };
 
     const body_string = try std.json.stringifyAlloc(allocator, body, .{});
@@ -168,7 +174,7 @@ test "Endpoint Workout | Add Exercise" {
         web_test.param("id", workout_id_string);
         web_test.body(body_string);
 
-        addExercise(&context, web_test.req, web_test.res) catch |err| {
+        addExercises(&context, web_test.req, web_test.res) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -180,36 +186,38 @@ test "Endpoint Workout | Add Exercise" {
             benchmark.fail(err);
             return err;
         };
-        const response = std.json.parseFromSlice(AddExercise.Response, allocator, response_body, .{}) catch |err| {
+        const response = std.json.parseFromSlice([]AddExercise.Response, allocator, response_body, .{}) catch |err| {
             benchmark.fail(err);
             return err;
         };
         defer response.deinit();
 
-        std.testing.expectEqual(body.exercise_id, response.value.exercise_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        for (body, response.value) |req, res| {
+            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
 
-        std.testing.expectEqual(workout.id, response.value.workout_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
 
-        std.testing.expectEqual(body.reps, response.value.reps) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+            std.testing.expectEqual(req.reps, res.reps) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
 
-        std.testing.expectEqual(body.sets, response.value.sets) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+            std.testing.expectEqual(req.sets, res.sets) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
 
-        std.testing.expectEqualStrings(body.notes, response.value.notes) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
     }
 }
 test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
@@ -227,11 +235,13 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     const workout = try Create.call(user.id, test_env.database, .{ .name = test_name });
 
     const nonexistent_exercise_id = std.math.maxInt(i32);
-    const body = AddExercise.Request{
-        .exercise_id = nonexistent_exercise_id,
-        .notes = test_name ++ "'s notes!",
-        .reps = 8,
-        .sets = 3,
+    const body = [_]AddExercise.Request{
+        AddExercise.Request{
+            .exercise_id = nonexistent_exercise_id,
+            .notes = test_name ++ "'s notes!",
+            .reps = 8,
+            .sets = 3,
+        },
     };
 
     const body_string = try std.json.stringifyAlloc(allocator, body, .{});
@@ -252,7 +262,7 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
         web_test.param("id", workout_id_string);
         web_test.body(body_string);
 
-        addExercise(&context, web_test.req, web_test.res) catch |err| {
+        addExercises(&context, web_test.req, web_test.res) catch |err| {
             benchmark.fail(err);
             return err;
         };
