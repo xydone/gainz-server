@@ -672,6 +672,7 @@ ALTER TABLE training.workout OWNER TO postgres;
 --
 
 CREATE TABLE training.workout_exercise (
+    id integer NOT NULL,
     workout_id integer NOT NULL,
     exercise_id integer NOT NULL,
     notes character varying(255),
@@ -694,6 +695,14 @@ CREATE SEQUENCE training.workout_id_seq
     NO MAXVALUE
     CACHE 1;
 
+CREATE SEQUENCE training.workout_exercise_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
 
 ALTER SEQUENCE training.workout_id_seq OWNER TO postgres;
 
@@ -702,6 +711,8 @@ ALTER SEQUENCE training.workout_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE training.workout_id_seq OWNED BY training.workout.id;
+
+ALTER SEQUENCE training.workout_exercise_id_seq OWNED BY training.workout_exercise.id;
 
 
 --
@@ -800,6 +811,8 @@ ALTER TABLE ONLY training.program ALTER COLUMN id SET DEFAULT nextval('training.
 --
 
 ALTER TABLE ONLY training.workout ALTER COLUMN id SET DEFAULT nextval('training.workout_id_seq'::regclass);
+
+ALTER TABLE ONLY training.workout_exercise ALTER COLUMN id SET DEFAULT nextval('training.workout_exercise_id_seq'::regclass);
 
 
 --
@@ -927,7 +940,7 @@ ALTER TABLE ONLY training.program
 --
 
 ALTER TABLE ONLY training.workout_exercise
-    ADD CONSTRAINT workout_exercise_pkey PRIMARY KEY (workout_id, exercise_id);
+    ADD CONSTRAINT workout_exercise_pkey PRIMARY KEY (id);
 
 
 

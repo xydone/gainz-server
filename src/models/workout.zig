@@ -92,6 +92,7 @@ pub const AddExercise = struct {
         reps: i32,
     };
     pub const Response = struct {
+        id: i32,
         workout_id: i32,
         exercise_id: i32,
         notes: []const u8,

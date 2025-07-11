@@ -13,7 +13,7 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
     router.*.get("/api/workout", getWorkout, .{ .data = &RouteData });
     router.*.post("/api/workout", createWorkout, .{ .data = &RouteData });
     //TODO: currently this route allows anyone to modify any workout by adding exercises to it. This should be addressed in the future.
-    router.*.post("/api/workout/exercises", addExercises, .{ .data = &RouteData });
+    router.*.post("/api/workout/:id/exercises", addExercises, .{ .data = &RouteData });
 }
 
 fn createWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
