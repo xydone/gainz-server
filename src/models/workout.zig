@@ -159,6 +159,54 @@ pub const AddExercise = struct {
     ;
 };
 
+pub const GetExerciseList = struct {
+    pub const Response = struct {
+        workout_id: i32,
+        workout_name: []const u8,
+        exercise_id: i32,
+        sets: i32,
+        reps: i32,
+        notes: []const u8,
+    };
+    pub const Errors = error{
+        CannotGet,
+        CannotParseResult,
+        OutOfMemory,
+    } || DatabaseErrors;
+    pub fn call(allocator: std.mem.Allocator, workout_id: i32, database: *Pool) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        const error_handler = ErrorHandler{ .conn = conn };
+
+        var query = conn.query(query_string, .{workout_id}) catch |err| {
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotGet;
+        };
+        defer query.deinit();
+
+        var response = std.ArrayList(Response).init(allocator);
+
+        while (query.next() catch return error.CannotGet) |result| {
+            response.append(result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+        }
+        return response.toOwnedSlice();
+    }
+
+    const query_string =
+        \\SELECT 
+        \\w.id AS workout_id,
+        \\w.name AS workout_name,
+        \\we.exercise_id,
+        \\we.sets,
+        \\we.reps,
+        \\we.notes
+        \\FROM training.workout w
+        \\JOIN training.workout_exercise we ON w.id = we.workout_id
+        \\WHERE w.id = $1;
+    ;
+};
+
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -282,6 +330,80 @@ test "API Workout | Add Exercise" {
         defer allocator.free(response);
 
         for (request, response) |req, res| {
+            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(req.reps, res.reps) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(req.sets, res.sets) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
+    }
+}
+
+test "API Workout | Get Exercise List" {
+    const test_name = "API Workout | Get Exercise List";
+    //SETUP
+    const Benchmark = @import("../tests/benchmark.zig");
+    const CreateExercise = @import("exercise/exercise.zig").Create;
+    const CreateCategory = @import("exercise/category.zig").Create;
+    const allocator = std.testing.allocator;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit(allocator);
+
+    const workout = try Create.call(setup.user.id, test_env.database, .{ .name = test_name });
+    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+        .name = "Chest",
+    });
+    const exercise = try CreateExercise.call(setup.user.id, test_env.database, .{
+        .category_id = @intCast(category.id),
+        .base_amount = 1,
+        .base_unit = "kg",
+        .name = "Bench press",
+    });
+    var add_exercise_request = [_]AddExercise.Request{
+        AddExercise.Request{
+            .exercise_id = @intCast(exercise.id),
+            .notes = "Example notes",
+            .sets = 6,
+            .reps = 10,
+        },
+        AddExercise.Request{
+            .exercise_id = @intCast(exercise.id),
+            .notes = "Example notes 2",
+            .sets = 16,
+            .reps = 15,
+        },
+    };
+    const add_exercise_response = try AddExercise.call(allocator, workout.id, test_env.database, &add_exercise_request);
+    defer allocator.free(add_exercise_response);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const response = GetExerciseList.call(allocator, workout.id, test_env.database) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer allocator.free(response);
+
+        for (add_exercise_request, response) |req, res| {
             std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
                 benchmark.fail(err);
                 return err;
