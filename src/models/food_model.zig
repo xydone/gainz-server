@@ -404,7 +404,7 @@ const TestSetup = Tests.TestSetup;
 
 test "API Food | Create" {
     // SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_name = "API Food | Create";
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
@@ -455,7 +455,7 @@ test "API Food | Create" {
 test "API Food | Get" {
     const test_env = Tests.test_env;
     // SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_name = "API Food | Get";
 
@@ -527,7 +527,7 @@ test "API Food | Get" {
 test "API Food | Search" {
     const test_env = Tests.test_env;
     // SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_name = "API Food | Search";
     var setup = try TestSetup.init(test_env.database, test_name);

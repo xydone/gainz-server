@@ -2,7 +2,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const Printer = @import("benchmark.zig").Printer;
 
 const Allocator = std.mem.Allocator;
 
@@ -10,6 +9,7 @@ const BORDER = "=" ** 80;
 
 // use in custom panic handler
 var current_test: ?[]const u8 = null;
+var benchmark_list = std.ArrayList(Benchmark).init(std.heap.smp_allocator);
 
 const Config = struct {
     verbose: bool,
@@ -107,11 +107,9 @@ const TestList = struct {
     }
 };
 pub fn main() !void {
-    var mem: [8192]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&mem);
     const printer = Printer.init();
 
-    const allocator = fba.allocator();
+    const allocator = std.heap.smp_allocator;
 
     var config = Config.init();
 
@@ -274,3 +272,137 @@ fn runTest(
         },
     }
 }
+
+pub const Benchmark = struct {
+    name: []const u8,
+    timer: std.time.Timer,
+    status: Status,
+    err: ?anyerror = null,
+    time_ms: ?f64 = null,
+
+    pub fn start(name: []const u8) Benchmark {
+        return .{
+            .name = name,
+            .timer = std.time.Timer.start() catch @panic("Could not start timer."),
+            .status = .pass,
+        };
+    }
+
+    fn printPass(self: Benchmark, printer: Printer) void {
+        printer.status(.pass, "{s} ({d:.2}ms)\n", .{ self.name, self.time_ms.? });
+    }
+
+    /// Assumes err is populated
+    fn printFail(self: Benchmark, printer: Printer) void {
+        printer.status(.fail, "\"{s}\" - {s}\n", .{ self.name, @errorName(self.err.?) });
+    }
+
+    pub fn end(self: *Benchmark) void {
+        const time = self.timer.lap();
+
+        const printer = Printer.init();
+        const ms = @as(f64, @floatFromInt(time)) / 1_000_000.0;
+        self.time_ms = ms;
+        switch (self.status) {
+            .pass => {
+                self.printPass(printer);
+                benchmark_list.append(self.*) catch @panic("OOM!");
+            },
+            .fail => {
+                self.printFail(printer);
+            },
+            else => {},
+        }
+    }
+
+    /// Meant to be called with an errdefer
+    pub fn fail(self: *Benchmark, err: anyerror) void {
+        self.status = .fail;
+        self.err = err;
+    }
+
+    /// Meant to be called at the end, after all tests have been executed.
+    ///
+    /// Should be used inside a tests:afterAll
+    pub fn analyze() void {
+        //TODO: look into displaying statistics based on category. ex: Slowest API tests; Slowest Endpoint tests, etc etc
+        const printer = Printer.init();
+        const list_length = benchmark_list.items.len;
+        // Add a new line before the stats
+        printer.fmt("\nStatistics:\n", .{});
+
+        //Calculate mean
+        var mean: f64 = undefined;
+        for (benchmark_list.items) |item| {
+            mean += item.time_ms.?;
+        }
+        mean = mean / @as(f64, @floatFromInt(list_length));
+
+        printer.fmt("Mean: {d:.2}ms\n", .{mean});
+
+        //Calculate median
+        //Sorting with moreThan so we can save ourselves a sort down the line when we need to calculate the slowest
+        std.mem.sort(Benchmark, benchmark_list.items, {}, Benchmark.moreThan);
+        var median: f64 = undefined;
+        if (list_length % 2 == 0) {
+            const middle1 = benchmark_list.items[list_length / 2 - 1];
+            const middle2 = benchmark_list.items[list_length / 2];
+            median = (middle1.time_ms.? + middle2.time_ms.?) / 2;
+        } else {
+            median = benchmark_list.items[list_length / 2].time_ms.?;
+        }
+        printer.fmt("Median: {d:.2}ms\n", .{median});
+
+        //Display slowest
+        printer.fmt("\nSlowest:\n", .{});
+        const AMOUNT_OF_SLOWEST = 5;
+        for (0..AMOUNT_OF_SLOWEST) |i| {
+            if (i == list_length) break;
+            const benchmark = benchmark_list.items[i];
+
+            // mirrors `.printPass(...)` except uses `Status.text` for color
+            printer.status(.text, "{s} ({d:.2}ms)\n", .{ benchmark.name, benchmark.time_ms.? });
+        }
+
+        // Finish off with a new line
+        printer.fmt("\n", .{});
+    }
+
+    fn moreThan(context: void, a: Benchmark, b: Benchmark) bool {
+        _ = context;
+        return a.time_ms.? > b.time_ms.?;
+    }
+};
+
+pub const Printer = struct {
+    out: std.fs.File.Writer,
+
+    pub fn init() Printer {
+        return .{
+            .out = std.io.getStdErr().writer(),
+        };
+    }
+
+    pub fn fmt(self: Printer, comptime format: []const u8, args: anytype) void {
+        std.fmt.format(self.out, format, args) catch unreachable;
+    }
+
+    pub fn status(self: Printer, s: Status, comptime format: []const u8, args: anytype) void {
+        const color = switch (s) {
+            .pass => "\x1b[32m",
+            .fail => "\x1b[31m",
+            .skip => "\x1b[33m",
+            else => "",
+        };
+        const out = self.out;
+        out.writeAll(color) catch @panic("writeAll failed?!");
+        std.fmt.format(out, format, args) catch @panic("std.fmt.format failed?!");
+        self.fmt("\x1b[0m", .{});
+    }
+};
+pub const Status = enum {
+    pass,
+    fail,
+    skip,
+    text,
+};

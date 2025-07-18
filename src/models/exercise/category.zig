@@ -90,7 +90,7 @@ const TestSetup = Tests.TestSetup;
 test "API Exercise Category | Create" {
     const test_name = "API Exercise Category | Create";
     //SETUP
-    const Benchmark = @import("../../tests/benchmark.zig");
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = try TestSetup.init(test_env.database, test_name);

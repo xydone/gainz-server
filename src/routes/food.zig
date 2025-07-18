@@ -159,7 +159,7 @@ test "Endpoint Food | Create" {
     // SETUP
     const test_name = "Endpoint Food | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -243,7 +243,7 @@ test "Endpoint Food | Get" {
     // SETUP
     const test_name = "Endpoint Food | Get";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -332,7 +332,7 @@ test "Endpoint Food | Get Invalid Food" {
     // SETUP
     const test_name = "Endpoint Food | Get Invalid Food";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -389,7 +389,7 @@ test "Endpoint Food | Search" {
     // SETUP
     const test_name = "Endpoint Food | Search";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -495,7 +495,7 @@ test "Endpoint Food | Create Serving" {
     // SETUP
     const test_name = "Endpoint Food | Create Serving";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -585,7 +585,7 @@ test "Endpoint Food | Get Serving" {
     // SETUP
     const test_name = "Endpoint Food | Get Serving";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -702,7 +702,7 @@ test "Endpoint Food | Get Serving Invalid Food ID" {
     // SETUP
     const test_name = "Endpoint Food | Get Serving Invalid Food ID";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 

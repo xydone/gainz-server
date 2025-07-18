@@ -66,6 +66,7 @@ test "tests:beforeAll" {
 
 test "tests:afterAll" {
     var test_env = Tests.test_env;
-
+    const Benchmark = @import("tests/test_runner.zig").Benchmark;
+    Benchmark.analyze();
     defer test_env.deinit();
 }

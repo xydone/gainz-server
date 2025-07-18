@@ -66,7 +66,7 @@ const TestSetup = Tests.TestSetup;
 test "API Goal | Create" {
     // SETUP
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_name = "API Goal | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -98,7 +98,7 @@ test "API Goal | Create" {
 
 test "API Goal | Get" {
     // SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     const test_name = "API Goal | Get";

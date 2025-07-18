@@ -96,7 +96,7 @@ test "Endpoint Workout | Create" {
     // SETUP
     const test_name = "Endpoint Workout | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -151,7 +151,7 @@ test "Endpoint Workout | Get" {
     // SETUP
     const test_name = "Endpoint Workout | Get";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -227,7 +227,7 @@ test "Endpoint Workout | Add Exercises" {
     // SETUP
     const test_name = "Endpoint Workout | Add Exercises";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;
@@ -327,7 +327,7 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     // SETUP
     const test_name = "Endpoint Workout | Add Exercise Invalid Exercise ID";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -400,7 +400,7 @@ test "Endpoint Workout | Get Exercises List" {
     // SETUP
     const test_name = "Endpoint Workout | Get Exercises List";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;

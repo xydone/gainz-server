@@ -213,7 +213,7 @@ const TestSetup = Tests.TestSetup;
 test "API Workout | Create" {
     const test_name = "API Workout | Create";
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -245,7 +245,7 @@ test "API Workout | Create" {
 test "API Workout | Get" {
     const test_name = "API Workout | Get";
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -292,7 +292,7 @@ test "API Workout | Get" {
 test "API Workout | Add Exercise" {
     const test_name = "API Workout | Add Exercise";
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
     const allocator = std.testing.allocator;
@@ -357,7 +357,7 @@ test "API Workout | Add Exercise" {
 test "API Workout | Get Exercise List" {
     const test_name = "API Workout | Get Exercise List";
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
     const allocator = std.testing.allocator;

@@ -55,7 +55,7 @@ test "Endpoint User | Create" {
     // SETUP
     const test_name = "Endpoint User | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 

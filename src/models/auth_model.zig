@@ -161,7 +161,7 @@ const TestSetup = Tests.TestSetup;
 
 test "API Auth | Create" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const jwt = @import("jwt");
     var test_env = Tests.test_env;
@@ -217,7 +217,7 @@ test "API Auth | Create" {
 
 test "API Auth | Refresh" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;
@@ -280,7 +280,7 @@ test "API Auth | Refresh" {
 
 test "API Auth | Invalidate" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;

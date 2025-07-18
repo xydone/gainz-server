@@ -90,7 +90,7 @@ test "API User | Create" {
     // SETUP
     const test_name = "API User | Create";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});
@@ -134,7 +134,7 @@ test "API User | Duplicate" {
     // SETUP
     const test_name = "API User | Duplicate";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});
@@ -172,7 +172,7 @@ test "API User | Delete" {
     // SETUP
     const test_name = "API User | Delete";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});

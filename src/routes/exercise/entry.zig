@@ -38,7 +38,7 @@ test "Endpoint Exercise | Log" {
     const ht = @import("httpz").testing;
     const Create = @import("../../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
-    const Benchmark = @import("../../tests/benchmark.zig");
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 

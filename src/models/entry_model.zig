@@ -533,7 +533,7 @@ const TestSetup = struct {
 
 test "API Entry | Create" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const Create = @import("food_model.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -594,7 +594,7 @@ test "API Entry | Create" {
 
 test "API Entry | Get" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get") catch return error.TestSetupFailed;
@@ -651,7 +651,7 @@ test "API Entry | Get" {
 
 test "API Entry | Get range" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -750,7 +750,7 @@ test "API Entry | Get range" {
 }
 test "API Entry | Get range (empty)" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -820,7 +820,7 @@ test "API Entry | Get range (empty)" {
 
 test "API Entry | Get recent (all)" {
     //SETUP
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
@@ -907,7 +907,7 @@ test "API Entry | Get recent (all)" {
 test "API Entry | Get recent (partial)" {
     //SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (partial)") catch return error.TestSetupFailed;
@@ -990,7 +990,7 @@ test "API Entry | Get recent (partial)" {
 test "API Entry | Get recent (empty)" {
     //SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (empty)") catch return error.TestSetupFailed;
@@ -1041,7 +1041,7 @@ test "API Entry | Get recent (empty)" {
 test "API Entry | Get average" {
     // SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get average") catch return error.TestSetupFailed;
@@ -1129,7 +1129,7 @@ test "API Entry | Get average" {
 test "API Entry | Get breakdown" {
     // SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/benchmark.zig");
+    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get breakdown") catch return error.TestSetupFailed;
