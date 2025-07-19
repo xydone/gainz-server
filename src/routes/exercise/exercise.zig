@@ -3,7 +3,6 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../../handler.zig");
-const rq = @import("../../request.zig");
 const rs = @import("../../response.zig");
 const Create = @import("../../models/exercise/exercise.zig").Create;
 const GetAll = @import("../../models/exercise/exercise.zig").GetAll;

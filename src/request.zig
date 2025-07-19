@@ -91,13 +91,6 @@ pub const RefreshAccessToken = struct {
     refresh_token: []const u8,
 };
 
-pub const PostUnit = struct {
-    amount: f64,
-    unit: []u8,
-    multiplier: f64,
-    exercise_id: u32,
-};
-
 pub const PostGoal = struct {
     target: types.GoalTargets,
     value: f64,
