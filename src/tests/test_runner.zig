@@ -7,7 +7,6 @@ const Allocator = std.mem.Allocator;
 
 const BORDER = "=" ** 80;
 
-// use in custom panic handler
 var current_test: ?[]const u8 = null;
 var benchmark_list = std.ArrayList(Benchmark).init(std.heap.smp_allocator);
 
@@ -167,11 +166,13 @@ pub fn main() !void {
     const test_run_order = [_]TestList{ setup_queue, api_queue, endpoint_queue, teardown_queue };
     for (test_run_order) |list| {
         for (list.test_functions.items) |t| {
+            current_test = t.name;
             const params = TestList.CallbackParams{ .config = config, .printer = printer, .test_stats = &test_stats, .t = t };
             try list.callback(params);
         }
     }
 
+    printer.fmt("\n{s}\n", .{BORDER});
     const total_tests = builtin.test_functions.len - test_stats.setup_teardown;
     const total_tests_executed = test_stats.pass + test_stats.fail;
     const not_executed = total_tests - total_tests_executed;
@@ -231,48 +232,6 @@ fn isEndpoint(test_name: []const u8) bool {
     return std.mem.startsWith(u8, test_name, "Endpoint");
 }
 
-fn runTest(
-    t: std.builtin.TestFn,
-    config: Config,
-    printer: Printer,
-    test_stats: *TestStats,
-) !void {
-    const is_unnamed_test = isUnnamed(t);
-    if (config.filter) |f| {
-        if (!is_unnamed_test and std.mem.indexOf(u8, t.name, f) == null) {
-            // continue;
-            return;
-        }
-    }
-
-    std.testing.allocator_instance = .{};
-    const result = t.func();
-
-    if (std.testing.allocator_instance.deinit() == .leak) {
-        test_stats.leak += 1;
-    }
-
-    if (result) |_| {
-        test_stats.pass += 1;
-    } else |err| switch (err) {
-        error.SkipZigTest => {
-            test_stats.skip += 1;
-        },
-        else => {
-            test_stats.fail += 1;
-            if (@errorReturnTrace()) |trace| {
-                printer.status(.fail, "{s}\n", .{BORDER});
-                printer.status(.fail, "TRACE:\n", .{});
-                std.debug.dumpStackTrace(trace.*);
-                printer.status(.fail, "{s}\n", .{BORDER});
-            }
-            if (config.fail_first) {
-                // break;
-            }
-        },
-    }
-}
-
 pub const Benchmark = struct {
     name: []const u8,
     timer: std.time.Timer,
@@ -324,52 +283,91 @@ pub const Benchmark = struct {
     /// Meant to be called at the end, after all tests have been executed.
     ///
     /// Should be used inside a tests:afterAll
-    pub fn analyze() void {
-        //TODO: look into displaying statistics based on category. ex: Slowest API tests; Slowest Endpoint tests, etc etc
+    pub fn analyze(allocator: std.mem.Allocator) void {
         const list_length = benchmark_list.items.len;
 
         // early exit if zero tests pass
         if (list_length == 0) return;
 
         const printer = Printer.init();
-        // Add a new line before the stats
-        printer.fmt("\nStatistics:\n", .{});
 
-        //Calculate mean
+        var api_queue = std.ArrayList(Benchmark).init(allocator);
+        defer api_queue.deinit();
+        var endpoint_queue = std.ArrayList(Benchmark).init(allocator);
+        defer endpoint_queue.deinit();
+
+        for (benchmark_list.items) |benchmark| {
+            if (isAPI(benchmark.name)) {
+                api_queue.append(benchmark) catch @panic("OOM!");
+            } else {
+                if (isEndpoint(benchmark.name)) {
+                    endpoint_queue.append(benchmark) catch @panic("OOM!");
+                }
+            }
+        }
+
+        const BenchmarkType = struct {
+            name: []const u8,
+            items: []Benchmark,
+        };
+        const benchmark_map = [_]BenchmarkType{
+            BenchmarkType{ .name = "API", .items = api_queue.items },
+            BenchmarkType{ .name = "Endpoint", .items = endpoint_queue.items },
+            BenchmarkType{ .name = "Total", .items = benchmark_list.items },
+        };
+
+        for (benchmark_map) |benchmark_type| {
+            // skip benchmark type if empty
+            if (benchmark_type.items.len == 0) continue;
+
+            // skip benchmark if it is universal set
+            if (benchmark_type.items.len == benchmark_list.items.len and !std.mem.eql(u8, benchmark_type.name, "Total")) continue;
+
+            printer.fmt("\n{s}\n", .{BORDER});
+            printer.fmt("{s} statistics:\n", .{benchmark_type.name});
+            //Calculate mean
+            const mean = calculateMean(benchmark_type.items);
+            printer.fmt("Mean: {d:.2}ms\n", .{mean});
+
+            //Calculate median
+
+            const median = calculateMedian(benchmark_type.items);
+
+            printer.fmt("Median: {d:.2}ms\n", .{median});
+
+            //Display slowest
+            printer.fmt("\nSlowest:\n", .{});
+            calculateSlowest(5, benchmark_type.items, printer);
+        }
+    }
+
+    inline fn calculateMean(benchmarks: []Benchmark) f64 {
         var mean: f64 = undefined;
-        for (benchmark_list.items) |item| {
+        for (benchmarks) |item| {
             mean += item.time_ms.?;
         }
-        mean = mean / @as(f64, @floatFromInt(list_length));
+        return mean / @as(f64, @floatFromInt(benchmarks.len));
+    }
 
-        printer.fmt("Mean: {d:.2}ms\n", .{mean});
-
-        //Calculate median
-        //Sorting with moreThan so we can save ourselves a sort down the line when we need to calculate the slowest
-        std.mem.sort(Benchmark, benchmark_list.items, {}, Benchmark.moreThan);
-        var median: f64 = undefined;
-        if (list_length % 2 == 0) {
-            const middle1 = benchmark_list.items[list_length / 2 - 1];
-            const middle2 = benchmark_list.items[list_length / 2];
-            median = (middle1.time_ms.? + middle2.time_ms.?) / 2;
+    inline fn calculateMedian(benchmarks: []Benchmark) f64 {
+        std.mem.sort(Benchmark, benchmarks, {}, Benchmark.moreThan);
+        if (benchmarks.len % 2 == 0) {
+            const middle1 = benchmarks[benchmarks.len / 2 - 1];
+            const middle2 = benchmarks[benchmarks.len / 2];
+            return (middle1.time_ms.? + middle2.time_ms.?) / 2;
         } else {
-            median = benchmark_list.items[list_length / 2].time_ms.?;
+            return benchmarks[benchmarks.len / 2].time_ms.?;
         }
-        printer.fmt("Median: {d:.2}ms\n", .{median});
+    }
 
-        //Display slowest
-        printer.fmt("\nSlowest:\n", .{});
-        const AMOUNT_OF_SLOWEST = 5;
-        for (0..AMOUNT_OF_SLOWEST) |i| {
-            if (i == list_length) break;
-            const benchmark = benchmark_list.items[i];
-
+    // need to pass in printer in here to avoid allocations
+    inline fn calculateSlowest(amount: u16, benchmarks: []Benchmark, printer: Printer) void {
+        for (0..amount) |i| {
+            if (i == benchmarks.len) break;
+            const benchmark = benchmarks[i];
             // mirrors `.printPass(...)` except uses `Status.text` for color
             printer.status(.text, "{s} ({d:.2}ms)\n", .{ benchmark.name, benchmark.time_ms.? });
         }
-
-        // Finish off with a new line
-        printer.fmt("\n", .{});
     }
 
     fn moreThan(context: void, a: Benchmark, b: Benchmark) bool {
