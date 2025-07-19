@@ -326,8 +326,12 @@ pub const Benchmark = struct {
     /// Should be used inside a tests:afterAll
     pub fn analyze() void {
         //TODO: look into displaying statistics based on category. ex: Slowest API tests; Slowest Endpoint tests, etc etc
-        const printer = Printer.init();
         const list_length = benchmark_list.items.len;
+
+        // early exit if zero tests pass
+        if (list_length == 0) return;
+
+        const printer = Printer.init();
         // Add a new line before the stats
         printer.fmt("\nStatistics:\n", .{});
 
