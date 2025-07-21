@@ -146,6 +146,7 @@ pub const GetRange = struct {
         CannotGet,
         CannotParseResult,
         OutOfMemory,
+        NoEntriesFound,
     } || DatabaseErrors;
 
     pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
@@ -164,6 +165,10 @@ pub const GetRange = struct {
             const entry = row.to(EntryList, .{}) catch return error.OutOfMemory;
 
             response.append(entry) catch return error.OutOfMemory;
+        }
+        if (response.items.len == 0) {
+            response.deinit();
+            return error.NoEntriesFound;
         }
         return Response{ .list = response.toOwnedSlice() catch return error.OutOfMemory, .allocator = allocator };
     }
@@ -186,8 +191,9 @@ pub const GetRange = struct {
         \\JOIN 
         \\training.exercise_category ec ON ehc.category_id = ec.id
         \\WHERE 
-        \\ee.created_by = $1 AND
-        \\ee.created_at BETWEEN $2 AND $3;
+        \\ee.created_by = $1
+        \\AND DATE (ee.created_at) >= $2
+        \\AND DATE (ee.created_at) <= $3
     ;
 };
 
@@ -376,6 +382,226 @@ test "API Exercise | Get Range" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
 
+    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    defer lower_bound_string.deinit();
+    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    defer upper_bound_string.deinit();
+
+    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
+    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+
+    const range_start = try lower_bound_string.toOwnedSlice();
+    defer allocator.free(range_start);
+    const range_end = try upper_bound_string.toOwnedSlice();
+    defer allocator.free(range_end);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const request = GetRange.Request{
+            .range_start = range_start,
+            .range_end = range_end,
+        };
+        var response = GetRange.call(allocator, setup.user.id, test_env.database, request) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer response.deinit();
+
+        std.testing.expectEqual(logged_responses.len, response.list.len) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        for (response.list, logged_responses) |entry, logged| {
+            std.testing.expectEqual(logged.id, entry.entry_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.exercise_id, entry.exercise_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.unit_id, entry.unit_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.value, entry.value) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            if (logged.notes) |logged_notes| {
+                if (entry.notes) |entry_notes| {
+                    std.testing.expectEqualStrings(logged_notes, entry_notes) catch |err| {
+                        benchmark.fail(err);
+                        return err;
+                    };
+                } else {
+                    // notes missing in entry when they were in response
+                    const err = error.NotesMissing;
+                    benchmark.fail(err);
+                    return err;
+                }
+            }
+        }
+    }
+}
+test "API Exercise | Get Range Upper Bound" {
+    const zdt = @import("zdt");
+    const test_name = "API Exercise | Get Range Upper Bound";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const CreateCategory = @import("category.zig").Create;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
+
+    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+        .name = "Chest",
+    });
+    const create_request = Create.Request{
+        .name = test_name,
+        .category_id = @intCast(category.id),
+        .base_amount = 1,
+        .base_unit = "kg",
+    };
+    const create_response = try Create.call(setup.user.id, test_env.database, create_request);
+
+    const log_request_1 = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 15,
+    };
+
+    const log_request_2 = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 8,
+    };
+    const log_response_1 = try LogExercise.call(setup.user.id, test_env.database, log_request_1);
+    const log_response_2 = try LogExercise.call(setup.user.id, test_env.database, log_request_2);
+
+    const logged_responses = [_]LogExercise.Response{ log_response_1, log_response_2 };
+
+    // setup dates
+    const now = try zdt.Datetime.now(null);
+    const now_day = try now.floorTo(.day);
+
+    var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
+    var upper_bound = now_day;
+
+    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    defer lower_bound_string.deinit();
+    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    defer upper_bound_string.deinit();
+
+    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
+    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+
+    const range_start = try lower_bound_string.toOwnedSlice();
+    defer allocator.free(range_start);
+    const range_end = try upper_bound_string.toOwnedSlice();
+    defer allocator.free(range_end);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const request = GetRange.Request{
+            .range_start = range_start,
+            .range_end = range_end,
+        };
+        var response = GetRange.call(allocator, setup.user.id, test_env.database, request) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer response.deinit();
+
+        std.testing.expectEqual(logged_responses.len, response.list.len) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        for (response.list, logged_responses) |entry, logged| {
+            std.testing.expectEqual(logged.id, entry.entry_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.exercise_id, entry.exercise_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.unit_id, entry.unit_id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(logged.value, entry.value) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            if (logged.notes) |logged_notes| {
+                if (entry.notes) |entry_notes| {
+                    std.testing.expectEqualStrings(logged_notes, entry_notes) catch |err| {
+                        benchmark.fail(err);
+                        return err;
+                    };
+                } else {
+                    // notes missing in entry when they were in response
+                    const err = error.NotesMissing;
+                    benchmark.fail(err);
+                    return err;
+                }
+            }
+        }
+    }
+}
+
+test "API Exercise | Get Range Lower Bound" {
+    const zdt = @import("zdt");
+    const test_name = "API Exercise | Get Range Lower Bound";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const CreateCategory = @import("category.zig").Create;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
+
+    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+        .name = "Chest",
+    });
+    const create_request = Create.Request{
+        .name = test_name,
+        .category_id = @intCast(category.id),
+        .base_amount = 1,
+        .base_unit = "kg",
+    };
+    const create_response = try Create.call(setup.user.id, test_env.database, create_request);
+
+    const log_request_1 = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 15,
+    };
+
+    const log_request_2 = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 8,
+    };
+    const log_response_1 = try LogExercise.call(setup.user.id, test_env.database, log_request_1);
+    const log_response_2 = try LogExercise.call(setup.user.id, test_env.database, log_request_2);
+
+    const logged_responses = [_]LogExercise.Response{ log_response_1, log_response_2 };
+
+    // setup dates
+    const now = try zdt.Datetime.now(null);
+    const now_day = try now.floorTo(.day);
+
+    var lower_bound = now_day;
+    var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
     var lower_bound_string = std.ArrayList(u8).init(allocator);
     defer lower_bound_string.deinit();
     var upper_bound_string = std.ArrayList(u8).init(allocator);

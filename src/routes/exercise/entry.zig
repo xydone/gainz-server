@@ -10,7 +10,7 @@ const GetRange = @import("../../models/exercise/exercise.zig").GetRange;
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/exercise/entry", createEntry, .{ .data = &RouteData });
-    router.*.get("/api/exercise/entry/:start/:end", getExerciseEntryRange, .{ .data = &RouteData });
+    router.*.get("/api/exercise/entry/range", getExerciseEntryRange, .{ .data = &RouteData });
 }
 
 pub fn createEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -43,8 +43,11 @@ pub fn getExerciseEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, 
     };
     const request: GetRange.Request = .{ .range_start = start, .range_end = end };
 
-    var exercises = GetRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+    var exercises = GetRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch |err| {
+        switch (err) {
+            error.NoEntriesFound => try rs.handleResponse(res, rs.ResponseError.not_found, "No exercise entries found in the given range!"),
+            else => try rs.handleResponse(res, rs.ResponseError.internal_server_error, null),
+        }
         return;
     };
     defer exercises.deinit();
