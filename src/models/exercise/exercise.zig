@@ -254,6 +254,42 @@ pub const LogExercise = struct {
     ;
 };
 
+pub const DeleteExerciseEntry = struct {
+    pub const Request = struct {};
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        created_by: i32,
+        exercise_id: i32,
+        value: f64,
+        unit_id: i32,
+        notes: ?[]const u8,
+    };
+    pub const Errors = error{
+        CannotDelete,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, entry_id: u32) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+
+        const row = conn.row(query_string, .{ user_id, entry_id }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotDelete;
+        } orelse return error.CannotDelete;
+
+        return row.to(Response, .{}) catch return error.CannotParseResult;
+    }
+    const query_string =
+        \\DELETE FROM training.exercise_entry
+        \\WHERE created_by = $1
+        \\AND id = $2
+        \\RETURNING *;
+    ;
+};
+
 const Tests = @import("../../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -296,8 +332,8 @@ test "API Exercise | Create" {
     }
 }
 
-test "API Exercise | Log" {
-    const test_name = "API Exercise | Log";
+test "API Exercise | Log Entry" {
+    const test_name = "API Exercise | Log Entry";
     //SETUP
     const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
@@ -344,6 +380,64 @@ test "API Exercise | Log" {
             return err;
         };
         if (request.notes) |notes| {
+            std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
+    }
+}
+
+test "API Exercise | Delete Entry" {
+    const test_name = "API Exercise | Delete Entry";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const CreateCategory = @import("category.zig").Create;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
+
+    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+        .name = "Chest",
+    });
+    const create_request = Create.Request{
+        .name = test_name,
+        .category_id = @intCast(category.id),
+        .base_amount = 1,
+        .base_unit = "kg",
+    };
+    const create_response = try Create.call(setup.user.id, test_env.database, create_request);
+
+    const log_request = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 15,
+    };
+    const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+
+        const response = DeleteExerciseEntry.call(setup.user.id, test_env.database, @intCast(log_response.id)) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+
+        std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(@as(i32, @intCast(log_request.unit_id)), response.unit_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(log_request.value, response.value) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        if (log_request.notes) |notes| {
             std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
                 benchmark.fail(err);
                 return err;
