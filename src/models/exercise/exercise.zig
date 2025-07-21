@@ -130,13 +130,19 @@ pub const GetRange = struct {
         }
     };
 
+    //TODO: this is super ugly.
     pub const EntryList = struct {
         entry_id: i32,
         entry_created_at: i64,
         created_by: i32,
         exercise_id: i32,
+        exercise_name: []const u8,
+        exercise_description: ?[]const u8,
         value: f64,
         unit_id: i32,
+        unit_name: []const u8,
+        unit_amount: f64,
+        unit_multiplier: f64,
         notes: ?[]const u8,
         category_id: i32,
         category_name: []const u8,
@@ -178,14 +184,23 @@ pub const GetRange = struct {
         \\ee.created_at AS entry_created_at,
         \\ee.created_by,
         \\ee.exercise_id,
+        \\ex.name AS exercise_name,
+        \\ex.description AS exercise_description,
         \\ee.value,
         \\ee.unit_id,
+        \\eu.unit AS unit_name,
+        \\eu.amount AS unit_amount,
+        \\eu.multiplier AS unit_multiplier,
         \\ee.notes,
         \\ec.id AS category_id,
         \\ec.name AS category_name,
         \\ec.description AS category_description
         \\FROM 
         \\training.exercise_entry ee
+        \\JOIN 
+        \\training.exercise ex ON ee.exercise_id = ex.id
+        \\JOIN 
+        \\training.exercise_unit eu ON ee.unit_id = eu.id
         \\JOIN 
         \\training.exercise_has_category ehc ON ee.exercise_id = ehc.exercise_id
         \\JOIN 
