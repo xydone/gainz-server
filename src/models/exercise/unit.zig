@@ -11,7 +11,7 @@ const log = std.log.scoped(.unit_model);
 pub const Create = struct {
     pub const Request = struct {
         amount: f64,
-        unit: []u8,
+        unit: []const u8,
         multiplier: f64,
     };
     pub const Response = struct {
@@ -19,7 +19,7 @@ pub const Create = struct {
         created_at: i64,
         created_by: i32,
         amount: f64,
-        unit: []u8,
+        unit: []const u8,
         multiplier: f64,
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
@@ -39,7 +39,7 @@ pub const Create = struct {
 
     const query_string =
         \\INSERT INTO
-        \\exercise_unit (created_by, amount, unit, multiplier)
+        \\training.exercise_unit (created_by, amount, unit, multiplier)
         \\VALUES
         \\($1, $2, $3, $4)
         \\RETURNING *

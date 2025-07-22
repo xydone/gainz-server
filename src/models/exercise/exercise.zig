@@ -290,6 +290,56 @@ pub const DeleteExerciseEntry = struct {
     ;
 };
 
+pub const EditExerciseEntry = struct {
+    pub const Request = struct {
+        exercise_id: ?i32 = null,
+        value: ?f64 = null,
+        unit_id: ?i32 = null,
+        notes: ?[]const u8 = null,
+
+        pub fn isValid(self: Request) bool {
+            return self.exercise_id != null or self.value != null or self.unit_id != null or self.notes != null;
+        }
+    };
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        created_by: i32,
+        exercise_id: i32,
+        value: f64,
+        unit_id: i32,
+        notes: ?[]const u8,
+    };
+    pub const Errors = error{
+        CannotEdit,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, entry_id: u32, database: *Pool, request: Request) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+
+        const row = conn.row(query_string, .{ user_id, entry_id, request.exercise_id, request.value, request.unit_id, request.notes }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotEdit;
+        } orelse return error.CannotEdit;
+
+        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+    }
+    const query_string =
+        \\UPDATE training.exercise_entry
+        \\SET
+        \\exercise_id = COALESCE($3, exercise_id),
+        \\value = COALESCE($4, value),
+        \\unit_id = COALESCE($5, unit_id),
+        \\notes = COALESCE($6, notes)
+        \\WHERE created_by = $1
+        \\AND id = $2
+        \\RETURNING *;
+    ;
+};
+
 const Tests = @import("../../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -380,6 +430,76 @@ test "API Exercise | Log Entry" {
             return err;
         };
         if (request.notes) |notes| {
+            std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
+    }
+}
+
+test "API Exercise | Edit Entry" {
+    const test_name = "API Exercise | Edit Entry";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
+    const test_env = Tests.test_env;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    const allocator = std.testing.allocator;
+    defer setup.deinit(allocator);
+
+    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+        .name = "Chest",
+    });
+    const create_request = Create.Request{
+        .name = test_name,
+        .category_id = @intCast(category.id),
+        .base_amount = 1,
+        .base_unit = "kg",
+    };
+    const create_response = try Create.call(setup.user.id, test_env.database, create_request);
+
+    const log_request = LogExercise.Request{
+        .exercise_id = @intCast(create_response.id),
+        .unit_id = @intCast(create_response.base_unit_id),
+        .value = 15,
+    };
+    const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
+
+    const unit_request = CreateUnit.Request{
+        .amount = 10,
+        .multiplier = 1,
+        .unit = test_name ++ "'s unit",
+    };
+    const unit_response = try CreateUnit.call(setup.user.id, test_env.database, unit_request);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        const request = EditExerciseEntry.Request{
+            .value = 10,
+            .unit_id = unit_response.id,
+        };
+        const response = EditExerciseEntry.call(setup.user.id, @intCast(log_response.id), test_env.database, request) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+
+        std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(@as(i32, @intCast(request.unit_id.?)), response.unit_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(request.value, response.value) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        if (log_request.notes) |notes| {
             std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
                 benchmark.fail(err);
                 return err;

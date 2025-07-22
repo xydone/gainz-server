@@ -6,11 +6,13 @@ const Handler = @import("../../handler.zig");
 const rs = @import("../../response.zig");
 const LogExercise = @import("../../models/exercise/exercise.zig").LogExercise;
 const DeleteExerciseEntry = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
+const EditExerciseEntry = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
 const GetRange = @import("../../models/exercise/exercise.zig").GetRange;
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/exercise/entry", createEntry, .{ .data = &RouteData });
+    router.*.put("/api/exercise/entry/:entry_id", editEntry, .{ .data = &RouteData });
     router.*.delete("/api/exercise/entry/:entry_id", deleteEntry, .{ .data = &RouteData });
     router.*.get("/api/exercise/entry/range", getExerciseEntryRange, .{ .data = &RouteData });
 }
@@ -32,6 +34,33 @@ pub fn createEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 
     try res.json(response, .{});
 }
+
+pub fn editEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
+        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        return;
+    };
+    const body = req.body() orelse {
+        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        return;
+    };
+    const exercise_entry = std.json.parseFromSliceLeaky(EditExerciseEntry.Request, ctx.app.allocator, body, .{}) catch {
+        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        return;
+    };
+    if (exercise_entry.isValid()) {
+        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
+        return;
+    }
+    const response = EditExerciseEntry.call(ctx.user_id.?, entry_id, ctx.app.db, exercise_entry) catch {
+        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        return;
+    };
+    res.status = 200;
+
+    try res.json(response, .{});
+}
+
 pub fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
         try rs.handleResponse(res, rs.ResponseError.bad_request, null);
@@ -153,6 +182,105 @@ test "Endpoint Exercise | Log Entry" {
             benchmark.fail(err);
             return err;
         };
+    }
+}
+
+test "Endpoint Exercise | Edit Entry" {
+    // SETUP
+    const test_name = "Endpoint Exercise | Edit Entry";
+    const ht = @import("httpz").testing;
+    const Create = @import("../../models/exercise/exercise.zig").Create;
+    const CreateCategory = @import("../../models/exercise/category.zig").Create;
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+
+    var user = try TestSetup.createUser(test_env.database, test_name);
+    defer user.deinit(allocator);
+
+    const category_request = CreateCategory.Request{ .name = "Chest" };
+
+    const category = try CreateCategory.call(user.id, test_env.database, category_request);
+
+    const create_request = Create.Request{
+        .name = test_name ++ " exercise",
+        .base_amount = 1,
+        .base_unit = test_name ++ "'s plates",
+        .category_id = @intCast(category.id),
+    };
+
+    const exercise = try Create.call(user.id, test_env.database, create_request);
+
+    const log_request = LogExercise.Request{
+        .exercise_id = @intCast(exercise.id),
+        .unit_id = @intCast(exercise.base_unit_id),
+        .value = 123,
+    };
+    const log_response = try LogExercise.call(user.id, test_env.database, log_request);
+    const body = EditExerciseEntry.Request{
+        .value = 10,
+        .notes = test_name ++ "'s notes",
+    };
+    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    defer allocator.free(body_string);
+
+    var context = try TestSetup.createContext(user.id, allocator, test_env.database);
+    defer TestSetup.deinitContext(allocator, context);
+
+    const log_id = try std.fmt.allocPrint(allocator, "{}", .{log_response.id});
+    defer allocator.free(log_id);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        var web_test = ht.init(.{});
+        defer web_test.deinit();
+
+        web_test.body(body_string);
+
+        web_test.param("entry_id", log_id);
+
+        editEntry(&context, web_test.req, web_test.res) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        web_test.expectStatus(200) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        const response_body = web_test.getBody() catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        const response = std.json.parseFromSlice(EditExerciseEntry.Response, allocator, response_body, .{}) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        defer response.deinit();
+
+        std.testing.expectEqual(user.id, response.value.created_by) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(exercise.base_unit_id, response.value.unit_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(exercise.id, response.value.exercise_id) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(body.value, response.value.value) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        if (response.value.notes) |notes| {
+            std.testing.expectEqualStrings(body.notes.?, notes) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
     }
 }
 
