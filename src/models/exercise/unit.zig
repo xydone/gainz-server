@@ -34,7 +34,7 @@ pub const Create = struct {
             return error.CannotCreate;
         } orelse return error.CannotCreate;
 
-        return row.to(Response, .{}) catch return error.CannotParseResult;
+        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
     }
 
     const query_string =
@@ -45,3 +45,140 @@ pub const Create = struct {
         \\RETURNING *
     ;
 };
+
+pub const GetAll = struct {
+    pub const Request = struct {};
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        created_by: i32,
+        amount: f64,
+        unit: []const u8,
+        multiplier: f64,
+    };
+    pub const Errors = error{
+        CannotGet,
+        CannotParseResult,
+        OutOfMemory,
+    } || DatabaseErrors;
+
+    /// Caller must free
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+
+        var list: std.ArrayList(Response) = .init(allocator);
+        defer list.deinit();
+
+        const result = conn.query(query_string, .{user_id}) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotGet;
+        };
+
+        while (result.next() catch return error.CannotGet) |row| {
+            list.append(row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+        }
+
+        return list.toOwnedSlice();
+    }
+
+    const query_string =
+        \\SELECT *
+        \\FROM training.exercise_unit
+        \\WHERE created_by = $1;
+    ;
+};
+
+const Tests = @import("../../tests/tests.zig");
+const TestSetup = Tests.TestSetup;
+
+test "API Exercise Unit | Create" {
+    const test_name = "API Exercise Unit | Create";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit(allocator);
+
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        const request = Create.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
+        const response = try Create.call(setup.user.id, test_env.database, request);
+
+        std.testing.expectEqual(setup.user.id, response.created_by) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(request.amount, response.amount) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqual(request.multiplier, response.multiplier) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+        std.testing.expectEqualStrings(request.unit, response.unit) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+    }
+}
+
+test "API Exercise Unit | Get All" {
+    const test_name = "API Exercise Unit | Get All";
+    //SETUP
+    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit(allocator);
+
+    const create_request = Create.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
+    const create = try Create.call(setup.user.id, test_env.database, create_request);
+
+    const created_units = [_]Create.Response{create};
+    // TEST
+    {
+        var benchmark = Benchmark.start(test_name);
+        defer benchmark.end();
+        const response_list = try GetAll.call(allocator, setup.user.id, test_env.database);
+        defer allocator.free(response_list);
+
+        std.testing.expectEqual(created_units.len, response_list.len) catch |err| {
+            benchmark.fail(err);
+            return err;
+        };
+
+        for (response_list, created_units) |response, created| {
+            std.testing.expectEqual(setup.user.id, response.created_by) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.id, response.id) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.amount, response.amount) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.multiplier, response.multiplier) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqual(created.created_at, response.created_at) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+            std.testing.expectEqualStrings(created.unit, response.unit) catch |err| {
+                benchmark.fail(err);
+                return err;
+            };
+        }
+    }
+}

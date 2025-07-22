@@ -48,7 +48,7 @@ pub fn editEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    if (exercise_entry.isValid()) {
+    if (!exercise_entry.isValid()) {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
         return;
     }
