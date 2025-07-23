@@ -2,14 +2,14 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const create = @import("../models/entry_model.zig").create;
-const get = @import("../models/entry_model.zig").get;
-const delete = @import("../models/entry_model.zig").delete;
-const edit = @import("../models/entry_model.zig").edit;
-const getAverage = @import("../models/entry_model.zig").getAverage;
-const getBreakdown = @import("../models/entry_model.zig").getBreakdown;
-const getInRange = @import("../models/entry_model.zig").getInRange;
-const getRecent = @import("../models/entry_model.zig").getRecent;
+const Create = @import("../models/entry_model.zig").Create;
+const Get = @import("../models/entry_model.zig").Get;
+const Delete = @import("../models/entry_model.zig").Delete;
+const Edit = @import("../models/entry_model.zig").Edit;
+const GetAverage = @import("../models/entry_model.zig").GetAverage;
+const GetBreakdown = @import("../models/entry_model.zig").GetBreakdown;
+const GetInRange = @import("../models/entry_model.zig").GetInRange;
+const GetRecent = @import("../models/entry_model.zig").GetRecent;
 
 const Handler = @import("../handler.zig");
 const rq = @import("../request.zig");
@@ -34,9 +34,8 @@ fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
         try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     };
-    const request: rq.GetEntry = .{ .entry = entry_id };
 
-    const result = get(ctx.user_id.?, ctx.app.db, request) catch {
+    const result = Get.call(ctx.user_id.?, ctx.app.db, entry_id) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -60,7 +59,7 @@ fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
         return;
     };
 
-    delete(ctx.app.db, rq.DeleteEntry{ .id = entry_id }) catch {
+    Delete.call(ctx.app.db, entry_id) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
@@ -78,12 +77,12 @@ fn putEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
         return;
     };
 
-    const entry = std.json.parseFromSliceLeaky(rq.EditEntry, ctx.app.allocator, body, .{}) catch {
+    const entry = std.json.parseFromSliceLeaky(Edit.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
 
-    edit(ctx, entry, entry_id) catch {
+    Edit.call(ctx.app.db, entry, entry_id) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
@@ -91,33 +90,27 @@ fn putEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Respo
 }
 
 fn getEntryRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const allocator = ctx.app.allocator;
     const query = try req.query();
 
     const limit = std.fmt.parseInt(u32, query.get("limit") orelse "10", 10) catch {
         try rs.handleResponse(res, rs.ResponseError.bad_request, null);
         return;
     };
-    const request: rq.GetEntryRecent = .{ .limit = limit };
 
-    var result = getRecent(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    const result = GetRecent.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, limit) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
-    defer result.deinit();
+    defer {
+        for (result) |entry| {
+            entry.deinit(allocator);
+        }
+        allocator.free(result);
+    }
     res.status = 200;
 
-    var response = std.ArrayList(rs.GetEntryRecent).init(ctx.app.allocator);
-    for (result.list) |entry| {
-        try response.append(rs.GetEntryRecent{
-            .id = entry.id,
-            .created_at = entry.created_at,
-            .brand_name = entry.food.?.brand_name,
-            .food_name = entry.food.?.food_name,
-            .food_id = entry.food_id,
-            .nutrients = entry.food.?.nutrients,
-        });
-    }
-    try res.json(try response.toOwnedSlice(), .{});
+    try res.json(result, .{});
 }
 
 fn getEntryAverage(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -132,8 +125,8 @@ fn getEntryAverage(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
         return;
     };
 
-    const request: rq.GetEntryBreakdown = .{ .range_start = start, .range_end = end };
-    const result = getAverage(ctx.user_id.?, ctx.app.db, request) catch {
+    const request: GetAverage.Request = .{ .range_start = start, .range_end = end };
+    const result = GetAverage.call(ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
@@ -152,16 +145,18 @@ fn getEntryStatsDetailed(ctx: *Handler.RequestContext, req: *httpz.Request, res:
         return;
     };
 
-    const request: rq.GetEntryBreakdown = .{ .range_start = start, .range_end = end };
-    const result = getBreakdown(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    const request: GetBreakdown.Request = .{ .range_start = start, .range_end = end };
+    const result = GetBreakdown.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
     res.status = 200;
-    try res.json(result.list, .{});
+    try res.json(result, .{});
 }
 
 fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const allocator = ctx.app.allocator;
+
     const query = try req.query();
     const start = query.get("start") orelse {
         try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
@@ -172,29 +167,15 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
         return;
     };
 
-    const request: rq.GetEntryRange = .{ .range_start = start, .range_end = end };
-    var result = getInRange(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
+    const request: GetInRange.Request = .{ .range_start = start, .range_end = end };
+    const result = GetInRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
         try rs.handleResponse(res, rs.ResponseError.not_found, null);
         return;
     };
-    defer result.deinit();
+    defer allocator.free(result);
     res.status = 200;
 
-    var response = std.ArrayList(rs.GetEntryRange).init(ctx.app.allocator);
-    for (result.list) |entry| {
-        try response.append(rs.GetEntryRange{
-            .entry_id = entry.id,
-            .food_id = entry.food_id,
-            .serving_id = entry.serving_id,
-            .created_at = entry.created_at,
-            .amount = entry.amount,
-            .category = entry.category,
-            .brand_name = entry.food.?.brand_name,
-            .food_name = entry.food.?.food_name,
-            .nutrients = entry.food.?.nutrients,
-        });
-    }
-    try res.json(try response.toOwnedSlice(), .{});
+    try res.json(result, .{});
 }
 
 fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
@@ -202,11 +183,11 @@ fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
         try rs.handleResponse(res, rs.ResponseError.body_missing, null);
         return;
     };
-    const json = std.json.parseFromSliceLeaky(rq.PostEntry, ctx.app.allocator, body, .{}) catch {
+    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
         return;
     };
-    const result = create(ctx.user_id.?, ctx.app.db, json) catch {
+    const result = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
