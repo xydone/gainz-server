@@ -27,12 +27,13 @@ pub const Create = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        const row = conn.row(query_string, .{ user_id, request.amount, request.unit, request.multiplier }) catch |err| {
+        var row = conn.row(query_string, .{ user_id, request.amount, request.unit, request.multiplier }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotCreate;
         } orelse return error.CannotCreate;
+        defer row.deinit() catch {};
 
         return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
     }

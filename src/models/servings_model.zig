@@ -24,39 +24,25 @@ pub const Create = struct {
         unit: []u8,
         multiplier: f64,
         food_id: i32,
-
-        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
-            allocator.free(self.unit);
-        }
     };
     pub const Errors = error{
         CannotCreate,
+        CannotParseResult,
         OutOfMemory,
     } || DatabaseErrors;
     pub fn call(ctx: *Handler.RequestContext, request: Request) Errors!Response {
         var conn = ctx.app.db.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        var result = conn.rowOpts(query_string, .{ ctx.user_id, request.food_id, request.amount, request.unit, request.multiplier }, .{}) catch |err| {
+        var row = conn.rowOpts(query_string, .{ ctx.user_id, request.food_id, request.amount, request.unit, request.multiplier }, .{}) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotCreate;
         } orelse return error.CannotCreate;
+        defer row.deinit() catch {};
 
-        const id = result.get(i32, 0);
-        const amount = result.get(f64, 1);
-        const unit = result.get([]u8, 2);
-        const multiplier = result.get(f64, 3);
-        const food_id = result.get(i32, 4);
-
-        return Response{
-            .id = id,
-            .amount = amount,
-            .unit = ctx.app.allocator.dupe(u8, unit) catch return error.OutOfMemory,
-            .multiplier = multiplier,
-            .food_id = food_id,
-        };
+        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
     }
     const query_string = "INSERT INTO servings (created_by, food_id, amount, unit, multiplier) VALUES($1,$2,$3,$4,$5) RETURNING id, amount, unit, multiplier, food_id;";
 };

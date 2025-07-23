@@ -159,7 +159,7 @@ pub const GetRange = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        var result = conn.queryOpts(query_string, .{ user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+        var result = conn.queryOpts(query_string, .{ user_id, request.range_start, request.range_end }, .{}) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -168,9 +168,7 @@ pub const GetRange = struct {
         defer result.deinit();
         var response = std.ArrayList(EntryList).init(allocator);
         while (result.next() catch return error.CannotGet) |row| {
-            const entry = row.to(EntryList, .{}) catch return error.OutOfMemory;
-
-            response.append(entry) catch return error.OutOfMemory;
+            response.append(row.to(EntryList, .{ .dupe = true }) catch return error.OutOfMemory) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) {
             response.deinit();
@@ -236,12 +234,13 @@ pub const LogExercise = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        const row = conn.row(query_string, .{ user_id, request.exercise_id, request.value, request.unit_id, request.notes }) catch |err| {
+        var row = conn.row(query_string, .{ user_id, request.exercise_id, request.value, request.unit_id, request.notes }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotLog;
         } orelse return error.CannotLog;
+        defer row.deinit() catch {};
 
         return row.to(Response, .{}) catch return error.CannotParseResult;
     }
@@ -273,12 +272,13 @@ pub const DeleteExerciseEntry = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        const row = conn.row(query_string, .{ user_id, entry_id }) catch |err| {
+        var row = conn.row(query_string, .{ user_id, entry_id }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotDelete;
         } orelse return error.CannotDelete;
+        defer row.deinit() catch {};
 
         return row.to(Response, .{}) catch return error.CannotParseResult;
     }
@@ -318,12 +318,13 @@ pub const EditExerciseEntry = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        const row = conn.row(query_string, .{ user_id, entry_id, request.exercise_id, request.value, request.unit_id, request.notes }) catch |err| {
+        var row = conn.row(query_string, .{ user_id, entry_id, request.exercise_id, request.value, request.unit_id, request.notes }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotEdit;
         } orelse return error.CannotEdit;
+        defer row.deinit() catch {};
 
         return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
     }
