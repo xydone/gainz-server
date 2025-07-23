@@ -26,20 +26,8 @@ pub const PostMeasurement = struct {
     date: ?[]const u8 = null,
 };
 
-pub const PostEntry = struct {
-    food_id: i32,
-    category: types.MealCategory,
-    amount: f64,
-    serving_id: i32,
-    created_at: ?[]const u8 = null,
-};
-
 pub const GetEntry = struct {
     entry: u32,
-};
-
-pub const DeleteEntry = struct {
-    id: u32,
 };
 
 pub const EditEntry = struct {

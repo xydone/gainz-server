@@ -133,7 +133,6 @@ pub fn postServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *htt
         try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
         return;
     };
-    defer result.deinit(ctx.app.allocator);
     res.status = 200;
     try res.json(result, .{});
 }

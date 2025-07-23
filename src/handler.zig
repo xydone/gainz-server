@@ -3,8 +3,8 @@ const std = @import("std");
 const httpz = @import("httpz");
 const jwt = @import("jwt");
 const pg = @import("pg");
-const rs = @import("response.zig");
-const rq = @import("request.zig");
+const handleResponse = @import("response.zig").handleResponse;
+const ResponseError = @import("response.zig").ResponseError;
 
 const types = @import("types.zig");
 const auth = @import("util/auth.zig");
@@ -27,6 +27,10 @@ pub const RequestContext = struct {
     app: *Handler,
     user_id: ?i32,
     refresh_token: ?[]const u8,
+};
+
+const RefreshAccessToken = struct {
+    refresh_token: []const u8,
 };
 
 pub fn dispatch(self: *Handler, action: httpz.Action(*RequestContext), req: *httpz.Request, res: *httpz.Response) !void {
@@ -85,11 +89,11 @@ fn verifyToken(req: *httpz.Request, res: *httpz.Response, ctx: *RequestContext) 
         }
         if (route_data.refresh) {
             const body = req.body() orelse {
-                try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+                try handleResponse(res, .body_missing, null);
                 return error.MissingBody;
             };
-            const json = std.json.parseFromSliceLeaky(rq.RefreshAccessToken, ctx.app.allocator, body, .{}) catch {
-                try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+            const json = std.json.parseFromSliceLeaky(RefreshAccessToken, ctx.app.allocator, body, .{}) catch {
+                try handleResponse(res, ResponseError.body_missing_fields, null);
                 return error.InvalidBodyJSON;
             };
             ctx.refresh_token = json.refresh_token;
