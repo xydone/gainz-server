@@ -5,7 +5,6 @@ const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
 const ErrorHandler = @import("../../db.zig").ErrorHandler;
 
 const Handler = @import("../../handler.zig");
-const rq = @import("../../request.zig");
 const log = std.log.scoped(.exercise_model);
 
 pub const Create = struct {

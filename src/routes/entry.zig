@@ -12,8 +12,8 @@ const GetInRange = @import("../models/entry_model.zig").GetInRange;
 const GetRecent = @import("../models/entry_model.zig").GetRecent;
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.entry);
@@ -31,36 +31,27 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 fn getEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
 
-    const result = Get.call(ctx.user_id.?, ctx.app.db, entry_id) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+    const response = Get.call(ctx.user_id.?, ctx.app.db, entry_id) catch {
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     res.status = 200;
 
-    const response = rs.GetEntry{
-        .id = result.id,
-        .amount = result.amount,
-        .category = result.category,
-        .created_at = result.created_at,
-        .food_id = result.food_id,
-        .serving_id = result.serving_id,
-        .user_id = result.user_id,
-    };
     try res.json(response, .{});
 }
 
 fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
 
     Delete.call(ctx.app.db, entry_id) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
+        try handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
     res.status = 200;
@@ -68,22 +59,22 @@ fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
 
 fn putEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
 
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
 
     const entry = std.json.parseFromSliceLeaky(Edit.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
 
     Edit.call(ctx.app.db, entry, entry_id) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, "Cannot find an entry with this ID.");
+        try handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
         return;
     };
     res.status = 200;
@@ -94,12 +85,12 @@ fn getEntryRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
     const query = try req.query();
 
     const limit = std.fmt.parseInt(u32, query.get("limit") orelse "10", 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
 
     const result = GetRecent.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, limit) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     defer {
@@ -117,17 +108,17 @@ fn getEntryAverage(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
     const query = try req.query();
 
     const start = query.get("start") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
 
     const request: GetAverage.Request = .{ .range_start = start, .range_end = end };
     const result = GetAverage.call(ctx.user_id.?, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     res.status = 200;
@@ -137,17 +128,17 @@ fn getEntryAverage(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 fn getEntryStatsDetailed(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
     const start = query.get("start") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
 
     const request: GetBreakdown.Request = .{ .range_start = start, .range_end = end };
     const result = GetBreakdown.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     res.status = 200;
@@ -159,17 +150,17 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
     const query = try req.query();
     const start = query.get("start") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
 
     const request: GetInRange.Request = .{ .range_start = start, .range_end = end };
     const result = GetInRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     defer allocator.free(result);
@@ -180,19 +171,18 @@ fn getEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
 fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
-    const result = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+    const response = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
 
-    const response = rs.PostEntry{ .category = result.category, .food_id = result.food_id, .id = result.id, .user_id = result.user_id };
     res.status = 200;
     try res.json(response, .{});
 }

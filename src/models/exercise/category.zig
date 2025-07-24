@@ -5,8 +5,6 @@ const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
 const ErrorHandler = @import("../../db.zig").ErrorHandler;
 
 const Handler = @import("../../handler.zig");
-const rq = @import("../../request.zig");
-const rs = @import("../../response.zig");
 
 const log = std.log.scoped(.category_model);
 
@@ -27,7 +25,11 @@ pub const Create = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        var row = conn.row(query_string, .{ user_id, request.name, request.description }) catch {
+        var row = conn.row(query_string, .{ user_id, request.name, request.description }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+
             return error.CannotCreate;
         } orelse return error.CannotCreate;
         defer row.deinit() catch {};
@@ -54,32 +56,26 @@ pub const Get = struct {
         name: []u8,
         description: ?[]u8 = null,
     };
-    pub const Errors = error{ CannotGet, CannotParseResult } || DatabaseErrors;
-    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool) anyerror![]rs.GetCategories {
-        var conn = try database.acquire();
+    pub const Errors = error{ CannotGet, CannotParseResult, OutOfMemory } || DatabaseErrors;
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
         var result = conn.queryOpts(query_string, .{user_id}, .{ .column_names = true }) catch |err| {
-            if (conn.err) |pg_err| {
-                log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-            }
-            return err;
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+
+            return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(rs.GetCategories).init(allocator);
-        while (try result.next()) |row| {
-            const id = row.get(i32, 0);
+        var response = std.ArrayList(Response).init(allocator);
+        defer response.deinit();
 
-            const name = row.getCol([]u8, "name");
-            const description = row.getCol(?[]u8, "description");
-
-            try response.append(rs.GetCategories{
-                .id = id,
-                .name = try allocator.dupe(u8, name),
-                .description = if (description == null) null else try allocator.dupe(u8, description.?),
-            });
+        while (result.next() catch return error.CannotGet) |row| {
+            try response.append(row.to(Response, .{}) catch return error.CannotParseResult);
         }
-        return try response.toOwnedSlice();
+        return response.toOwnedSlice() catch return error.OutOfMemory;
     }
     const query_string = "SELECT id,name, description FROM training.exercise_category WHERE created_by = $1";
 };

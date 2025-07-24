@@ -1,137 +1,175 @@
 const std = @import("std");
 
-const pg = @import("pg");
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
 const auth = @import("../util/auth.zig");
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.measurements_model);
 
-pub const MeasurementList = struct {
-    list: []Measurement,
-    allocator: std.mem.Allocator,
+pub const Create = struct {
+    pub const Request = struct {
+        type: types.MeasurementType,
+        value: f64,
+        date: ?[]const u8 = null,
+    };
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        type: types.MeasurementType,
+        value: f64,
+    };
+    pub const Errors = error{
+        CannotCreate,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var row = conn.row(query_string, //
+            .{
+                user_id,
+                request.type,
+                request.value,
+                request.date,
+            }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
 
-    pub fn deinit(self: *MeasurementList) void {
-        self.allocator.free(self.list);
+            return error.CannotCreate;
+        } orelse return error.CannotCreate;
+        defer row.deinit() catch {};
+
+        return row.to(Response, .{ .dupe = true }) catch return error.CannotCreate;
     }
+    const query_string = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE(TO_TIMESTAMP($4, 'YYYY-MM-DD'), NOW())) RETURNING id,created_at, type, value;";
 };
 
-pub const Measurement = struct {
-    id: i32,
-    created_at: i64,
-    type: types.MeasurementType,
-    value: f64,
+pub const Get = struct {
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        type: types.MeasurementType,
+        value: f64,
+    };
+    pub const Errors = error{
+        CannotGet,
+        NotFound,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, measurement_id: u32) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var row = conn.row(query_string, //
+            .{ user_id, measurement_id }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+
+            return error.CannotGet;
+        } orelse return error.NotFound;
+        defer row.deinit() catch {};
+
+        return row.to(Response, .{}) catch return error.CannotParseResult;
+    }
+    const query_string = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND id = $2";
 };
 
-pub fn create(user_id: i32, database: *pg.Pool, request: rq.PostMeasurement) anyerror!Measurement {
-    var conn = try database.acquire();
-    defer conn.release();
-    var row = conn.row(SQL_STRINGS.create, //
-        .{
-            user_id,
-            request.type,
-            request.value,
-            request.date,
-        }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
+pub const GetRecent = struct {
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        type: types.MeasurementType,
+        value: f64,
     };
-    //NOTE: you must deinitialize rows or else query time balloons 10x
-    defer row.?.deinit() catch {};
-    const id = row.?.get(i32, 0);
-    const created_at = row.?.get(i64, 1);
-    const measurement_type = row.?.get(types.MeasurementType, 2);
-    const value = row.?.get(f64, 3);
+    pub const Errors = error{
+        CannotGet,
+        NotFound,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, measurement_type: types.MeasurementType) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var row = conn.row(query_string, //
+            .{ user_id, measurement_type }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
 
-    return Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value };
-}
+            return error.CannotGet;
+        } orelse return error.NotFound;
+        defer row.deinit() catch {};
 
-pub fn get(user_id: i32, database: *pg.Pool, request: rq.GetMeasurement) anyerror!Measurement {
-    var conn = try database.acquire();
-    defer conn.release();
-    var row = conn.row(SQL_STRINGS.get, //
-        .{ user_id, request.measurement_id }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    } orelse return error.NotFound;
-    defer row.deinit() catch {};
-
-    const id = row.get(i32, 0);
-    const created_at = row.get(i64, 1);
-    const measurement_type = row.get(types.MeasurementType, 2);
-    const value = row.get(f64, 3);
-    return Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value };
-}
-
-pub fn getRecent(user_id: i32, database: *pg.Pool, request: rq.GetMeasurementRecent) anyerror!Measurement {
-    var conn = try database.acquire();
-    defer conn.release();
-    var row = conn.row(SQL_STRINGS.getRecent, //
-        .{ user_id, request.measurement_type }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    } orelse return error.NotFound;
-    defer row.deinit() catch {};
-
-    const id = row.get(i32, 0);
-    const created_at = row.get(i64, 1);
-    const measurement_type = row.get(types.MeasurementType, 2);
-    const value = row.get(f64, 3);
-    return Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value };
-}
-
-/// Returns MeasurementList, which must be deinitalized.
-pub fn getInRange(user_id: i32, allocator: std.mem.Allocator, database: *pg.Pool, request: rq.GetMeasurementRange) anyerror!MeasurementList {
-    var conn = try database.acquire();
-    defer conn.release();
-    var result = conn.query(SQL_STRINGS.getInRange, //
-        .{ user_id, request.range_start, request.range_end, request.measurement_type }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
-        }
-        return err;
-    };
-    defer result.deinit();
-    var response = std.ArrayList(Measurement).init(allocator);
-
-    while (try result.next()) |row| {
-        const id = row.get(i32, 0);
-        const created_at = row.get(i64, 1);
-        const measurement_type = row.get(types.MeasurementType, 2);
-        const value = row.get(f64, 3);
-        try response.append(Measurement{ .id = id, .created_at = created_at, .type = measurement_type, .value = value });
+        return row.to(Response, .{}) catch return error.CannotParseResult;
     }
-    if (response.items.len == 0) return error.NotFound;
-    return MeasurementList{ .allocator = allocator, .list = try response.toOwnedSlice() };
-}
+    const query_string = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC LIMIT 1;";
+};
 
-pub fn delete(user_id: i32, database: *pg.Pool, request: rq.DeleteMeasurement) !i64 {
-    var conn = try database.acquire();
-    defer conn.release();
-    return conn.exec(SQL_STRINGS.delete, //
-        .{ user_id, request.measurement_id }) catch |err| {
-        if (conn.err) |pg_err| {
-            log.err("severity: {s} |code: {s} | failure: {s}", .{ pg_err.severity, pg_err.code, pg_err.message });
+pub const GetInRange = struct {
+    pub const Request = struct {
+        /// datetime string (ex: 2024-01-01)
+        range_start: []const u8,
+        /// datetime string (ex: 2024-01-01)
+        range_end: []const u8,
+    };
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        type: types.MeasurementType,
+        value: f64,
+    };
+    pub const Errors = error{
+        CannotGet,
+        NotFound,
+        CannotParseResult,
+        OutOfMemory,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, allocator: std.mem.Allocator, database: *Pool, measurement_type: types.MeasurementType, request: Request) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var result = conn.query(query_string, //
+            .{ user_id, request.range_start, request.range_end, measurement_type }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+
+            return error.CannotGet;
+        };
+        defer result.deinit();
+        var response = std.ArrayList(Response).init(allocator);
+
+        while (result.next() catch return error.CannotGet) |row| {
+            try response.append(row.to(Response, .{}) catch return error.CannotParseResult);
         }
-        return err;
-    } orelse error.NotFound;
-}
+        if (response.items.len == 0) return error.NotFound;
+        return response.toOwnedSlice() catch return error.OutOfMemory;
+    }
+    const query_string = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
+};
 
-const SQL_STRINGS = struct {
-    pub const create = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE(TO_TIMESTAMP($4, 'YYYY-MM-DD'), NOW())) RETURNING id,created_at, type, value;";
-    pub const get = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND id = $2";
-    pub const getRecent = "SELECT id, created_at, type, value FROM measurements WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC LIMIT 1;";
-    pub const getInRange = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
-    pub const delete = "DELETE FROM measurements WHERE user_id = $1 AND id = $2;";
+pub const Delete = struct {
+    pub const Response = i64;
+    pub const Errors = error{
+        CannotDelete,
+        NotFound,
+        CannotParseResult,
+    } || DatabaseErrors;
+    pub fn call(user_id: i32, database: *Pool, measurement_id: i32) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        return conn.exec(query_string, .{ user_id, measurement_id }) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+
+            return error.CannotDelete;
+        } orelse error.NotFound;
+    }
+    const query_string = "DELETE FROM measurements WHERE user_id = $1 AND id = $2";
 };
 
 // TESTS
@@ -150,7 +188,7 @@ test "API Measurement | Create (with date)" {
 
     const test_date = "2024-01-01";
     const provided_date = try zdt.Datetime.fromString(test_date, "%Y-%m-%d");
-    const create_request = rq.PostMeasurement{
+    const create_request = Create.Request{
         .date = test_date,
         .type = types.MeasurementType.weight,
         .value = 75.35,
@@ -161,7 +199,7 @@ test "API Measurement | Create (with date)" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const response = create(setup.user.id, test_env.database, create_request) catch |err| {
+        const response = Create.call(setup.user.id, test_env.database, create_request) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -198,7 +236,7 @@ test "API Measurement | Create (default date)" {
     const now_timestamp = try zdt.Datetime.now(null);
     const now_date = try now_timestamp.floorTo(.day);
 
-    const create_request = rq.PostMeasurement{
+    const create_request = Create.Request{
         .date = null,
         .type = types.MeasurementType.weight,
         .value = 75.35,
@@ -208,7 +246,7 @@ test "API Measurement | Create (default date)" {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const response = create(setup.user.id, test_env.database, create_request) catch |err| {
+        const response = Create.call(setup.user.id, test_env.database, create_request) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -243,21 +281,21 @@ test "API Measurement | Delete" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const create_request = rq.PostMeasurement{
+    const create_request = Create.Request{
         .date = null,
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
     // Initialize data
-    const measurement = try create(setup.user.id, test_env.database, create_request);
+    const measurement = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const created_measurements = [_]Measurement{measurement};
+    const created_measurements = [_]Create.Response{measurement};
     // Test
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const amount_deleted = delete(setup.user.id, test_env.database, .{ .measurement_id = measurement.id }) catch |err| {
+        const amount_deleted = Delete.call(setup.user.id, test_env.database, measurement.id) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -277,29 +315,28 @@ test "API Measurement | Get in range (lower bound)" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    const inserted_measurement = try create(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_range_request = rq.GetMeasurementRange{
-        .measurement_type = types.MeasurementType.neck,
+    const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
         .range_end = "2025-01-04",
     };
@@ -307,22 +344,29 @@ test "API Measurement | Get in range (lower bound)" {
     // Only one measurement is expected to be in the range, as the others that follow
     // range_start <= date of insertion <= range_end
     // are for a different type (in our case, different than neck)
-    const in_range_measurements = [_]Measurement{inserted_measurement};
+    const in_range_measurements = [_]Create.Response{inserted_measurement};
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var measurements = getInRange(setup.user.id, allocator, test_env.database, get_range_request) catch |err| {
+        const measurements = GetInRange.call(
+            setup.user.id,
+            allocator,
+            test_env.database,
+            types.MeasurementType.neck,
+            get_range_request,
+        ) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer measurements.deinit();
-        std.testing.expectEqual(in_range_measurements.len, measurements.list.len) catch |err| {
+        defer allocator.free(measurements);
+
+        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        for (measurements.list, in_range_measurements) |measurement, inserted| {
+        for (measurements, in_range_measurements) |measurement, inserted| {
             std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
                 benchmark.fail(err);
                 return err;
@@ -344,53 +388,52 @@ test "API Measurement | Get in range (upper bound)" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    const inserted_measurement = try create(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_range_request = rq.GetMeasurementRange{
-        .measurement_type = types.MeasurementType.neck,
+    const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
         .range_end = "2025-01-02",
     };
     // Only one measurement is expected to be in the range, as the others that follow
     // range_start <= date of insertion <= range_end
     // are for a different type (in our case, different than neck)
-    const in_range_measurements = [_]Measurement{inserted_measurement};
+    const in_range_measurements = [_]Create.Response{inserted_measurement};
 
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var measurements = getInRange(setup.user.id, allocator, test_env.database, get_range_request) catch |err| {
+        const measurements = GetInRange.call(setup.user.id, allocator, test_env.database, types.MeasurementType.neck, get_range_request) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer measurements.deinit();
+        defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.list.len) catch |err| {
+        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        for (measurements.list, in_range_measurements) |measurement, inserted| {
+        for (measurements, in_range_measurements) |measurement, inserted| {
             std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
                 benchmark.fail(err);
                 return err;
@@ -412,53 +455,58 @@ test "API Measurement | Get in range (overlap)" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    const inserted_measurement = try create(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_range_request = rq.GetMeasurementRange{
-        .measurement_type = types.MeasurementType.weight,
+    const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
         .range_end = "2025-01-02",
     };
     // Only one measurement is expected to be in the range, as the others that follow
     // range_start <= date of insertion <= range_end
     // are for a different type (in our case, different than weight)
-    const in_range_measurements = [_]Measurement{inserted_measurement};
+    const in_range_measurements = [_]Create.Response{inserted_measurement};
 
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var measurements = getInRange(setup.user.id, allocator, test_env.database, get_range_request) catch |err| {
+        const measurements = GetInRange.call(
+            setup.user.id,
+            allocator,
+            test_env.database,
+            types.MeasurementType.weight,
+            get_range_request,
+        ) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer measurements.deinit();
+        defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.list.len) catch |err| {
+        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        for (measurements.list, in_range_measurements) |measurement, inserted| {
+        for (measurements, in_range_measurements) |measurement, inserted| {
             std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
                 benchmark.fail(err);
                 return err;
@@ -480,48 +528,54 @@ test "API Measurement | Get in range (multiple)" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    const measurement_1 = try create(setup.user.id, test_env.database, create_request);
+    const measurement_1 = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    const measurement_2 = try create(setup.user.id, test_env.database, create_request);
+    const measurement_2 = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    const measurement_3 = try create(setup.user.id, test_env.database, create_request);
+    const measurement_3 = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    const measurement_4 = try create(setup.user.id, test_env.database, create_request);
+    const measurement_4 = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_range_request = rq.GetMeasurementRange{
-        .measurement_type = types.MeasurementType.weight,
+    const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
         .range_end = "2025-01-04",
     };
-    const in_range_measurements = [_]Measurement{ measurement_1, measurement_2, measurement_3, measurement_4 };
+    const in_range_measurements = [_]Create.Response{ measurement_1, measurement_2, measurement_3, measurement_4 };
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        var measurements = getInRange(setup.user.id, allocator, test_env.database, get_range_request) catch |err| {
+        const measurements = GetInRange.call(
+            setup.user.id,
+            allocator,
+            test_env.database,
+            types.MeasurementType.weight,
+            get_range_request,
+        ) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        defer measurements.deinit();
-        std.testing.expectEqual(in_range_measurements.len, measurements.list.len) catch |err| {
+        defer allocator.free(measurements);
+
+        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        for (measurements.list, in_range_measurements) |measurement, inserted| {
+        for (measurements, in_range_measurements) |measurement, inserted| {
             std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
                 benchmark.fail(err);
                 return err;
@@ -543,29 +597,28 @@ test "API Measurement | Get in range (empty)" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_range_request = rq.GetMeasurementRange{
-        .measurement_type = types.MeasurementType.neck,
+    const get_range_request = GetInRange.Request{
         .range_start = "2099-01-01",
         .range_end = "2099-01-01",
     };
@@ -573,9 +626,15 @@ test "API Measurement | Get in range (empty)" {
     var benchmark = Benchmark.start(test_name);
     defer benchmark.end();
 
-    if (getInRange(setup.user.id, allocator, test_env.database, get_range_request)) |*measurement_list| {
+    if (GetInRange.call(
+        setup.user.id,
+        allocator,
+        test_env.database,
+        types.MeasurementType.neck,
+        get_range_request,
+    )) |*measurement_list| {
         const list = @constCast(measurement_list);
-        list.deinit();
+        allocator.free(list.*);
     } else |err| {
         std.testing.expectEqual(error.NotFound, err) catch |inner_err| benchmark.fail(inner_err);
     }
@@ -590,37 +649,34 @@ test "API Measurement | Get by ID" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
 
-    const measurement_1 = try create(setup.user.id, test_env.database, create_request);
+    const measurement_1 = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-03";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-04";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
 
-    const get_measurement = rq.GetMeasurement{
-        .measurement_id = @intCast(measurement_1.id),
-    };
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const measurement = get(setup.user.id, test_env.database, get_measurement) catch |err| {
+        const measurement = Get.call(setup.user.id, test_env.database, @intCast(measurement_1.id)) catch |err| {
             benchmark.fail(err);
             return err;
         };
@@ -648,38 +704,38 @@ test "API Measurement | Get recent" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    var create_request = rq.PostMeasurement{
+    var create_request = Create.Request{
         .date = "2025-01-01",
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-03";
 
-    _ = try create(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-04";
 
-    const last_weight_measurement = try create(setup.user.id, test_env.database, create_request);
-
-    const get_measurement = rq.GetMeasurementRecent{
-        .measurement_type = .weight,
-    };
+    const last_weight_measurement = try Create.call(setup.user.id, test_env.database, create_request);
 
     // TEST
     {
         var benchmark = Benchmark.start(test_name);
         defer benchmark.end();
 
-        const measurement = getRecent(setup.user.id, test_env.database, get_measurement) catch |err| {
+        const measurement = GetRecent.call(
+            setup.user.id,
+            test_env.database,
+            .weight,
+        ) catch |err| {
             benchmark.fail(err);
             return err;
         };

@@ -3,10 +3,12 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
+const ResponseError = @import("../response.zig").ResponseError;
+const handleResponse = @import("../response.zig").handleResponse;
+
 const types = @import("../types.zig");
-const Goals = @import("../models/goals_model.zig").Goals;
+const Create = @import("../models/goals_model.zig").Create;
+const Get = @import("../models/goals_model.zig").Get;
 
 const log = std.log.scoped(.goals);
 
@@ -18,36 +20,37 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 pub fn createGoal(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
-    const json = std.json.parseFromSliceLeaky(rq.PostGoal, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
-    const goal = Goals.create(ctx.user_id.?, ctx.app.db, json) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+    const goal = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
-    _ = goal; // autofix
     res.status = 200;
+
+    try res.json(goal, .{});
 }
 
 pub fn getGoals(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
-
-    const response = Goals.get(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
+    const allocator = ctx.app.allocator;
+    _ = allocator; // autofix
+    const response = Get.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
         error.NoGoals => {
-            try rs.handleResponse(res, rs.ResponseError.not_found, "The user has no goals entered!");
+            try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
             return;
         },
         else => {
-            try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+            try handleResponse(res, ResponseError.internal_server_error, null);
             return;
         },
     };
-    defer response.deinit();
 
     res.status = 200;
-    return res.json(response.value, .{});
+    return res.json(response, .{});
 }

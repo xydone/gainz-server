@@ -6,8 +6,6 @@ const DatabaseErrors = @import("../db.zig").DatabaseErrors;
 const ErrorHandler = @import("../db.zig").ErrorHandler;
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
 const auth = @import("../util/auth.zig");
 const types = @import("../types.zig");
 
@@ -70,7 +68,23 @@ pub const Get = struct {
     pub const Request = struct {
         food_id: u32,
     };
-    pub const Response = Food;
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        food_name: ?[]const u8,
+        brand_name: ?[]const u8,
+        nutrients: types.Nutrients,
+        servings: []types.Servings,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            if (self.brand_name) |name| allocator.free(name);
+            if (self.food_name) |name| allocator.free(name);
+            for (self.servings) |serving| {
+                allocator.free(serving.unit);
+            }
+            allocator.free(self.servings);
+        }
+    };
     pub const Errors = error{
         CannotGet,
         FoodNotFound,
@@ -160,14 +174,30 @@ pub const Search = struct {
     pub const Request = struct {
         search_term: []const u8,
     };
-    pub const Response = []Food;
+    pub const Response = struct {
+        id: i32,
+        created_at: i64,
+        food_name: ?[]const u8,
+        brand_name: ?[]const u8,
+        nutrients: types.Nutrients,
+        servings: []types.Servings,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            if (self.brand_name) |name| allocator.free(name);
+            if (self.food_name) |name| allocator.free(name);
+            for (self.servings) |serving| {
+                allocator.free(serving.unit);
+            }
+            allocator.free(self.servings);
+        }
+    };
     pub const Errors = error{
         CannotSearch,
         ServingsParsingError,
         OutOfMemory,
     } || DatabaseErrors;
     /// Caller must free slice
-    pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Request) Errors![]Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var result = conn.queryOpts(query_string, //
@@ -178,7 +208,7 @@ pub const Search = struct {
             return error.CannotSearch;
         };
         defer result.deinit();
-        var response = std.ArrayList(Food).init(allocator);
+        var response = std.ArrayList(Response).init(allocator);
         while (result.next() catch return error.CannotSearch) |row| {
             const id = row.get(i32, 0);
             const created_at = row.getCol(i64, "created_at");
@@ -212,16 +242,16 @@ pub const Search = struct {
                 return error.ServingsParsingError;
             };
 
-            try response.append(Food{
+            response.append(Response{
                 .id = id,
                 .created_at = created_at,
                 .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
                 .brand_name = allocator.dupe(u8, brand_name) catch return error.OutOfMemory,
                 .nutrients = nutrients,
                 .servings = servings,
-            });
+            }) catch return error.OutOfMemory;
         }
-        return try response.toOwnedSlice();
+        return response.toOwnedSlice() catch return error.OutOfMemory;
     }
 
     const query_string =
@@ -503,7 +533,7 @@ test "API Food | Get" {
             benchmark.fail(err);
             return err;
         };
-        for (food.servings.?, response.servings.?) |inserted_serving, response_serving| {
+        for (food.servings.?, response.servings) |inserted_serving, response_serving| {
             std.testing.expectEqual(inserted_serving.amount, response_serving.amount) catch |err| {
                 benchmark.fail(err);
                 return err;
@@ -582,19 +612,19 @@ test "API Food | Search" {
             benchmark.fail(err);
             return err;
         };
-        std.testing.expectEqual(inserted_food.servings.?[0].amount, result.servings.?[0].amount) catch |err| {
+        std.testing.expectEqual(inserted_food.servings.?[0].amount, result.servings[0].amount) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        std.testing.expectEqual(inserted_food.servings.?[0].id, result.servings.?[0].id) catch |err| {
+        std.testing.expectEqual(inserted_food.servings.?[0].id, result.servings[0].id) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        std.testing.expectEqual(inserted_food.servings.?[0].multiplier, result.servings.?[0].multiplier) catch |err| {
+        std.testing.expectEqual(inserted_food.servings.?[0].multiplier, result.servings[0].multiplier) catch |err| {
             benchmark.fail(err);
             return err;
         };
-        std.testing.expectEqualStrings(inserted_food.servings.?[0].unit, result.servings.?[0].unit) catch |err| {
+        std.testing.expectEqualStrings(inserted_food.servings.?[0].unit, result.servings[0].unit) catch |err| {
             benchmark.fail(err);
             return err;
         };

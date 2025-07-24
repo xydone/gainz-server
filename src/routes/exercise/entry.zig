@@ -3,7 +3,9 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../../handler.zig");
-const rs = @import("../../response.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
 const LogExercise = @import("../../models/exercise/exercise.zig").LogExercise;
 const DeleteExerciseEntry = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
 const EditExerciseEntry = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
@@ -19,15 +21,15 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 pub fn createEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const exercise_entry = std.json.parseFromSliceLeaky(LogExercise.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     const response = LogExercise.call(ctx.user_id.?, ctx.app.db, exercise_entry) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
@@ -37,23 +39,23 @@ pub fn createEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 
 pub fn editEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const exercise_entry = std.json.parseFromSliceLeaky(EditExerciseEntry.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     if (!exercise_entry.isValid()) {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
+        try handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
         return;
     }
     const response = EditExerciseEntry.call(ctx.user_id.?, entry_id, ctx.app.db, exercise_entry) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
@@ -63,11 +65,11 @@ pub fn editEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 
 pub fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, null);
+        try handleResponse(res, ResponseError.bad_request, null);
         return;
     };
     const response = DeleteExerciseEntry.call(ctx.user_id.?, ctx.app.db, entry_id) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
@@ -78,19 +80,19 @@ pub fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
 pub fn getExerciseEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
     const start = query.get("start") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
     const request: GetRange.Request = .{ .range_start = start, .range_end = end };
 
     var exercises = GetRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch |err| {
         switch (err) {
-            error.NoEntriesFound => try rs.handleResponse(res, rs.ResponseError.not_found, "No exercise entries found in the given range!"),
-            else => try rs.handleResponse(res, rs.ResponseError.internal_server_error, null),
+            error.NoEntriesFound => try handleResponse(res, ResponseError.not_found, "No exercise entries found in the given range!"),
+            else => try handleResponse(res, ResponseError.internal_server_error, null),
         }
         return;
     };

@@ -5,8 +5,6 @@ const DatabaseErrors = @import("../db.zig").DatabaseErrors;
 const ErrorHandler = @import("../db.zig").ErrorHandler;
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
 const auth = @import("../util/auth.zig");
 
 const log = std.log.scoped(.user_model);

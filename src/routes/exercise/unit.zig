@@ -3,8 +3,9 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../../handler.zig");
-const rq = @import("../../request.zig");
-const rs = @import("../../response.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
 const Create = @import("../../models/exercise/unit.zig").Create;
 const GetAll = @import("../../models/exercise/unit.zig").GetAll;
 
@@ -16,15 +17,15 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 pub fn createUnit(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const unit = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     const response = Create.call(ctx.user_id.?, ctx.app.db, unit) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
@@ -36,7 +37,7 @@ pub fn getUnits(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
     _ = req; // autofix
     const allocator = ctx.app.allocator;
     const response = GetAll.call(allocator, ctx.user_id.?, ctx.app.db) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     defer allocator.free(response);

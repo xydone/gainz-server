@@ -3,7 +3,9 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../../handler.zig");
-const rs = @import("../../response.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
 const Create = @import("../../models/exercise/exercise.zig").Create;
 const GetAll = @import("../../models/exercise/exercise.zig").GetAll;
 
@@ -16,7 +18,7 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 pub fn getExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
     var exercises = GetAll.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     defer exercises.deinit();
@@ -26,15 +28,15 @@ pub fn getExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *htt
 
 pub fn createExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     const exercise = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;

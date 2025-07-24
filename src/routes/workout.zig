@@ -3,7 +3,9 @@ const std = @import("std");
 const httpz = @import("httpz");
 
 const Handler = @import("../handler.zig");
-const rs = @import("../response.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+
 const Create = @import("../models/workout.zig").Create;
 const Get = @import("../models/workout.zig").Get;
 const GetExerciseList = @import("../models/workout.zig").GetExerciseList;
@@ -20,15 +22,15 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 fn createWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const workout = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     const response = Create.call(ctx.user_id.?, ctx.app.db, workout) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
@@ -37,7 +39,7 @@ fn createWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.
 fn getWorkout(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
     const response = Get.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     defer ctx.app.allocator.free(response);
@@ -49,7 +51,7 @@ fn getWorkoutExerciseList(ctx: *Handler.RequestContext, req: *httpz.Request, res
     const id_param = req.param("id") orelse return error.NoIDParam;
     const workout_id = try std.fmt.parseInt(i32, id_param, 10);
     const response = GetExerciseList.call(ctx.app.allocator, workout_id, ctx.app.db) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     defer ctx.app.allocator.free(response);
@@ -62,12 +64,12 @@ fn addExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
     const id_param = req.param("id") orelse return error.NoIDParam;
     const workout_id = try std.fmt.parseInt(i32, id_param, 10);
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
 
     const workout = std.json.parseFromSliceLeaky([]AddExercise.Request, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
     defer ctx.app.allocator.free(workout);
@@ -75,10 +77,10 @@ fn addExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
     const response = AddExercise.call(ctx.app.allocator, workout_id, ctx.app.db, workout) catch |err| {
         switch (err) {
             AddExercise.Errors.InvalidExerciseID => {
-                try rs.handleResponse(res, rs.ResponseError.not_found, "Invalid exercise ID!");
+                try handleResponse(res, ResponseError.not_found, "Invalid exercise ID!");
             },
             else => {
-                try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+                try handleResponse(res, ResponseError.internal_server_error, null);
             },
         }
         return;
@@ -378,7 +380,7 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
             return err;
         };
 
-        const error_response = std.json.parseFromSlice(rs.ResponseError, allocator, response_body, .{}) catch |err| {
+        const error_response = std.json.parseFromSlice(ResponseError, allocator, response_body, .{}) catch |err| {
             benchmark.fail(err);
             return err;
         };

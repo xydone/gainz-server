@@ -4,8 +4,9 @@ const httpz = @import("httpz");
 
 const Create = @import("../models/users_model.zig").Create;
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+
 const types = @import("../types.zig");
 const Measurement = @import("./measurement.zig");
 const NoteEntries = @import("note_entries.zig");
@@ -31,15 +32,15 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const allocator = ctx.app.allocator;
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
     const json = std.json.parseFromSliceLeaky(Create.Request, allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     const response = Create.call(ctx.app.db, allocator, json) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     defer response.deinit(allocator);

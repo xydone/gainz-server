@@ -2,14 +2,14 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const get = @import("../models/measurements_model.zig").get;
-const getInRange = @import("../models/measurements_model.zig").getInRange;
-const getRecent = @import("../models/measurements_model.zig").getRecent;
-const create = @import("../models/measurements_model.zig").create;
+const Get = @import("../models/measurements_model.zig").Get;
+const GetInRange = @import("../models/measurements_model.zig").GetInRange;
+const GetRecent = @import("../models/measurements_model.zig").GetRecent;
+const Create = @import("../models/measurements_model.zig").Create;
 
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
-const rs = @import("../response.zig");
+const ResponseError = @import("../response.zig").ResponseError;
+const handleResponse = @import("../response.zig").handleResponse;
 const types = @import("../types.zig");
 
 const log = std.log.scoped(.measurement);
@@ -24,73 +24,66 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
 
 fn getMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const measurement_id = std.fmt.parseInt(u32, req.param("measurement_id").?, 10) catch {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Measurement ID not valid integer!");
+        try handleResponse(res, ResponseError.bad_request, "Measurement ID not valid integer!");
         return;
     };
 
-    const value = rq.GetMeasurement{ .measurement_id = measurement_id };
-
-    const result = get(ctx.user_id.?, ctx.app.db, value) catch |err| switch (err) {
+    const response = Get.call(ctx.user_id.?, ctx.app.db, measurement_id) catch |err| switch (err) {
         error.NotFound => {
-            try rs.handleResponse(res, rs.ResponseError.unauthorized, null);
+            try handleResponse(res, ResponseError.unauthorized, null);
             return;
         },
         else => {
-            try rs.handleResponse(res, rs.ResponseError.not_found, null);
+            try handleResponse(res, ResponseError.not_found, null);
             return;
         },
     };
-    const response = rs.GetMeasurement{
-        .created_at = result.created_at,
-        .id = result.id,
-        .type = result.type,
-        .value = result.value,
-    };
+
     try res.json(response, .{});
     return;
 }
 
 fn getMeasurementRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
+    const allocator = ctx.app.allocator;
     const query = try req.query();
     // parsing the parameter and then turning the string request to an enum (probably slow?)
     const measurement_type = std.meta.stringToEnum(types.MeasurementType, query.get("type") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?type= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?type= from request parameters!");
         return;
     }) orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Invalid \'type\' field!");
+        try handleResponse(res, ResponseError.bad_request, "Invalid \'type\' field!");
         return;
     };
     const start = query.get("start") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?start= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
         return;
     };
     const end = query.get("end") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?end= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
-    const request: rq.GetMeasurementRange = .{ .measurement_type = measurement_type, .range_start = start, .range_end = end };
-    var measurements = getInRange(ctx.user_id.?, ctx.app.allocator, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+    const request: GetInRange.Request = .{ .range_start = start, .range_end = end };
+    const measurements = GetInRange.call(ctx.user_id.?, ctx.app.allocator, ctx.app.db, measurement_type, request) catch {
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
-    defer measurements.deinit();
+    defer allocator.free(measurements);
     res.status = 200;
-    try res.json(measurements.list, .{});
+    try res.json(measurements, .{});
 }
 
 fn getMeasurementRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const query = try req.query();
     // parsing the parameter and then turning the string request to an enum (probably slow?)
     const measurement_type = std.meta.stringToEnum(types.MeasurementType, query.get("type") orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Missing ?type= from request parameters!");
+        try handleResponse(res, ResponseError.bad_request, "Missing ?type= from request parameters!");
         return;
     }) orelse {
-        try rs.handleResponse(res, rs.ResponseError.bad_request, "Invalid \'type\' field!");
+        try handleResponse(res, ResponseError.bad_request, "Invalid \'type\' field!");
         return;
     };
-    const request: rq.GetMeasurementRecent = .{ .measurement_type = measurement_type };
-    const measurements = getRecent(ctx.user_id.?, ctx.app.db, request) catch {
-        try rs.handleResponse(res, rs.ResponseError.not_found, null);
+    const measurements = GetRecent.call(ctx.user_id.?, ctx.app.db, measurement_type) catch {
+        try handleResponse(res, ResponseError.not_found, null);
         return;
     };
     res.status = 200;
@@ -99,19 +92,18 @@ fn getMeasurementRecent(ctx: *Handler.RequestContext, req: *httpz.Request, res: 
 
 fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     const body = req.body() orelse {
-        try rs.handleResponse(res, rs.ResponseError.body_missing, null);
+        try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
-    const measurement = std.json.parseFromSliceLeaky(rq.PostMeasurement, ctx.app.allocator, body, .{}) catch {
-        try rs.handleResponse(res, rs.ResponseError.body_missing_fields, null);
+    const measurement = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
+        try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
 
-    const result = create(ctx.user_id.?, ctx.app.db, measurement) catch {
-        try rs.handleResponse(res, rs.ResponseError.internal_server_error, null);
+    const result = Create.call(ctx.user_id.?, ctx.app.db, measurement) catch {
+        try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
     res.status = 200;
-    const response = rs.PostMeasurement{ .created_at = result.created_at, .type = result.type, .value = result.value };
-    try res.json(response, .{});
+    try res.json(result, .{});
 }

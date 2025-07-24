@@ -3,7 +3,6 @@ const pg = @import("pg");
 const dotenv = @import("../util/dotenv.zig").dotenv;
 const Database = @import("../db.zig");
 const redis = @import("../util/redis.zig");
-const rq = @import("../request.zig");
 const Handler = @import("../handler.zig");
 
 pub var test_env: TestEnvironment = undefined;

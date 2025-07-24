@@ -78,8 +78,3 @@ pub const PostNoteEntry = struct {
 pub const RefreshAccessToken = struct {
     refresh_token: []const u8,
 };
-
-pub const PostGoal = struct {
-    target: types.GoalTargets,
-    value: f64,
-};
