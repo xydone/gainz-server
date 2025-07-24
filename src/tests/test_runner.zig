@@ -126,6 +126,7 @@ pub fn main() !void {
     }
 
     var test_stats = TestStats.init();
+    var timer = std.time.Timer.start() catch @panic("Timer not supported.");
 
     const setup_queue = TestList.init(allocator, .basic);
     defer setup_queue.deinit(allocator);
@@ -177,6 +178,8 @@ pub fn main() !void {
     const total_tests_executed = test_stats.pass + test_stats.fail;
     const not_executed = total_tests - total_tests_executed;
     const has_leaked = test_stats.leak != 0;
+    const total_time: f64 = @as(f64, @floatFromInt(timer.lap())) / 1_000_000.0;
+    printer.status(.text, "{s: <15}: {d:.3}ms\n", .{ "TOTAL TIME", total_time });
     printer.status(.text, "{s: <15}: {d}\n", .{ "TOTAL EXECUTED", total_tests_executed });
     printer.status(.pass, "{s: <15}: {d}\n", .{ "PASS", test_stats.pass });
     printer.status(.fail, "{s: <15}: {d}\n", .{ "FAILED", test_stats.fail });
@@ -323,8 +326,18 @@ pub const Benchmark = struct {
             // skip benchmark if it is universal set
             if (benchmark_type.items.len == benchmark_list.items.len and !std.mem.eql(u8, benchmark_type.name, "Total")) continue;
 
+            //calculate runtime of group
+            var total_runtime: f64 = 0;
+            for (benchmark_type.items) |benchmark| {
+                total_runtime += benchmark.time_ms.?;
+            }
+
             printer.fmt("\n{s}\n", .{BORDER});
             printer.fmt("{s} statistics:\n", .{benchmark_type.name});
+
+            //Display runtime of group
+            printer.fmt("\nRelevant runtime: {d:.2}ms\n", .{total_runtime});
+
             //Calculate mean
             const mean = calculateMean(benchmark_type.items);
             printer.fmt("Mean: {d:.2}ms\n", .{mean});
