@@ -69,13 +69,13 @@ pub const Get = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(Response).init(allocator);
-        defer response.deinit();
+        var response: std.ArrayList(Response) = .empty;
+        defer response.deinit(allocator);
 
         while (result.next() catch return error.CannotGet) |row| {
-            try response.append(row.to(Response, .{}) catch return error.CannotParseResult);
+            try response.append(allocator, row.to(Response, .{}) catch return error.CannotParseResult);
         }
-        return response.toOwnedSlice() catch return error.OutOfMemory;
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
     const query_string = "SELECT id,name, description FROM training.exercise_category WHERE created_by = $1";
 };
@@ -86,7 +86,6 @@ const TestSetup = Tests.TestSetup;
 test "API Exercise Category | Create" {
     const test_name = "API Exercise Category | Create";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -94,19 +93,11 @@ test "API Exercise Category | Create" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const request = Create.Request{ .name = "Chest" };
         const response = try Create.call(setup.user.id, test_env.database, .{
             .name = "Chest",
         });
-        std.testing.expectEqual(request.description, response.description) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(request.name, response.name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(request.description, response.description);
+        try std.testing.expectEqualStrings(request.name, response.name);
     }
 }

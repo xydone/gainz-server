@@ -140,13 +140,13 @@ pub const GetInRange = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
 
         while (result.next() catch return error.CannotGet) |row| {
-            try response.append(row.to(Response, .{}) catch return error.CannotParseResult);
+            try response.append(allocator, row.to(Response, .{}) catch return error.CannotParseResult);
         }
         if (response.items.len == 0) return error.NotFound;
-        return response.toOwnedSlice() catch return error.OutOfMemory;
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
     const query_string = "SELECT * FROM measurements WHERE user_id = $1 AND Date(created_at) >= $2 AND Date(created_at) <= $3 AND type = $4";
 };
@@ -178,7 +178,6 @@ const TestSetup = Tests.TestSetup;
 
 test "API Measurement | Create (with date)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Create (with date)";
@@ -196,36 +195,20 @@ test "API Measurement | Create (with date)" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const response = Create.call(setup.user.id, test_env.database, create_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try Create.call(setup.user.id, test_env.database, create_request);
 
         //validate date
         const db_timestamp = try zdt.Datetime.fromUnix(response.created_at, .microsecond, null);
         const db_date = try db_timestamp.floorTo(.day);
         const date_difference = provided_date.diff(db_date).asSeconds();
 
-        std.testing.expectEqual(0, date_difference) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.value, response.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.type, response.type) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(0, date_difference);
+        try std.testing.expectEqual(create_request.value, response.value);
+        try std.testing.expectEqual(create_request.type, response.type);
     }
 }
 test "API Measurement | Create (default date)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Create (default date)";
@@ -243,38 +226,22 @@ test "API Measurement | Create (default date)" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const response = Create.call(setup.user.id, test_env.database, create_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try Create.call(setup.user.id, test_env.database, create_request);
 
         //validate date
         const db_timestamp = try zdt.Datetime.fromUnix(response.created_at, .microsecond, null);
         const db_date = try db_timestamp.floorTo(.day);
         const date_difference = now_date.diff(db_date).asSeconds();
 
-        std.testing.expectEqual(0, date_difference) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(0, date_difference);
 
-        std.testing.expectEqual(create_request.value, response.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.type, response.type) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(create_request.value, response.value);
+        try std.testing.expectEqual(create_request.type, response.type);
     }
 }
 
 test "API Measurement | Delete" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Delete";
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -292,23 +259,13 @@ test "API Measurement | Delete" {
     const created_measurements = [_]Create.Response{measurement};
     // Test
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const amount_deleted = Delete.call(setup.user.id, test_env.database, measurement.id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(@as(i64, @intCast(created_measurements.len)), amount_deleted) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const amount_deleted = try Delete.call(setup.user.id, test_env.database, measurement.id);
+        try std.testing.expectEqual(@as(i64, @intCast(created_measurements.len)), amount_deleted);
     }
 }
 
 test "API Measurement | Get in range (lower bound)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get in range (lower bound)";
@@ -347,41 +304,25 @@ test "API Measurement | Get in range (lower bound)" {
     const in_range_measurements = [_]Create.Response{inserted_measurement};
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurements = GetInRange.call(
+        const measurements = try GetInRange.call(
             setup.user.id,
             allocator,
             test_env.database,
             types.MeasurementType.neck,
             get_range_request,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
         defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(in_range_measurements.len, measurements.len);
         for (measurements, in_range_measurements) |measurement, inserted| {
-            std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.type, measurement.type) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.value, measurement.value);
+            try std.testing.expectEqual(inserted.type, measurement.type);
         }
     }
 }
 
 test "API Measurement | Get in range (upper bound)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (upper bound)";
@@ -420,35 +361,19 @@ test "API Measurement | Get in range (upper bound)" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurements = GetInRange.call(setup.user.id, allocator, test_env.database, types.MeasurementType.neck, get_range_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const measurements = try GetInRange.call(setup.user.id, allocator, test_env.database, types.MeasurementType.neck, get_range_request);
         defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(in_range_measurements.len, measurements.len);
         for (measurements, in_range_measurements) |measurement, inserted| {
-            std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.type, measurement.type) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.value, measurement.value);
+            try std.testing.expectEqual(inserted.type, measurement.type);
         }
     }
 }
 
 test "API Measurement | Get in range (overlap)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (overlap)";
@@ -487,41 +412,25 @@ test "API Measurement | Get in range (overlap)" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurements = GetInRange.call(
+        const measurements = try GetInRange.call(
             setup.user.id,
             allocator,
             test_env.database,
             types.MeasurementType.weight,
             get_range_request,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
         defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(in_range_measurements.len, measurements.len);
         for (measurements, in_range_measurements) |measurement, inserted| {
-            std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.type, measurement.type) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.value, measurement.value);
+            try std.testing.expectEqual(inserted.type, measurement.type);
         }
     }
 }
 
 test "API Measurement | Get in range (multiple)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (multiple)";
@@ -556,41 +465,25 @@ test "API Measurement | Get in range (multiple)" {
     const in_range_measurements = [_]Create.Response{ measurement_1, measurement_2, measurement_3, measurement_4 };
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurements = GetInRange.call(
+        const measurements = try GetInRange.call(
             setup.user.id,
             allocator,
             test_env.database,
             types.MeasurementType.weight,
             get_range_request,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
         defer allocator.free(measurements);
 
-        std.testing.expectEqual(in_range_measurements.len, measurements.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(in_range_measurements.len, measurements.len);
         for (measurements, in_range_measurements) |measurement, inserted| {
-            std.testing.expectEqual(inserted.value, measurement.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.type, measurement.type) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.value, measurement.value);
+            try std.testing.expectEqual(inserted.type, measurement.type);
         }
     }
 }
 
 test "API Measurement | Get in range (empty)" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     const test_name = "API Measurements | Get in range (empty)";
@@ -623,8 +516,6 @@ test "API Measurement | Get in range (empty)" {
         .range_end = "2099-01-01",
     };
     // TEST
-    var benchmark = Benchmark.start(test_name);
-    defer benchmark.end();
 
     if (GetInRange.call(
         setup.user.id,
@@ -636,13 +527,12 @@ test "API Measurement | Get in range (empty)" {
         const list = @constCast(measurement_list);
         allocator.free(list.*);
     } else |err| {
-        std.testing.expectEqual(error.NotFound, err) catch |inner_err| benchmark.fail(inner_err);
+        try std.testing.expectEqual(error.NotFound, err);
     }
 }
 
 test "API Measurement | Get by ID" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get by ID";
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -673,31 +563,15 @@ test "API Measurement | Get by ID" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurement = Get.call(setup.user.id, test_env.database, @intCast(measurement_1.id)) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(measurement_1.id, measurement.id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(measurement_1.value, measurement.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(measurement_1.type, measurement.type) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const measurement = try Get.call(setup.user.id, test_env.database, @intCast(measurement_1.id));
+        try std.testing.expectEqual(measurement_1.id, measurement.id);
+        try std.testing.expectEqual(measurement_1.value, measurement.value);
+        try std.testing.expectEqual(measurement_1.type, measurement.type);
     }
 }
 
 test "API Measurement | Get recent" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const test_name = "API Measurements | Get recent";
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -728,29 +602,14 @@ test "API Measurement | Get recent" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const measurement = GetRecent.call(
+        const measurement = try GetRecent.call(
             setup.user.id,
             test_env.database,
             .weight,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
 
-        std.testing.expectEqual(last_weight_measurement.id, measurement.id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(last_weight_measurement.value, measurement.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(last_weight_measurement.type, measurement.type) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(last_weight_measurement.id, measurement.id);
+        try std.testing.expectEqual(last_weight_measurement.value, measurement.value);
+        try std.testing.expectEqual(last_weight_measurement.type, measurement.type);
     }
 }

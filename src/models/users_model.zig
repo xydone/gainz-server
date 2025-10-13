@@ -88,7 +88,6 @@ test "API User | Create" {
     // SETUP
     const test_name = "API User | Create";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});
@@ -104,27 +103,15 @@ test "API User | Create" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        var response = Create.call(
+        var response = try Create.call(
             test_env.database,
             allocator,
             request,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
         defer response.deinit(allocator);
 
-        std.testing.expectEqualStrings(test_name, response.username) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(display_name, response.display_name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(test_name, response.username);
+        try std.testing.expectEqualStrings(display_name, response.display_name);
     }
 }
 
@@ -132,7 +119,6 @@ test "API User | Duplicate" {
     // SETUP
     const test_name = "API User | Duplicate";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});
@@ -154,14 +140,11 @@ test "API User | Duplicate" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         if (Create.call(test_env.database, allocator, request)) |*duplicate_user| {
             const usr = @constCast(duplicate_user);
             usr.deinit(allocator);
         } else |err| {
-            std.testing.expectEqual(UserErrors.UsernameNotUnique, err) catch |inner_err| benchmark.fail(inner_err);
+            try std.testing.expectEqual(UserErrors.UsernameNotUnique, err);
         }
     }
 }
@@ -170,7 +153,6 @@ test "API User | Delete" {
     // SETUP
     const test_name = "API User | Delete";
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     const display_name = try std.fmt.allocPrint(allocator, "Display {s}", .{test_name});
@@ -189,15 +171,9 @@ test "API User | Delete" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        _ = Delete.call(
+        _ = try Delete.call(
             test_env.database,
             user.id,
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
     }
 }

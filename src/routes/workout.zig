@@ -11,6 +11,8 @@ const Get = @import("../models/workout.zig").Get;
 const GetExerciseList = @import("../models/workout.zig").GetExerciseList;
 const AddExercise = @import("../models/workout.zig").AddExercise;
 
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.get("/api/workout", getWorkout, .{ .data = &RouteData });
@@ -98,7 +100,6 @@ test "Endpoint Workout | Create" {
     // SETUP
     const test_name = "Endpoint Workout | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -106,46 +107,26 @@ test "Endpoint Workout | Create" {
     defer user.deinit(allocator);
 
     const body = Create.Request{ .name = test_name };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.body(body_string);
 
-        createWorkout(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice(Create.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try createWorkout(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(Create.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        std.testing.expectEqual(user.id, response.value.created_by) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(body.name, response.value.name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(user.id, response.value.created_by);
+        try std.testing.expectEqualStrings(body.name, response.value.name);
     }
 }
 
@@ -153,7 +134,6 @@ test "Endpoint Workout | Get" {
     // SETUP
     const test_name = "Endpoint Workout | Get";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -161,7 +141,7 @@ test "Endpoint Workout | Get" {
     defer user.deinit(allocator);
 
     const body = Create.Request{ .name = test_name };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
@@ -180,47 +160,21 @@ test "Endpoint Workout | Get" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        getWorkout(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getWorkout(&context, web_test.req, web_test.res);
 
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice([]Get.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice([]Get.Response, allocator, response_body, .{});
         defer response.deinit();
 
         for (inserted_responses, response.value) |inserted, res| {
-            std.testing.expectEqual(inserted.id, res.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.created_at, res.created_at) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.created_by, res.created_by) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(inserted.name, res.name) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.id, res.id);
+            try std.testing.expectEqual(inserted.created_at, res.created_at);
+            try std.testing.expectEqual(inserted.created_by, res.created_by);
+            try std.testing.expectEqualStrings(inserted.name, res.name);
         }
     }
 }
@@ -229,7 +183,6 @@ test "Endpoint Workout | Add Exercises" {
     // SETUP
     const test_name = "Endpoint Workout | Add Exercises";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;
@@ -261,7 +214,7 @@ test "Endpoint Workout | Add Exercises" {
         },
     };
 
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     const workout_id_string = try std.fmt.allocPrint(allocator, "{}", .{workout.id});
@@ -271,57 +224,28 @@ test "Endpoint Workout | Add Exercises" {
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("id", workout_id_string);
         web_test.body(body_string);
 
-        addExercises(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice([]AddExercise.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try addExercises(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice([]AddExercise.Response, allocator, response_body, .{});
         defer response.deinit();
 
         for (body, response.value) |req, res| {
-            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
 
-            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(workout.id, res.workout_id);
 
-            std.testing.expectEqual(req.reps, res.reps) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.reps, res.reps);
 
-            std.testing.expectEqual(req.sets, res.sets) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.sets, res.sets);
 
-            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(req.notes, res.notes);
         }
     }
 }
@@ -329,7 +253,6 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     // SETUP
     const test_name = "Endpoint Workout | Add Exercise Invalid Exercise ID";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -349,7 +272,7 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
         },
     };
 
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     const workout_id_string = try std.fmt.allocPrint(allocator, "{}", .{workout.id});
@@ -359,42 +282,22 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("id", workout_id_string);
         web_test.body(body_string);
 
-        addExercises(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(404) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try addExercises(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(404);
+        const response_body = try web_test.getBody();
 
-        const error_response = std.json.parseFromSlice(ResponseError, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const error_response = try std.json.parseFromSlice(ResponseError, allocator, response_body, .{});
         defer error_response.deinit();
 
-        std.testing.expectEqual(404, error_response.value.code) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(404, error_response.value.code);
 
-        std.testing.expectEqualStrings("Invalid exercise ID!", error_response.value.details.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings("Invalid exercise ID!", error_response.value.details.?);
     }
 }
 
@@ -402,7 +305,6 @@ test "Endpoint Workout | Get Exercises List" {
     // SETUP
     const test_name = "Endpoint Workout | Get Exercises List";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;
@@ -440,7 +342,7 @@ test "Endpoint Workout | Get Exercises List" {
         },
     };
 
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     const workout_id_string = try std.fmt.allocPrint(allocator, "{}", .{workout.id});
@@ -457,57 +359,28 @@ test "Endpoint Workout | Get Exercises List" {
     try addExercises(&context, add_exercises.req, add_exercises.res);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("id", workout_id_string);
         web_test.body(body_string);
 
-        getWorkoutExerciseList(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice([]GetExerciseList.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getWorkoutExerciseList(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice([]GetExerciseList.Response, allocator, response_body, .{});
         defer response.deinit();
 
         for (body, response.value) |req, res| {
-            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
 
-            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(workout.id, res.workout_id);
 
-            std.testing.expectEqual(req.reps, res.reps) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.reps, res.reps);
 
-            std.testing.expectEqual(req.sets, res.sets) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.sets, res.sets);
 
-            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(req.notes, res.notes);
         }
     }
 }

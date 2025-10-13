@@ -15,6 +15,8 @@ const types = @import("../types.zig");
 
 const log = std.log.scoped(.food);
 
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
 
@@ -147,7 +149,6 @@ test "Endpoint Food | Create" {
     // SETUP
     const test_name = "Endpoint Food | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -166,72 +167,40 @@ test "Endpoint Food | Create" {
             .carbs = 25,
         },
     };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.body(body_string);
 
-        postFood(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try postFood(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        std.testing.expect(response.value.servings != null) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expect(response.value.servings != null);
         const food = response.value;
         const automatic_serving = food.servings.?[0];
 
-        std.testing.expectEqualStrings(body.brand_name.?, food.brand_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(body.food_name.?, food.food_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(body.nutrients, food.nutrients) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(body.food_grams, automatic_serving.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(body.food_grams, automatic_serving.multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(body.brand_name.?, food.brand_name.?);
+        try std.testing.expectEqualStrings(body.food_name.?, food.food_name.?);
+        try std.testing.expectEqual(body.nutrients, food.nutrients);
+        try std.testing.expectEqual(body.food_grams, automatic_serving.amount);
+        try std.testing.expectEqual(body.food_grams, automatic_serving.multiplier);
     }
 }
 test "Endpoint Food | Get" {
     // SETUP
     const test_name = "Endpoint Food | Get";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -261,58 +230,26 @@ test "Endpoint Food | Get" {
     defer allocator.free(food_id_string);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("food_id", food_id_string);
 
-        getFood(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getFood(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        std.testing.expect(response.value.servings != null) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expect(response.value.servings != null);
         const food = response.value;
         const automatic_serving = food.servings.?[0];
 
-        std.testing.expectEqualStrings(create_body.brand_name.?, food.brand_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(create_body.food_name.?, food.food_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_body.nutrients, food.nutrients) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_body.food_grams, automatic_serving.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_body.food_grams, automatic_serving.multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(create_body.brand_name.?, food.brand_name.?);
+        try std.testing.expectEqualStrings(create_body.food_name.?, food.food_name.?);
+        try std.testing.expectEqual(create_body.nutrients, food.nutrients);
+        try std.testing.expectEqual(create_body.food_grams, automatic_serving.amount);
+        try std.testing.expectEqual(create_body.food_grams, automatic_serving.multiplier);
     }
 }
 
@@ -320,7 +257,6 @@ test "Endpoint Food | Get Invalid Food" {
     // SETUP
     const test_name = "Endpoint Food | Get Invalid Food";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -334,42 +270,22 @@ test "Endpoint Food | Get Invalid Food" {
     defer allocator.free(food_id_string);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("food_id", food_id_string);
 
-        getFood(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(404) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getFood(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(404);
+        const response_body = try web_test.getBody();
 
-        const error_response = std.json.parseFromSlice(ResponseError, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const error_response = try std.json.parseFromSlice(ResponseError, allocator, response_body, .{});
         defer error_response.deinit();
 
-        std.testing.expectEqual(404, error_response.value.code) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(404, error_response.value.code);
         if (error_response.value.details == null) return error.ErrorDetailsNotFound;
         const details = error_response.value.details.?;
-        std.testing.expectEqualStrings("Food does not exist!", details) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings("Food does not exist!", details);
     }
 }
 
@@ -377,7 +293,6 @@ test "Endpoint Food | Search" {
     // SETUP
     const test_name = "Endpoint Food | Search";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -423,54 +338,25 @@ test "Endpoint Food | Search" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.query("search", body.search_term);
 
-        searchFood(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice([]Search.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try searchFood(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice([]Search.Response, allocator, response_body, .{});
         defer response.deinit();
 
         for (response.value) |*food| {
             const automatic_serving = food.servings[0];
 
-            std.testing.expectEqualStrings(second_food_req.brand_name.?, food.brand_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(second_food_req.food_name.?, food.food_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(second_food_req.nutrients, food.nutrients) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(second_food_req.food_grams, automatic_serving.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(second_food_req.food_grams, automatic_serving.multiplier) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(second_food_req.brand_name.?, food.brand_name.?);
+            try std.testing.expectEqualStrings(second_food_req.food_name.?, food.food_name.?);
+            try std.testing.expectEqual(second_food_req.nutrients, food.nutrients);
+            try std.testing.expectEqual(second_food_req.food_grams, automatic_serving.amount);
+            try std.testing.expectEqual(second_food_req.food_grams, automatic_serving.multiplier);
         }
     }
 }
@@ -479,7 +365,6 @@ test "Endpoint Food | Create Serving" {
     // SETUP
     const test_name = "Endpoint Food | Create Serving";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -513,55 +398,30 @@ test "Endpoint Food | Create Serving" {
         .multiplier = 1,
         .unit = test_name,
     };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     const food_id_string = try std.fmt.allocPrint(allocator, "{}", .{food.id});
     defer allocator.free(food_id_string);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.body(body_string);
         web_test.param("id", food_id_string);
 
-        postServings(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice(CreateServing.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try postServings(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(CreateServing.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        std.testing.expectEqual(food.id, response.value.food_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(body.amount, response.value.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(body.multiplier, response.value.multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(body.unit, response.value.unit) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(food.id, response.value.food_id);
+        try std.testing.expectEqual(body.amount, response.value.amount);
+        try std.testing.expectEqual(body.multiplier, response.value.multiplier);
+        try std.testing.expectEqualStrings(body.unit, response.value.unit);
     }
 }
 
@@ -569,7 +429,6 @@ test "Endpoint Food | Get Serving" {
     // SETUP
     const test_name = "Endpoint Food | Get Serving";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -603,7 +462,7 @@ test "Endpoint Food | Get Serving" {
         .multiplier = 1,
         .unit = test_name,
     };
-    const create_serving_string = try std.json.stringifyAlloc(allocator, create_serving_body, .{});
+    const create_serving_string = try jsonStringify(allocator, create_serving_body);
     defer allocator.free(create_serving_string);
 
     const food_id_string = try std.fmt.allocPrint(allocator, "{}", .{food.id});
@@ -618,29 +477,15 @@ test "Endpoint Food | Get Serving" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("id", food_id_string);
 
-        getServings(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice([]GetServing.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getServings(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice([]GetServing.Response, allocator, response_body, .{});
         defer response.deinit();
 
         const expected_servings = [_]GetServing.Response{
@@ -660,24 +505,12 @@ test "Endpoint Food | Get Serving" {
             },
         };
 
-        std.testing.expectEqual(expected_servings.len, response.value.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(expected_servings.len, response.value.len);
         for (expected_servings, response.value) |expected, result| {
-            std.testing.expectEqual(expected.amount, result.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(expected.amount, result.amount);
 
-            std.testing.expectEqual(expected.multiplier, result.multiplier) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(expected.unit, result.unit) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(expected.multiplier, result.multiplier);
+            try std.testing.expectEqualStrings(expected.unit, result.unit);
         }
     }
 }
@@ -686,7 +519,6 @@ test "Endpoint Food | Get Serving Invalid Food ID" {
     // SETUP
     const test_name = "Endpoint Food | Get Serving Invalid Food ID";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -701,40 +533,20 @@ test "Endpoint Food | Get Serving Invalid Food ID" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.param("id", incorrect_food_id_string);
 
-        getServings(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(404) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try getServings(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(404);
+        const response_body = try web_test.getBody();
 
-        const error_response = std.json.parseFromSlice(ResponseError, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const error_response = try std.json.parseFromSlice(ResponseError, allocator, response_body, .{});
         defer error_response.deinit();
 
-        std.testing.expectEqual(404, error_response.value.code) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(404, error_response.value.code);
 
-        std.testing.expectEqualStrings("Invalid food ID!", error_response.value.details.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings("Invalid food ID!", error_response.value.details.?);
     }
 }

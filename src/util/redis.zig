@@ -23,11 +23,20 @@ pub const RedisClient = struct {
     }
 
     pub fn sendCommand(self: *RedisClient, command: []const u8) ![]u8 {
-        try self.connection.writer().writeAll(command);
-        var buf: [1024]u8 = undefined;
-        const readBytes = try self.connection.reader().read(&buf);
+        var writer = self.connection.writer(&.{});
+        try writer.interface.writeAll(command);
 
-        return try trimResponse(buf[0..readBytes]);
+        var stream_buf: [1024]u8 = undefined;
+
+        var stream_reader: std.net.Stream.Reader = self.connection.reader(&stream_buf);
+        var reader: *std.Io.Reader = stream_reader.interface();
+
+        var slice: [1024]u8 = undefined;
+        var slices = [_][]u8{&slice};
+        // const read_bytes = try reader.readSliceShort(&buf);
+        const read_bytes = try reader.readVec(&slices);
+
+        return try trimResponse(slice[0..read_bytes]);
     }
 
     pub fn set(self: *RedisClient, key: []const u8, value: []const u8) ![]u8 {

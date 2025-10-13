@@ -159,7 +159,6 @@ const TestSetup = Tests.TestSetup;
 
 test "API Auth | Create" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const jwt = @import("jwt");
     var test_env = Tests.test_env;
@@ -188,16 +187,10 @@ test "API Auth | Create" {
 
     // Create test
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        var create_response = Create.call(props, .{
+        var create_response = try Create.call(props, .{
             .username = test_name,
             .password = password,
-        }) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        });
         defer create_response.deinit(allocator);
 
         access_token = try allocator.dupe(u8, create_response.access_token);
@@ -206,16 +199,12 @@ test "API Auth | Create" {
         var decoded = try jwt.decode(allocator, auth.JWTClaims, create_response.access_token, .{ .secret = jwt_secret }, .{});
         defer decoded.deinit();
 
-        std.testing.expectEqual(setup.user.id, decoded.claims.user_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(setup.user.id, decoded.claims.user_id);
     }
 }
 
 test "API Auth | Refresh" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;
@@ -245,9 +234,6 @@ test "API Auth | Refresh" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         const refresh_props = Refresh.Props{
             .allocator = allocator,
             .jwt_secret = jwt_secret,
@@ -257,28 +243,18 @@ test "API Auth | Refresh" {
         };
         defer allocator.free(refresh_props.refresh_token);
 
-        const refresh_response = Refresh.call(refresh_props) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const refresh_response = try Refresh.call(refresh_props);
         defer refresh_response.deinit(allocator);
 
-        std.testing.expectEqualStrings(refresh_response.refresh_token, refresh_token) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(refresh_response.refresh_token, refresh_token);
 
         const is_same_access_token = std.mem.eql(u8, refresh_response.access_token, access_token);
-        std.testing.expect(!is_same_access_token) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expect(!is_same_access_token);
     }
 }
 
 test "API Auth | Invalidate" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
 
     var test_env = Tests.test_env;
@@ -308,16 +284,7 @@ test "API Auth | Invalidate" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const invalidate_response = Auth.invalidate(.{ .redis_client = &test_env.redis_client, .refresh_token = refresh_token }) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expect(invalidate_response) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const invalidate_response = try Auth.invalidate(.{ .redis_client = &test_env.redis_client, .refresh_token = refresh_token });
+        try std.testing.expect(invalidate_response);
     }
 }

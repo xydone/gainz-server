@@ -8,7 +8,7 @@ const Allocator = std.mem.Allocator;
 const BORDER = "=" ** 80;
 
 var current_test: ?[]const u8 = null;
-var benchmark_list = std.ArrayList(Benchmark).init(std.heap.smp_allocator);
+var is_fail_first_triggered = false;
 
 const Config = struct {
     verbose: bool,
@@ -51,7 +51,7 @@ const TestList = struct {
 
     pub fn init(allocator: std.mem.Allocator, callback_type: CallbackType) TestList {
         const list = allocator.create(std.ArrayList(std.builtin.TestFn)) catch @panic("cannot allocate arraylist");
-        list.* = std.ArrayList(std.builtin.TestFn).init(allocator);
+        list.* = std.ArrayList(std.builtin.TestFn).empty;
         return TestList{
             .test_functions = list,
             .callback = switch (callback_type) {
@@ -62,7 +62,7 @@ const TestList = struct {
     }
 
     pub fn deinit(self: TestList, allocator: std.mem.Allocator) void {
-        self.test_functions.deinit();
+        self.test_functions.deinit(allocator);
         allocator.destroy(self.test_functions);
     }
 
@@ -73,6 +73,7 @@ const TestList = struct {
     }
     pub fn test_callback(params: CallbackParams) !void {
         const is_unnamed_test = isUnnamed(params.t);
+        const name = makeNameFriendly(params.t.name);
         if (params.config.filter) |f| {
             if (!is_unnamed_test and std.mem.indexOf(u8, params.t.name, f) == null) {
                 // continue;
@@ -89,12 +90,16 @@ const TestList = struct {
 
         if (result) |_| {
             params.test_stats.pass += 1;
+            printPass(params.printer, name);
         } else |err| switch (err) {
             error.SkipZigTest => {
                 params.test_stats.skip += 1;
             },
             else => {
+                //TODO: jank!
+                if (params.config.fail_first) is_fail_first_triggered = true;
                 params.test_stats.fail += 1;
+                printFail(params.printer, name, err);
                 if (@errorReturnTrace()) |trace| {
                     params.printer.status(.fail, "{s}\n", .{BORDER});
                     params.printer.status(.fail, "TRACE:\n", .{});
@@ -106,9 +111,8 @@ const TestList = struct {
     }
 };
 pub fn main() !void {
-    const printer = Printer.init();
-
     const allocator = std.heap.smp_allocator;
+    const printer = Printer.init(allocator);
 
     var config = Config.init();
 
@@ -140,20 +144,20 @@ pub fn main() !void {
     for (builtin.test_functions) |t| {
         const name = makeNameFriendly(t.name);
         if (isEndpoint(name)) {
-            try endpoint_queue.test_functions.append(t);
+            try endpoint_queue.test_functions.append(allocator, t);
             continue;
         }
         if (isAPI(name)) {
-            try api_queue.test_functions.append(t);
+            try api_queue.test_functions.append(allocator, t);
             continue;
         }
         if (isSetup(name)) {
-            try setup_queue.test_functions.append(t);
+            try setup_queue.test_functions.append(allocator, t);
             test_stats.setup_teardown += 1;
             continue;
         }
         if (isTeardown(name)) {
-            try teardown_queue.test_functions.append(t);
+            try teardown_queue.test_functions.append(allocator, t);
             test_stats.setup_teardown += 1;
             continue;
         }
@@ -165,15 +169,16 @@ pub fn main() !void {
     // 3. Endpoint
     // 4. Teardown
     const test_run_order = [_]TestList{ setup_queue, api_queue, endpoint_queue, teardown_queue };
-    for (test_run_order) |list| {
+    for (test_run_order) |list| outer: {
         for (list.test_functions.items) |t| {
+            if (is_fail_first_triggered) break :outer;
             current_test = t.name;
             const params = TestList.CallbackParams{ .config = config, .printer = printer, .test_stats = &test_stats, .t = t };
             try list.callback(params);
         }
     }
 
-    printer.fmt("\n{s}\n", .{BORDER});
+    printer.fmt("{s}\n", .{BORDER});
     const total_tests = builtin.test_functions.len - test_stats.setup_teardown;
     const total_tests_executed = test_stats.pass + test_stats.fail;
     const not_executed = total_tests - total_tests_executed;
@@ -187,6 +192,14 @@ pub fn main() !void {
     if (has_leaked) printer.status(.fail, "{s: <15}: {d}\n", .{ "LEAKED", test_stats.leak });
 
     std.posix.exit(if (test_stats.fail == 0) 0 else 1);
+}
+
+fn printPass(printer: Printer, name: []const u8) void {
+    printer.status(.pass, "{s}\n", .{name});
+}
+
+fn printFail(printer: Printer, name: []const u8, err: anyerror) void {
+    printer.status(.fail, "\"{s}\" - {s}\n", .{ name, @errorName(err) });
 }
 
 pub const panic = std.debug.FullPanic(struct {
@@ -235,171 +248,19 @@ fn isEndpoint(test_name: []const u8) bool {
     return std.mem.startsWith(u8, test_name, "Endpoint");
 }
 
-pub const Benchmark = struct {
-    name: []const u8,
-    timer: std.time.Timer,
-    status: Status,
-    err: ?anyerror = null,
-    time_ms: ?f64 = null,
-
-    pub fn start(name: []const u8) Benchmark {
-        return .{
-            .name = name,
-            .timer = std.time.Timer.start() catch @panic("Could not start timer."),
-            .status = .pass,
-        };
-    }
-
-    fn printPass(self: Benchmark, printer: Printer) void {
-        printer.status(.pass, "{s} ({d:.2}ms)\n", .{ self.name, self.time_ms.? });
-    }
-
-    /// Assumes err is populated
-    fn printFail(self: Benchmark, printer: Printer) void {
-        printer.status(.fail, "\"{s}\" - {s}\n", .{ self.name, @errorName(self.err.?) });
-    }
-
-    pub fn end(self: *Benchmark) void {
-        const time = self.timer.lap();
-
-        const printer = Printer.init();
-        const ms = @as(f64, @floatFromInt(time)) / 1_000_000.0;
-        self.time_ms = ms;
-        switch (self.status) {
-            .pass => {
-                self.printPass(printer);
-                benchmark_list.append(self.*) catch @panic("OOM!");
-            },
-            .fail => {
-                self.printFail(printer);
-            },
-            else => {},
-        }
-    }
-
-    /// Meant to be called with an errdefer
-    pub fn fail(self: *Benchmark, err: anyerror) void {
-        self.status = .fail;
-        self.err = err;
-    }
-
-    /// Meant to be called at the end, after all tests have been executed.
-    ///
-    /// Should be used inside a tests:afterAll
-    pub fn analyze(allocator: std.mem.Allocator) void {
-        const list_length = benchmark_list.items.len;
-
-        // early exit if zero tests pass
-        if (list_length == 0) return;
-
-        const printer = Printer.init();
-
-        var api_queue = std.ArrayList(Benchmark).init(allocator);
-        defer api_queue.deinit();
-        var endpoint_queue = std.ArrayList(Benchmark).init(allocator);
-        defer endpoint_queue.deinit();
-
-        for (benchmark_list.items) |benchmark| {
-            if (isAPI(benchmark.name)) {
-                api_queue.append(benchmark) catch @panic("OOM!");
-            } else {
-                if (isEndpoint(benchmark.name)) {
-                    endpoint_queue.append(benchmark) catch @panic("OOM!");
-                }
-            }
-        }
-
-        const BenchmarkType = struct {
-            name: []const u8,
-            items: []Benchmark,
-        };
-        const benchmark_map = [_]BenchmarkType{
-            BenchmarkType{ .name = "API", .items = api_queue.items },
-            BenchmarkType{ .name = "Endpoint", .items = endpoint_queue.items },
-            BenchmarkType{ .name = "Total", .items = benchmark_list.items },
-        };
-
-        for (benchmark_map) |benchmark_type| {
-            // skip benchmark type if empty
-            if (benchmark_type.items.len == 0) continue;
-
-            // skip benchmark if it is universal set
-            if (benchmark_type.items.len == benchmark_list.items.len and !std.mem.eql(u8, benchmark_type.name, "Total")) continue;
-
-            //calculate runtime of group
-            var total_runtime: f64 = 0;
-            for (benchmark_type.items) |benchmark| {
-                total_runtime += benchmark.time_ms.?;
-            }
-
-            printer.fmt("\n{s}\n", .{BORDER});
-            printer.fmt("{s} statistics:\n", .{benchmark_type.name});
-
-            //Display runtime of group
-            printer.fmt("\nRelevant runtime: {d:.2}ms\n", .{total_runtime});
-
-            //Calculate mean
-            const mean = calculateMean(benchmark_type.items);
-            printer.fmt("Mean: {d:.2}ms\n", .{mean});
-
-            //Calculate median
-
-            const median = calculateMedian(benchmark_type.items);
-
-            printer.fmt("Median: {d:.2}ms\n", .{median});
-
-            //Display slowest
-            printer.fmt("\nSlowest:\n", .{});
-            calculateSlowest(5, benchmark_type.items, printer);
-        }
-    }
-
-    inline fn calculateMean(benchmarks: []Benchmark) f64 {
-        var mean: f64 = undefined;
-        for (benchmarks) |item| {
-            mean += item.time_ms.?;
-        }
-        return mean / @as(f64, @floatFromInt(benchmarks.len));
-    }
-
-    inline fn calculateMedian(benchmarks: []Benchmark) f64 {
-        std.mem.sort(Benchmark, benchmarks, {}, Benchmark.moreThan);
-        if (benchmarks.len % 2 == 0) {
-            const middle1 = benchmarks[benchmarks.len / 2 - 1];
-            const middle2 = benchmarks[benchmarks.len / 2];
-            return (middle1.time_ms.? + middle2.time_ms.?) / 2;
-        } else {
-            return benchmarks[benchmarks.len / 2].time_ms.?;
-        }
-    }
-
-    // need to pass in printer in here to avoid allocations
-    inline fn calculateSlowest(amount: u16, benchmarks: []Benchmark, printer: Printer) void {
-        for (0..amount) |i| {
-            if (i == benchmarks.len) break;
-            const benchmark = benchmarks[i];
-            // mirrors `.printPass(...)` except uses `Status.text` for color
-            printer.status(.text, "{s} ({d:.2}ms)\n", .{ benchmark.name, benchmark.time_ms.? });
-        }
-    }
-
-    fn moreThan(context: void, a: Benchmark, b: Benchmark) bool {
-        _ = context;
-        return a.time_ms.? > b.time_ms.?;
-    }
-};
-
 pub const Printer = struct {
-    out: std.fs.File.Writer,
+    out: *std.fs.File.Writer,
 
-    pub fn init() Printer {
+    pub fn init(allocator: Allocator) Printer {
+        const writer = allocator.create(std.fs.File.Writer) catch @panic("OOM");
+        writer.* = std.fs.File.stderr().writer(&.{});
         return .{
-            .out = std.io.getStdErr().writer(),
+            .out = writer,
         };
     }
 
     pub fn fmt(self: Printer, comptime format: []const u8, args: anytype) void {
-        std.fmt.format(self.out, format, args) catch unreachable;
+        self.out.interface.print(format, args) catch unreachable;
     }
 
     pub fn status(self: Printer, s: Status, comptime format: []const u8, args: anytype) void {
@@ -409,9 +270,9 @@ pub const Printer = struct {
             .skip => "\x1b[33m",
             else => "",
         };
-        const out = self.out;
-        out.writeAll(color) catch @panic("writeAll failed?!");
-        std.fmt.format(out, format, args) catch @panic("std.fmt.format failed?!");
+
+        self.out.interface.writeAll(color) catch @panic("writeAll failed?!");
+        self.fmt(format, args);
         self.fmt("\x1b[0m", .{});
     }
 };

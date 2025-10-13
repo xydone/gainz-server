@@ -175,7 +175,7 @@ pub const GetRecent = struct {
 
         defer result.deinit();
 
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
         while (result.next() catch return error.CannotGet) |row| {
             const entry_id = row.getCol(i32, "entry_id");
             const serving_id = row.getCol(i32, "serving_id");
@@ -186,7 +186,7 @@ pub const GetRecent = struct {
             const food_name = std.fmt.allocPrint(allocator, "{?s}", .{row.getCol(?[]u8, "food_name")}) catch return error.OutOfMemory;
             const brand_name = std.fmt.allocPrint(allocator, "{?s}", .{row.getCol(?[]u8, "brand_name")}) catch return error.OutOfMemory;
             const nutrients = row.to(types.Nutrients, .{ .map = .name }) catch return error.CannotParseResult;
-            try response.append(Response{
+            try response.append(allocator, Response{
                 .id = entry_id,
                 .user_id = user_id,
                 .food_id = food_id,
@@ -204,7 +204,7 @@ pub const GetRecent = struct {
             });
         }
         if (response.items.len == 0) return error.NoEntries;
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     pub const query_string =
@@ -265,8 +265,8 @@ pub const GetInRange = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(Response).init(allocator);
-        defer response.deinit();
+        var response: std.ArrayList(Response) = .empty;
+        defer response.deinit(allocator);
 
         while (result.next() catch return error.CannotGet) |row| {
             const entry_id = row.getCol(i32, "id");
@@ -298,10 +298,10 @@ pub const GetInRange = struct {
                     .created_at = food_created_at,
                 },
             };
-            response.append(entry) catch return error.OutOfMemory;
+            response.append(allocator, entry) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) return error.NoEntries;
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     pub const query_string =
@@ -437,14 +437,14 @@ pub const GetBreakdown = struct {
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotGet;
         };
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
         while (result.next() catch return error.CannotGet) |row| {
             const entry_date = row.getCol(i64, "entry_date");
             const nutrients = row.to(types.Nutrients, .{ .map = .name }) catch return error.CannotParseResult;
-            response.append(.{ .created_at = entry_date, .nutrients = nutrients }) catch return error.OutOfMemory;
+            response.append(allocator, .{ .created_at = entry_date, .nutrients = nutrients }) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) return error.NoEntries;
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     const query_string =
@@ -578,7 +578,6 @@ const TestSetup = struct {
 
 test "API Entry | Create" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateFood = @import("food_model.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -609,37 +608,18 @@ test "API Entry | Create" {
     var entry_id: i32 = undefined;
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Create");
-        defer benchmark.end();
-
-        const entry = Create.call(user.id, test_env.database, create_entry) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const entry = try Create.call(user.id, test_env.database, create_entry);
         entry_id = entry.id;
 
-        std.testing.expectEqual(create_entry.food_id, entry.food_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_entry.serving_id, entry.serving_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_entry.amount, entry.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_entry.category, entry.category) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(create_entry.food_id, entry.food_id);
+        try std.testing.expectEqual(create_entry.serving_id, entry.serving_id);
+        try std.testing.expectEqual(create_entry.amount, entry.amount);
+        try std.testing.expectEqual(create_entry.category, entry.category);
     }
 }
 
 test "API Entry | Get" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get") catch return error.TestSetupFailed;
@@ -658,40 +638,18 @@ test "API Entry | Get" {
     const entry = try Create.call(setup.user.id, test_env.database, create_entry);
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get");
-        defer benchmark.end();
+        const result = try Get.call(setup.user.id, test_env.database, @intCast(entry.id));
 
-        const result = Get.call(setup.user.id, test_env.database, @intCast(entry.id)) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-
-        std.testing.expectEqual(entry.food_id, result.food_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(entry.serving_id, result.serving_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(entry.user_id, result.user_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(entry.category, result.category) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(entry.amount, result.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(entry.food_id, result.food_id);
+        try std.testing.expectEqual(entry.serving_id, result.serving_id);
+        try std.testing.expectEqual(entry.user_id, result.user_id);
+        try std.testing.expectEqual(entry.category, result.category);
+        try std.testing.expectEqual(entry.amount, result.amount);
     }
 }
 
 test "API Entry | Get range" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -705,9 +663,9 @@ test "API Entry | Get range" {
     const now_day = try now.floorTo(.day);
 
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     // Create multiple entries
     var create_entry = Create.Request{
         .food_id = setup.food.id,
@@ -727,13 +685,13 @@ test "API Entry | Get range" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .day));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .day));
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -746,13 +704,7 @@ test "API Entry | Get range" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get range");
-        defer benchmark.end();
-
-        const entry_list = GetInRange.call(allocator, setup.user.id, test_env.database, get_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const entry_list = try GetInRange.call(allocator, setup.user.id, test_env.database, get_request);
         defer {
             for (entry_list) |entry| {
                 entry.deinit(allocator);
@@ -760,41 +712,22 @@ test "API Entry | Get range" {
             allocator.free(entry_list);
         }
 
-        std.testing.expectEqual(2, entry_list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(2, entry_list.len);
 
         // The most recently inserted entry in the range will appear first. Entry 3 is outside of the range
         const inserted_entries = [_]Create.Response{ entry_2, entry_1 };
 
         for (entry_list, inserted_entries) |entry, inserted| {
-            std.testing.expectEqual(inserted.id, entry.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.amount, entry.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(setup.food.id, entry.food.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.id, entry.id);
+            try std.testing.expectEqual(inserted.amount, entry.amount);
+            try std.testing.expectEqual(setup.food.id, entry.food.id);
+            try std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?);
+            try std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?);
         }
     }
 }
 test "API Entry | Get range (empty)" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -809,9 +742,9 @@ test "API Entry | Get range (empty)" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     // Create multiple entries
     var create_entry = Create.Request{
         .food_id = setup.food.id,
@@ -831,13 +764,13 @@ test "API Entry | Get range (empty)" {
     var lower_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(3, .day));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(3, .day));
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -850,23 +783,19 @@ test "API Entry | Get range (empty)" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get range (empty)");
-        defer benchmark.end();
-
         if (GetInRange.call(allocator, setup.user.id, test_env.database, get_request)) |*entry_list| {
             const list = @constCast(entry_list);
             for (list.*) |entry| {
                 entry.deinit(allocator);
             }
         } else |err| {
-            std.testing.expectEqual(error.NoEntries, err) catch |inner_err| benchmark.fail(inner_err);
+            try std.testing.expectEqual(error.NoEntries, err);
         }
     }
 }
 
 test "API Entry | Get recent (all)" {
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const zdt = @import("zdt");
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
@@ -881,9 +810,9 @@ test "API Entry | Get recent (all)" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     var create_entry = Create.Request{
         .food_id = setup.food.id,
         .category = .breakfast,
@@ -902,13 +831,7 @@ test "API Entry | Get recent (all)" {
     const limit: u32 = 50;
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get recent (all)");
-        defer benchmark.end();
-
-        const entry_list = GetRecent.call(allocator, setup.user.id, test_env.database, limit) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, limit);
 
         defer {
             for (entry_list) |entry| {
@@ -920,36 +843,15 @@ test "API Entry | Get recent (all)" {
         // The entries are sorted by the created_at date
         // Meaning, the id or insert order wouldn't match the return
         const ordered_entries = [_]Create.Response{ entry_2, entry_1, entry_3 };
-        std.testing.expectEqual(ordered_entries.len, entry_list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(ordered_entries.len, entry_list.len);
 
         for (entry_list, ordered_entries) |entry, ordered| {
-            std.testing.expectEqual(ordered.id, entry.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(ordered.amount, entry.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(ordered.category, entry.category) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(ordered.serving_id, entry.serving_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(ordered.id, entry.id);
+            try std.testing.expectEqual(ordered.amount, entry.amount);
+            try std.testing.expectEqual(ordered.category, entry.category);
+            try std.testing.expectEqual(ordered.serving_id, entry.serving_id);
+            try std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?);
+            try std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?);
         }
     }
 }
@@ -957,7 +859,6 @@ test "API Entry | Get recent (all)" {
 test "API Entry | Get recent (partial)" {
     //SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (partial)") catch return error.TestSetupFailed;
@@ -971,9 +872,9 @@ test "API Entry | Get recent (partial)" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     var create_entry = Create.Request{
         .food_id = setup.food.id,
         .category = .breakfast,
@@ -993,48 +894,21 @@ test "API Entry | Get recent (partial)" {
     const inserted_entries = [_]Create.Response{ entry_2, entry_1 };
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get recent (partial)");
-        defer benchmark.end();
-
-        const entry_list = GetRecent.call(allocator, setup.user.id, test_env.database, limit) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, limit);
         defer {
             for (entry_list) |entry| {
                 entry.deinit(allocator);
             }
             allocator.free(entry_list);
         }
-        std.testing.expectEqual(inserted_entries.len, entry_list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(inserted_entries.len, entry_list.len);
         for (entry_list, inserted_entries) |entry, inserted| {
-            std.testing.expectEqual(inserted.id, entry.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.amount, entry.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.category, entry.category) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted.serving_id, entry.serving_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted.id, entry.id);
+            try std.testing.expectEqual(inserted.amount, entry.amount);
+            try std.testing.expectEqual(inserted.category, entry.category);
+            try std.testing.expectEqual(inserted.serving_id, entry.serving_id);
+            try std.testing.expectEqualStrings(setup.food.food_name.?, entry.food.food_name.?);
+            try std.testing.expectEqualStrings(setup.food.brand_name.?, entry.food.brand_name.?);
         }
     }
 }
@@ -1042,7 +916,6 @@ test "API Entry | Get recent (partial)" {
 test "API Entry | Get recent (empty)" {
     //SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get recent (empty)") catch return error.TestSetupFailed;
@@ -1056,9 +929,9 @@ test "API Entry | Get recent (empty)" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     var create_entry = Create.Request{
         .food_id = setup.food.id,
         .category = .breakfast,
@@ -1076,16 +949,13 @@ test "API Entry | Get recent (empty)" {
     const limit: u32 = 0;
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get recent (empty)");
-        defer benchmark.end();
-
         if (GetRecent.call(allocator, setup.user.id, test_env.database, limit)) |*entry_list| {
             const list = @constCast(entry_list);
             for (list.*) |entry| {
                 entry.deinit(allocator);
             }
         } else |err| {
-            std.testing.expectEqual(error.NoEntries, err) catch |inner_err| benchmark.fail(inner_err);
+            try std.testing.expectEqual(error.NoEntries, err);
         }
     }
 }
@@ -1093,7 +963,6 @@ test "API Entry | Get recent (empty)" {
 test "API Entry | Get average" {
     // SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = TestSetup.init(test_env.database, "API Entry | Get average") catch return error.TestSetupFailed;
@@ -1107,9 +976,9 @@ test "API Entry | Get average" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     var create_entry = Create.Request{
         .food_id = setup.food.id,
         .category = .breakfast,
@@ -1128,13 +997,13 @@ test "API Entry | Get average" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -1159,29 +1028,16 @@ test "API Entry | Get average" {
     }
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get average");
-        defer benchmark.end();
+        const average = try GetAverage.call(setup.user.id, test_env.database, get_entry_breakdown);
 
-        const average = GetAverage.call(setup.user.id, test_env.database, get_entry_breakdown) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-
-        std.testing.expectEqual(expected_average.calories / @as(f64, @floatFromInt(unique_days.count())), average.calories) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(expected_average.added_sugars, average.added_sugars) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(expected_average.calories / @as(f64, @floatFromInt(unique_days.count())), average.calories);
+        try std.testing.expectEqual(expected_average.added_sugars, average.added_sugars);
     }
 }
 
 test "API Entry | Get breakdown" {
     // SETUP
     const zdt = @import("zdt");
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = TestSetup.init(test_env.database, "API Entry | Get breakdown") catch return error.TestSetupFailed;
@@ -1195,9 +1051,9 @@ test "API Entry | Get breakdown" {
 
     // Create Entries
     var date = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
-    var date_string = std.ArrayList(u8).init(allocator);
+    var date_string = std.Io.Writer.Allocating.init(allocator);
     defer date_string.deinit();
-    try date.toString("%Y-%m-%d", date_string.writer());
+    try date.toString("%Y-%m-%d", &date_string.writer);
     var create_entry = Create.Request{
         .food_id = setup.food.id,
         .category = .breakfast,
@@ -1216,13 +1072,13 @@ test "API Entry | Get breakdown" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -1248,31 +1104,16 @@ test "API Entry | Get breakdown" {
 
     // TEST
     {
-        var benchmark = Benchmark.start("API Entry | Get breakdown");
-        defer benchmark.end();
-
-        const breakdown = GetBreakdown.call(allocator, setup.user.id, test_env.database, get_entry_breakdown) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const breakdown = try GetBreakdown.call(allocator, setup.user.id, test_env.database, get_entry_breakdown);
         defer allocator.free(breakdown);
 
-        std.testing.expectEqual(unique_days.count(), breakdown.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(unique_days.count(), breakdown.len);
         for (breakdown) |day_breakdown| {
             const datetime = try zdt.Datetime.fromUnix(day_breakdown.created_at, .microsecond, null);
             const expected = unique_days.get(datetime.dayOfYear()).?;
 
-            std.testing.expectEqual(expected.calories, day_breakdown.nutrients.calories) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(expected.added_sugars, day_breakdown.nutrients.added_sugars) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(expected.calories, day_breakdown.nutrients.calories);
+            try std.testing.expectEqual(expected.added_sugars, day_breakdown.nutrients.added_sugars);
         }
     }
 }

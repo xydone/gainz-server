@@ -208,7 +208,7 @@ pub const Search = struct {
             return error.CannotSearch;
         };
         defer result.deinit();
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
         while (result.next() catch return error.CannotSearch) |row| {
             const id = row.get(i32, 0);
             const created_at = row.getCol(i64, "created_at");
@@ -242,7 +242,7 @@ pub const Search = struct {
                 return error.ServingsParsingError;
             };
 
-            response.append(Response{
+            response.append(allocator, Response{
                 .id = id,
                 .created_at = created_at,
                 .food_name = allocator.dupe(u8, food_name) catch return error.OutOfMemory,
@@ -251,7 +251,7 @@ pub const Search = struct {
                 .servings = servings,
             }) catch return error.OutOfMemory;
         }
-        return response.toOwnedSlice() catch return error.OutOfMemory;
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
 
     const query_string =
@@ -434,7 +434,6 @@ const TestSetup = Tests.TestSetup;
 
 test "API Food | Create" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_name = "API Food | Create";
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
@@ -450,42 +449,20 @@ test "API Food | Create" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        var food = Create.call(setup.user.id, allocator, test_env.database, create_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        var food = try Create.call(setup.user.id, allocator, test_env.database, create_request);
         defer food.deinit(allocator);
 
-        std.testing.expectEqualStrings(create_request.brand_name.?, food.brand_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(create_request.food_name.?, food.food_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.food_grams, food.servings.?[0].amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.food_grams, food.servings.?[0].multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_request.nutrients, food.nutrients) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(create_request.brand_name.?, food.brand_name.?);
+        try std.testing.expectEqualStrings(create_request.food_name.?, food.food_name.?);
+        try std.testing.expectEqual(create_request.food_grams, food.servings.?[0].amount);
+        try std.testing.expectEqual(create_request.food_grams, food.servings.?[0].multiplier);
+        try std.testing.expectEqual(create_request.nutrients, food.nutrients);
     }
 }
 
 test "API Food | Get" {
     const test_env = Tests.test_env;
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_name = "API Food | Get";
 
@@ -507,49 +484,19 @@ test "API Food | Get" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        var response = Get.call(allocator, test_env.database, get_request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        var response = try Get.call(allocator, test_env.database, get_request);
         defer response.deinit(allocator);
 
-        std.testing.expectEqual(food.id, response.id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(food.food_name.?, response.food_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(food.brand_name.?, response.brand_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(food.id, response.id);
+        try std.testing.expectEqualStrings(food.food_name.?, response.food_name.?);
+        try std.testing.expectEqualStrings(food.brand_name.?, response.brand_name.?);
 
-        std.testing.expectEqual(food.created_at, response.created_at) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(food.created_at, response.created_at);
         for (food.servings.?, response.servings) |inserted_serving, response_serving| {
-            std.testing.expectEqual(inserted_serving.amount, response_serving.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted_serving.id, response_serving.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(inserted_serving.multiplier, response_serving.multiplier) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(inserted_serving.unit, response_serving.unit) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(inserted_serving.amount, response_serving.amount);
+            try std.testing.expectEqual(inserted_serving.id, response_serving.id);
+            try std.testing.expectEqual(inserted_serving.multiplier, response_serving.multiplier);
+            try std.testing.expectEqualStrings(inserted_serving.unit, response_serving.unit);
         }
     }
 }
@@ -557,7 +504,6 @@ test "API Food | Get" {
 test "API Food | Search" {
     const test_env = Tests.test_env;
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_name = "API Food | Search";
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -575,17 +521,11 @@ test "API Food | Search" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         const search_food = Search.Request{
             .search_term = test_name[0..15],
         };
 
-        const results = Search.call(allocator, test_env.database, search_food) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const results = try Search.call(allocator, test_env.database, search_food);
         defer {
             for (results) |*food| {
                 food.deinit(allocator);
@@ -596,38 +536,14 @@ test "API Food | Search" {
         if (results.len == 0) return error.FoodNotFoundViaSearch;
 
         const result = results[0];
-        std.testing.expectEqual(inserted_food.id, result.id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(inserted_food.food_name.?, result.food_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(inserted_food.brand_name.?, result.brand_name.?) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(inserted_food.created_at, result.created_at) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(inserted_food.servings.?[0].amount, result.servings[0].amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(inserted_food.servings.?[0].id, result.servings[0].id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(inserted_food.servings.?[0].multiplier, result.servings[0].multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(inserted_food.servings.?[0].unit, result.servings[0].unit) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(inserted_food.id, result.id);
+        try std.testing.expectEqualStrings(inserted_food.food_name.?, result.food_name.?);
+        try std.testing.expectEqualStrings(inserted_food.brand_name.?, result.brand_name.?);
+        try std.testing.expectEqual(inserted_food.created_at, result.created_at);
+        try std.testing.expectEqual(inserted_food.servings.?[0].amount, result.servings[0].amount);
+        try std.testing.expectEqual(inserted_food.servings.?[0].id, result.servings[0].id);
+        try std.testing.expectEqual(inserted_food.servings.?[0].multiplier, result.servings[0].multiplier);
+        try std.testing.expectEqualStrings(inserted_food.servings.?[0].unit, result.servings[0].unit);
     }
 }
 

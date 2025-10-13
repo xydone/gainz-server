@@ -76,7 +76,8 @@ pub const Get = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(Response).init(ctx.app.allocator);
+        var response: std.ArrayList(Response) = .empty;
+        defer response.deinit(ctx.app.allocator);
 
         while (result.next() catch return error.CannotGet) |row| {
             const id = row.get(i32, 0);
@@ -84,10 +85,10 @@ pub const Get = struct {
             const unit = row.get([]u8, 4);
             const multiplier = row.get(f64, 5);
 
-            response.append(Response{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier }) catch return error.OutOfMemory;
+            response.append(ctx.app.allocator, Response{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier }) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) return error.InvalidFoodID;
-        return response.toOwnedSlice() catch return error.OutOfMemory;
+        return response.toOwnedSlice(ctx.app.allocator) catch return error.OutOfMemory;
     }
     const query_string = "SELECT * from servings WHERE food_id=$1";
 };

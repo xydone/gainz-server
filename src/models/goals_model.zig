@@ -111,7 +111,6 @@ const TestSetup = Tests.TestSetup;
 test "API Goal | Create" {
     // SETUP
     const test_env = Tests.test_env;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_name = "API Goal | Create";
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -123,27 +122,14 @@ test "API Goal | Create" {
     };
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const goal = Create.call(setup.user.id, test_env.database, create_goal) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_goal.target, goal.target) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(create_goal.value, goal.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const goal = try Create.call(setup.user.id, test_env.database, create_goal);
+        try std.testing.expectEqual(create_goal.target, goal.target);
+        try std.testing.expectEqual(create_goal.value, goal.value);
     }
 }
 
 test "API Goal | Get" {
     // SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     const test_name = "API Goal | Get";
@@ -158,17 +144,8 @@ test "API Goal | Get" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
+        const result = try Get.call(allocator, setup.user.id, test_env.database);
 
-        const result = Get.call(allocator, setup.user.id, test_env.database) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-
-        std.testing.expectEqual(goal.value, result.weight) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(goal.value, result.weight);
     }
 }

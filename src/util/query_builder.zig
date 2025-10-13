@@ -49,30 +49,30 @@ pub const Query = struct {
 
         const number_of_entries = total_parameters / params_per_entry;
 
-        var list = std.ArrayList(u8).init(self.allocator);
-        errdefer list.deinit();
+        var allocating_writer = std.Io.Writer.Allocating.init(self.allocator);
+        errdefer allocating_writer.deinit();
 
         var current_placeholder_idx = start_index;
 
         for (0..number_of_entries) |entry_idx| {
             if (entry_idx != 0) {
-                try list.writer().writeAll(",");
+                try allocating_writer.writer.writeAll(",");
             }
 
-            try list.writer().writeAll("(");
+            try allocating_writer.writer.writeAll("(");
 
             for (0..params_per_entry) |param_idx_in_entry| {
                 if (param_idx_in_entry != 0) {
-                    try list.writer().writeAll(",");
+                    try allocating_writer.writer.writeAll(",");
                 }
 
-                try std.fmt.format(list.writer(), "${}", .{current_placeholder_idx});
+                try allocating_writer.writer.print("${}", .{current_placeholder_idx});
                 current_placeholder_idx += 1;
             }
-            try list.writer().writeAll(")");
+            try allocating_writer.writer.writeAll(")");
         }
 
-        self.*.root = try list.toOwnedSlice();
+        self.*.root = try allocating_writer.toOwnedSlice();
     }
 
     /// Caller owns memory

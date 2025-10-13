@@ -95,20 +95,20 @@ pub const GetAll = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(Exercise).init(allocator);
+        var response: std.ArrayList(Exercise) = .empty;
         while (result.next() catch return error.CannotGet) |row| {
             const id = row.get(i32, 0);
 
             const name = row.getCol([]u8, "name");
             const description = row.getCol(?[]u8, "description");
 
-            response.append(Exercise{
+            response.append(allocator, Exercise{
                 .id = id,
                 .name = allocator.dupe(u8, name) catch return error.OutOfMemory,
                 .description = if (description == null) null else allocator.dupe(u8, description.?) catch return error.OutOfMemory,
             }) catch return error.OutOfMemory;
         }
-        return Response{ .list = response.toOwnedSlice() catch return error.OutOfMemory, .allocator = allocator };
+        return Response{ .list = response.toOwnedSlice(allocator) catch return error.OutOfMemory, .allocator = allocator };
     }
     const query_string = "SELECT id,name, description FROM training.exercise WHERE created_by = $1";
 };
@@ -165,15 +165,15 @@ pub const GetRange = struct {
             return error.CannotGet;
         };
         defer result.deinit();
-        var response = std.ArrayList(EntryList).init(allocator);
+        var response: std.ArrayList(EntryList) = .empty;
         while (result.next() catch return error.CannotGet) |row| {
-            response.append(row.to(EntryList, .{ .dupe = true }) catch return error.OutOfMemory) catch return error.OutOfMemory;
+            response.append(allocator, row.to(EntryList, .{ .dupe = true }) catch return error.OutOfMemory) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) {
-            response.deinit();
+            response.deinit(allocator);
             return error.NoEntriesFound;
         }
-        return Response{ .list = response.toOwnedSlice() catch return error.OutOfMemory, .allocator = allocator };
+        return Response{ .list = response.toOwnedSlice(allocator) catch return error.OutOfMemory, .allocator = allocator };
     }
     const query_string =
         \\ SELECT 
@@ -346,7 +346,6 @@ const TestSetup = Tests.TestSetup;
 test "API Exercise | Create" {
     const test_name = "API Exercise | Create";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -358,34 +357,22 @@ test "API Exercise | Create" {
     });
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const request = Create.Request{
             .name = test_name,
             .category_id = @intCast(category.id),
             .base_amount = 1,
             .base_unit = "kg",
         };
-        const response = Create.call(setup.user.id, test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try Create.call(setup.user.id, test_env.database, request);
 
-        std.testing.expectEqual(request.description, response.description) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(request.name, response.name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(request.description, response.description);
+        try std.testing.expectEqualStrings(request.name, response.name);
     }
 }
 
 test "API Exercise | Log Entry" {
     const test_name = "API Exercise | Log Entry";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -405,35 +392,18 @@ test "API Exercise | Log Entry" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const request = LogExercise.Request{
             .exercise_id = @intCast(create_response.id),
             .unit_id = @intCast(create_response.base_unit_id),
             .value = 15,
         };
-        const response = LogExercise.call(setup.user.id, test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try LogExercise.call(setup.user.id, test_env.database, request);
 
-        std.testing.expectEqual(@as(i32, @intCast(request.exercise_id)), response.exercise_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(@as(i32, @intCast(request.unit_id)), response.unit_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(request.value, response.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(@as(i32, @intCast(request.exercise_id)), response.exercise_id);
+        try std.testing.expectEqual(@as(i32, @intCast(request.unit_id)), response.unit_id);
+        try std.testing.expectEqual(request.value, response.value);
         if (request.notes) |notes| {
-            std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(notes, response.notes.?);
         }
     }
 }
@@ -441,7 +411,6 @@ test "API Exercise | Log Entry" {
 test "API Exercise | Edit Entry" {
     const test_name = "API Exercise | Edit Entry";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
@@ -476,34 +445,17 @@ test "API Exercise | Edit Entry" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const request = EditExerciseEntry.Request{
             .value = 10,
             .unit_id = unit_response.id,
         };
-        const response = EditExerciseEntry.call(setup.user.id, @intCast(log_response.id), test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try EditExerciseEntry.call(setup.user.id, @intCast(log_response.id), test_env.database, request);
 
-        std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(@as(i32, @intCast(request.unit_id.?)), response.unit_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(request.value, response.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id);
+        try std.testing.expectEqual(@as(i32, @intCast(request.unit_id.?)), response.unit_id);
+        try std.testing.expectEqual(request.value, response.value);
         if (log_request.notes) |notes| {
-            std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(notes, response.notes.?);
         }
     }
 }
@@ -511,7 +463,6 @@ test "API Exercise | Edit Entry" {
 test "API Exercise | Delete Entry" {
     const test_name = "API Exercise | Delete Entry";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -537,31 +488,13 @@ test "API Exercise | Delete Entry" {
     const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
+        const response = try DeleteExerciseEntry.call(setup.user.id, test_env.database, @intCast(log_response.id));
 
-        const response = DeleteExerciseEntry.call(setup.user.id, test_env.database, @intCast(log_response.id)) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-
-        std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(@as(i32, @intCast(log_request.unit_id)), response.unit_id) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(log_request.value, response.value) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id);
+        try std.testing.expectEqual(@as(i32, @intCast(log_request.unit_id)), response.unit_id);
+        try std.testing.expectEqual(log_request.value, response.value);
         if (log_request.notes) |notes| {
-            std.testing.expectEqualStrings(notes, response.notes.?) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqualStrings(notes, response.notes.?);
         }
     }
 }
@@ -570,7 +503,6 @@ test "API Exercise | Get Range" {
     const zdt = @import("zdt");
     const test_name = "API Exercise | Get Range";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -611,13 +543,13 @@ test "API Exercise | Get Range" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -626,50 +558,25 @@ test "API Exercise | Get Range" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         const request = GetRange.Request{
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = GetRange.call(allocator, setup.user.id, test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
         defer response.deinit();
 
-        std.testing.expectEqual(logged_responses.len, response.list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(logged_responses.len, response.list.len);
         for (response.list, logged_responses) |entry, logged| {
-            std.testing.expectEqual(logged.id, entry.entry_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.exercise_id, entry.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.unit_id, entry.unit_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.value, entry.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(logged.id, entry.entry_id);
+            try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
+            try std.testing.expectEqual(logged.unit_id, entry.unit_id);
+            try std.testing.expectEqual(logged.value, entry.value);
             if (logged.notes) |logged_notes| {
                 if (entry.notes) |entry_notes| {
-                    std.testing.expectEqualStrings(logged_notes, entry_notes) catch |err| {
-                        benchmark.fail(err);
-                        return err;
-                    };
+                    try std.testing.expectEqualStrings(logged_notes, entry_notes);
                 } else {
                     // notes missing in entry when they were in response
                     const err = error.NotesMissing;
-                    benchmark.fail(err);
                     return err;
                 }
             }
@@ -680,7 +587,6 @@ test "API Exercise | Get Range Upper Bound" {
     const zdt = @import("zdt");
     const test_name = "API Exercise | Get Range Upper Bound";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -721,13 +627,13 @@ test "API Exercise | Get Range Upper Bound" {
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = now_day;
 
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -736,50 +642,25 @@ test "API Exercise | Get Range Upper Bound" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         const request = GetRange.Request{
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = GetRange.call(allocator, setup.user.id, test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
         defer response.deinit();
 
-        std.testing.expectEqual(logged_responses.len, response.list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(logged_responses.len, response.list.len);
         for (response.list, logged_responses) |entry, logged| {
-            std.testing.expectEqual(logged.id, entry.entry_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.exercise_id, entry.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.unit_id, entry.unit_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.value, entry.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(logged.id, entry.entry_id);
+            try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
+            try std.testing.expectEqual(logged.unit_id, entry.unit_id);
+            try std.testing.expectEqual(logged.value, entry.value);
             if (logged.notes) |logged_notes| {
                 if (entry.notes) |entry_notes| {
-                    std.testing.expectEqualStrings(logged_notes, entry_notes) catch |err| {
-                        benchmark.fail(err);
-                        return err;
-                    };
+                    try std.testing.expectEqualStrings(logged_notes, entry_notes);
                 } else {
                     // notes missing in entry when they were in response
                     const err = error.NotesMissing;
-                    benchmark.fail(err);
                     return err;
                 }
             }
@@ -791,7 +672,6 @@ test "API Exercise | Get Range Lower Bound" {
     const zdt = @import("zdt");
     const test_name = "API Exercise | Get Range Lower Bound";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const CreateCategory = @import("category.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -831,13 +711,13 @@ test "API Exercise | Get Range Lower Bound" {
 
     var lower_bound = now_day;
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
-    var lower_bound_string = std.ArrayList(u8).init(allocator);
+    var lower_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer lower_bound_string.deinit();
-    var upper_bound_string = std.ArrayList(u8).init(allocator);
+    var upper_bound_string: std.Io.Writer.Allocating = .init(allocator);
     defer upper_bound_string.deinit();
 
-    try lower_bound.format("%Y-%m-%d", .{}, lower_bound_string.writer());
-    try upper_bound.format("%Y-%m-%d", .{}, upper_bound_string.writer());
+    try lower_bound.toString("%Y-%m-%d", &lower_bound_string.writer);
+    try upper_bound.toString("%Y-%m-%d", &upper_bound_string.writer);
 
     const range_start = try lower_bound_string.toOwnedSlice();
     defer allocator.free(range_start);
@@ -846,50 +726,25 @@ test "API Exercise | Get Range Lower Bound" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
         const request = GetRange.Request{
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = GetRange.call(allocator, setup.user.id, test_env.database, request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
         defer response.deinit();
 
-        std.testing.expectEqual(logged_responses.len, response.list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(logged_responses.len, response.list.len);
         for (response.list, logged_responses) |entry, logged| {
-            std.testing.expectEqual(logged.id, entry.entry_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.exercise_id, entry.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.unit_id, entry.unit_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(logged.value, entry.value) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(logged.id, entry.entry_id);
+            try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
+            try std.testing.expectEqual(logged.unit_id, entry.unit_id);
+            try std.testing.expectEqual(logged.value, entry.value);
             if (logged.notes) |logged_notes| {
                 if (entry.notes) |entry_notes| {
-                    std.testing.expectEqualStrings(logged_notes, entry_notes) catch |err| {
-                        benchmark.fail(err);
-                        return err;
-                    };
+                    try std.testing.expectEqualStrings(logged_notes, entry_notes);
                 } else {
                     // notes missing in entry when they were in response
                     const err = error.NotesMissing;
-                    benchmark.fail(err);
                     return err;
                 }
             }

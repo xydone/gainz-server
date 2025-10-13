@@ -41,7 +41,7 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerr
     };
     defer result.deinit();
 
-    var response = std.ArrayList(rs.GetNoteEntry).init(ctx.app.allocator);
+    var response: std.ArrayList(rs.GetNoteEntry) = .empty;
 
     while (try result.next()) |row| {
         const id = row.get(i32, 0);
@@ -49,10 +49,10 @@ pub fn getInRange(ctx: *Handler.RequestContext, request: rq.GetNoteRange) anyerr
         const note_id = row.get(i32, 2);
         const created_by = row.get(i32, 3);
 
-        try response.append(rs.GetNoteEntry{ .id = id, .created_at = created_at, .note_id = note_id, .created_by = created_by });
+        try response.append(ctx.app.allocator, rs.GetNoteEntry{ .id = id, .created_at = created_at, .note_id = note_id, .created_by = created_by });
     }
 
-    return response.toOwnedSlice();
+    return response.toOwnedSlice(ctx.app.allocator);
 }
 
 const SQL_STRINGS = struct {

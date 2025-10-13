@@ -1,24 +1,24 @@
 .{
     .name = .gainz_server,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
     .version = "0.0.0",
 
     .dependencies = .{
         .pg = .{
-            .url = "git+https://github.com/karlseguin/pg.zig?ref=master#64a70d813386e4cfab7d5927d5efcfae0a2aea18",
-            .hash = "pg-0.0.0-Wp_7gcf9BQC1UCvCha1tkKTIPgT8ybuxJQGEb3ekz0ti",
+            .url = "git+https://github.com/karlseguin/pg.zig#c187af6760d4a923ff4c4020db76aae3c8b8a273",
+            .hash = "pg-0.0.0-Wp_7geUtBgC21DUn8zhRP3jDdWwXk3DjUyjFv7301VtI",
         },
         .httpz = .{
-            .url = "git+https://github.com/karlseguin/http.zig?ref=master#91600601f81544c6eeff48e83b76e1e6c5fea00b",
-            .hash = "httpz-0.0.0-PNVzrLa0BgBOHnKWUMiDXXU8iXKdc8qENAWc60QubUq6",
+            .url = "git+https://github.com/karlseguin/http.zig#00014146eaf9e17750b752fa4905f7623fbe30f7",
+            .hash = "httpz-0.0.0-PNVzrFndBgDr9zQx7Mj_MFiqYslgcRlx45FJ_gERmRTb",
         },
         .jwt = .{
-            .url = "git+https://github.com/xydone/zig-jwt#cd95f31405502bbb98c19afdf6d8816085f167d3",
-            .hash = "jwt-0.1.0-NpgsfhamAADrKAGeGmj_2aN1p3gw6y3YZBIPmruylq0V",
+            .url = "git+https://github.com/xydone/zig-jwt?ref=0.15.1#73770ef31e60857692baefe3d22fba9a12faa0ae",
+            .hash = "jwt-0.1.0-NpgsfnakAAC2Q3t5TFZjdMTuzYuAVOtC-TG3GEhhDwyZ",
         },
         .zdt = .{
-            .url = "git+https://github.com/FObersteiner/zdt#d9dc11e913370775ed57a1c43a81350cea1fda8e",
-            .hash = "zdt-0.6.2-xr0_vLG7EAAN4dsgKs-oJ4Mr5LirR4c69Iu0TTc1sbDx",
+            .url = "git+https://codeberg.org/FObersteiner/zdt#6ca732a03578a13e1955e0d34747c365e381f45c",
+            .hash = "zdt-0.8.1-xr0_vAxUDwCJRDh9pcAS_mdZBIsvcGTtN-K8JJSWY4I6",
         },
     },
 

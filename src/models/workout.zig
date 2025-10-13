@@ -71,12 +71,12 @@ pub const Get = struct {
         };
         defer query.deinit();
 
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
 
         while (query.next() catch return error.CannotGet) |result| {
-            response.append(result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            response.append(allocator, result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     const query_string =
@@ -140,14 +140,14 @@ pub const AddExercise = struct {
         };
         defer result.deinit();
 
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
 
         while (result.next() catch return error.CannotCreate) |row| {
             const res = row.to(Response, .{ .dupe = true }) catch return error.CannotCreate;
-            response.append(res) catch return error.OutOfMemory;
+            response.append(allocator, res) catch return error.OutOfMemory;
         }
 
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     const query_string_prefix =
@@ -185,12 +185,12 @@ pub const GetExerciseList = struct {
         };
         defer query.deinit();
 
-        var response = std.ArrayList(Response).init(allocator);
+        var response: std.ArrayList(Response) = .empty;
 
         while (query.next() catch return error.CannotGet) |result| {
-            response.append(result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            response.append(allocator, result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
-        return response.toOwnedSlice();
+        return response.toOwnedSlice(allocator);
     }
 
     const query_string =
@@ -213,7 +213,6 @@ const TestSetup = Tests.TestSetup;
 test "API Workout | Create" {
     const test_name = "API Workout | Create";
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -221,31 +220,19 @@ test "API Workout | Create" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-        const response = Create.call(
+        const response = try Create.call(
             setup.user.id,
             test_env.database,
             .{ .name = test_name },
-        ) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(setup.user.id, response.created_by) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(test_name, response.name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        );
+        try std.testing.expectEqual(setup.user.id, response.created_by);
+        try std.testing.expectEqualStrings(test_name, response.name);
     }
 }
 
 test "API Workout | Get" {
     const test_name = "API Workout | Get";
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -259,32 +246,14 @@ test "API Workout | Get" {
     const create_responses = [_]Create.Response{create};
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const response = Get.call(allocator, setup.user.id, test_env.database) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try Get.call(allocator, setup.user.id, test_env.database);
         defer allocator.free(response);
 
         for (create_responses, response) |created, res| {
-            std.testing.expectEqual(created.id, res.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.created_by, res.created_by) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.created_at, res.created_at) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(created.name, res.name) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(created.id, res.id);
+            try std.testing.expectEqual(created.created_by, res.created_by);
+            try std.testing.expectEqual(created.created_at, res.created_at);
+            try std.testing.expectEqualStrings(created.name, res.name);
         }
     }
 }
@@ -292,7 +261,6 @@ test "API Workout | Get" {
 test "API Workout | Add Exercise" {
     const test_name = "API Workout | Add Exercise";
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
     const allocator = std.testing.allocator;
@@ -321,35 +289,15 @@ test "API Workout | Add Exercise" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-        const response = AddExercise.call(allocator, workout.id, test_env.database, &request) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try AddExercise.call(allocator, workout.id, test_env.database, &request);
         defer allocator.free(response);
 
         for (request, response) |req, res| {
-            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(req.reps, res.reps) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(req.sets, res.sets) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
+            try std.testing.expectEqual(workout.id, res.workout_id);
+            try std.testing.expectEqual(req.reps, res.reps);
+            try std.testing.expectEqual(req.sets, res.sets);
+            try std.testing.expectEqualStrings(req.notes, res.notes);
         }
     }
 }
@@ -357,7 +305,6 @@ test "API Workout | Add Exercise" {
 test "API Workout | Get Exercise List" {
     const test_name = "API Workout | Get Exercise List";
     //SETUP
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
     const allocator = std.testing.allocator;
@@ -394,36 +341,15 @@ test "API Workout | Get Exercise List" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
-
-        const response = GetExerciseList.call(allocator, workout.id, test_env.database) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        const response = try GetExerciseList.call(allocator, workout.id, test_env.database);
         defer allocator.free(response);
 
         for (add_exercise_request, response) |req, res| {
-            std.testing.expectEqual(req.exercise_id, res.exercise_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(workout.id, res.workout_id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(req.reps, res.reps) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(req.sets, res.sets) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(req.notes, res.notes) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
+            try std.testing.expectEqual(workout.id, res.workout_id);
+            try std.testing.expectEqual(req.reps, res.reps);
+            try std.testing.expectEqual(req.sets, res.sets);
+            try std.testing.expectEqualStrings(req.notes, res.notes);
         }
     }
 }

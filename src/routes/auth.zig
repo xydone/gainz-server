@@ -13,6 +13,8 @@ const Refresh = @import("../models/auth_model.zig").Refresh;
 
 const log = std.log.scoped(.auth);
 
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .refresh = true };
     router.*.post("/api/auth", createToken, .{});
@@ -103,7 +105,6 @@ test "Endpoint Auth | Create" {
     // SETUP
     const test_name = "Endpoint Auth | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -114,28 +115,21 @@ test "Endpoint Auth | Create" {
         .username = user.username,
         .password = "Testing password",
     };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(null, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.body(body_string);
 
-        createToken(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try createToken(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
     }
 }
 
@@ -143,7 +137,6 @@ test "Endpoint Auth | Refresh" {
     // SETUP
     const test_name = "Endpoint Auth | Refresh";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -154,7 +147,8 @@ test "Endpoint Auth | Refresh" {
         .username = user.username,
         .password = "Testing password",
     };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(null, allocator, test_env.database);
@@ -175,35 +169,23 @@ test "Endpoint Auth | Refresh" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        refreshToken(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try refreshToken(&context, web_test.req, web_test.res);
         const response_body = try web_test.getBody();
         const response = try std.json.parseFromSlice(Refresh.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try web_test.expectStatus(200);
 
         // The access tokens should be different
         if (std.mem.eql(u8, create_token_response.value.access_token, response.value.access_token)) {
             const err = error.SameRefreshTokens;
-            benchmark.fail(err);
             return err;
         }
 
         // The refresh tokens should be the same
-        std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token);
     }
 }

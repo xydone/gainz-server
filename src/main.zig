@@ -66,8 +66,6 @@ test "tests:beforeAll" {
 
 test "tests:afterAll" {
     var test_env = Tests.test_env;
-    const Benchmark = @import("tests/test_runner.zig").Benchmark;
-    // NOTE: only use std.heap.smp_allocator when tracking memory usage is unimportant
-    Benchmark.analyze(std.heap.smp_allocator);
+
     defer test_env.deinit();
 }

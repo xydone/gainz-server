@@ -38,8 +38,6 @@ pub fn createGoal(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
 
 pub fn getGoals(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
     _ = req; // autofix
-    const allocator = ctx.app.allocator;
-    _ = allocator; // autofix
     const response = Get.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
         error.NoGoals => {
             try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");

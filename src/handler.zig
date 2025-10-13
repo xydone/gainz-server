@@ -113,11 +113,12 @@ const Logging = struct {
         const time = self.timer.read();
         const locale = try zdt.Timezone.tzLocal(self.allocator);
         const now = try zdt.Datetime.now(.{ .tz = &locale });
-        var buf = std.ArrayList(u8).init(self.allocator);
-        defer buf.deinit();
+
+        var writer = std.Io.Writer.Allocating.init(self.allocator);
+        defer writer.deinit();
         // https://github.com/FObersteiner/zdt/wiki/String-parsing-and-formatting-directives
-        try now.toString("[%Y-%m-%d %H:%M:%S]", buf.writer());
-        const datetime = try buf.toOwnedSlice();
+        try now.toString("[%Y-%m-%d %H:%M:%S]", &writer.writer);
+        const datetime = try writer.toOwnedSlice();
         std.debug.print("{s} {s} {s} {s}{d}\x1b[0m in {d:.2}ms ({d}ns)\n", .{
             datetime,
             @tagName(self.req.method),

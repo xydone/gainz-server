@@ -16,10 +16,10 @@ pub const dotenv = struct {
             };
 
             defer file.close();
-            var buf_reader = std.io.bufferedReader(file.reader());
-            var in_stream = buf_reader.reader();
             var buf: [1024]u8 = undefined;
-            while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+            var reader = file.reader(&buf);
+
+            while (reader.interface.takeDelimiterExclusive('\n')) |line| {
                 // ignore commented out lines
                 if (line.len > 0 and line[0] == '#') {
                     continue;
@@ -30,6 +30,9 @@ pub const dotenv = struct {
                     const value = line[index + 1 ..];
                     try map.put(key, value);
                 }
+            } else |err| switch (err) {
+                error.EndOfStream => {}, // normal termination if the file does not end with a line which contains a new line
+                else => return err,
             }
         }
         return .{

@@ -68,8 +68,8 @@ pub const GetAll = struct {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        var list: std.ArrayList(Response) = .init(allocator);
-        defer list.deinit();
+        var list: std.ArrayList(Response) = .empty;
+        defer list.deinit(allocator);
 
         const result = conn.query(query_string, .{user_id}) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
@@ -79,10 +79,10 @@ pub const GetAll = struct {
         };
 
         while (result.next() catch return error.CannotGet) |row| {
-            list.append(row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            list.append(allocator, row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
 
-        return list.toOwnedSlice();
+        return list.toOwnedSlice(allocator);
     }
 
     const query_string =
@@ -98,7 +98,6 @@ const TestSetup = Tests.TestSetup;
 test "API Exercise Unit | Create" {
     const test_name = "API Exercise Unit | Create";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -106,34 +105,19 @@ test "API Exercise Unit | Create" {
 
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const request = Create.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
         const response = try Create.call(setup.user.id, test_env.database, request);
 
-        std.testing.expectEqual(setup.user.id, response.created_by) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(request.amount, response.amount) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqual(request.multiplier, response.multiplier) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(request.unit, response.unit) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(setup.user.id, response.created_by);
+        try std.testing.expectEqual(request.amount, response.amount);
+        try std.testing.expectEqual(request.multiplier, response.multiplier);
+        try std.testing.expectEqualStrings(request.unit, response.unit);
     }
 }
 
 test "API Exercise Unit | Get All" {
     const test_name = "API Exercise Unit | Get All";
     //SETUP
-    const Benchmark = @import("../../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -145,41 +129,18 @@ test "API Exercise Unit | Get All" {
     const created_units = [_]Create.Response{create};
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         const response_list = try GetAll.call(allocator, setup.user.id, test_env.database);
         defer allocator.free(response_list);
 
-        std.testing.expectEqual(created_units.len, response_list.len) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqual(created_units.len, response_list.len);
 
         for (response_list, created_units) |response, created| {
-            std.testing.expectEqual(setup.user.id, response.created_by) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.id, response.id) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.amount, response.amount) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.multiplier, response.multiplier) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqual(created.created_at, response.created_at) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
-            std.testing.expectEqualStrings(created.unit, response.unit) catch |err| {
-                benchmark.fail(err);
-                return err;
-            };
+            try std.testing.expectEqual(setup.user.id, response.created_by);
+            try std.testing.expectEqual(created.id, response.id);
+            try std.testing.expectEqual(created.amount, response.amount);
+            try std.testing.expectEqual(created.multiplier, response.multiplier);
+            try std.testing.expectEqual(created.created_at, response.created_at);
+            try std.testing.expectEqualStrings(created.unit, response.unit);
         }
     }
 }

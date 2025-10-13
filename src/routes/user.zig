@@ -15,6 +15,8 @@ const Entry = @import("entry.zig");
 
 const log = std.log.scoped(.users);
 
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     router.*.post("/api/user", createUser, .{});
 
@@ -56,7 +58,6 @@ test "Endpoint User | Create" {
     // SETUP
     const test_name = "Endpoint User | Create";
     const ht = @import("httpz").testing;
-    const Benchmark = @import("../tests/test_runner.zig").Benchmark;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -65,45 +66,25 @@ test "Endpoint User | Create" {
         .display_name = "Display " ++ test_name,
         .password = "Testing password",
     };
-    const body_string = try std.json.stringifyAlloc(allocator, body, .{});
+    const body_string = try jsonStringify(allocator, body);
     defer allocator.free(body_string);
 
     var context = try TestSetup.createContext(null, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
     // TEST
     {
-        var benchmark = Benchmark.start(test_name);
-        defer benchmark.end();
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
         web_test.body(body_string);
 
-        createUser(&context, web_test.req, web_test.res) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        web_test.expectStatus(200) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response_body = web_test.getBody() catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        const response = std.json.parseFromSlice(Create.Response, allocator, response_body, .{}) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try createUser(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+        const response_body = try web_test.getBody();
+        const response = try std.json.parseFromSlice(Create.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        std.testing.expectEqualStrings(body.username, response.value.username) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
-        std.testing.expectEqualStrings(body.display_name, response.value.display_name) catch |err| {
-            benchmark.fail(err);
-            return err;
-        };
+        try std.testing.expectEqualStrings(body.username, response.value.username);
+        try std.testing.expectEqualStrings(body.display_name, response.value.display_name);
     }
 }
