@@ -13,6 +13,10 @@ const log = std.log.scoped(.auth_model);
 const ACCESS_TOKEN_EXPIRY = 15 * 60;
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 
+inline fn generateAccessTokenExpiry() i64 {
+    return std.time.timestamp() + ACCESS_TOKEN_EXPIRY;
+}
+
 pub const Create = struct {
     pub const Request = struct {
         username: []const u8,
@@ -60,7 +64,7 @@ pub const Create = struct {
         const user_id = row.get(i32, 0);
         const hash = row.get([]u8, 1);
         const isValidPassword = auth.verifyPassword(props.allocator, hash, request.password) catch return error.CannotCreate;
-        const claims = auth.JWTClaims{ .user_id = user_id, .exp = std.time.milliTimestamp() + ACCESS_TOKEN_EXPIRY };
+        const claims = auth.JWTClaims{ .user_id = user_id, .exp = generateAccessTokenExpiry() };
 
         if (!isValidPassword) return error.CannotCreate;
         const access_token = auth.createJWT(props.allocator, claims, props.jwt_secret) catch return error.CannotCreate;
@@ -106,7 +110,7 @@ pub const Refresh = struct {
             else => return error.RedisError,
         };
         const number = std.fmt.parseInt(i32, result, 10) catch return error.ParseError;
-        const claims = auth.JWTClaims{ .user_id = number, .exp = std.time.milliTimestamp() + ACCESS_TOKEN_EXPIRY };
+        const claims = auth.JWTClaims{ .user_id = number, .exp = generateAccessTokenExpiry() };
 
         const access_token = auth.createJWT(props.allocator, claims, props.jwt_secret) catch return error.CannotCreateJWT;
 

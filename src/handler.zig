@@ -85,6 +85,7 @@ fn verifyToken(req: *httpz.Request, res: *httpz.Response, ctx: *RequestContext) 
                 return error.InvalidJWT;
             };
             defer decoded.deinit();
+            std.debug.assert(decoded.claims.exp >= std.time.timestamp());
             ctx.user_id = decoded.claims.user_id;
         }
         if (route_data.refresh) {
