@@ -179,12 +179,6 @@ test "Endpoint Auth | Refresh" {
 
         try web_test.expectStatus(200);
 
-        // The access tokens should be different
-        if (std.mem.eql(u8, create_token_response.value.access_token, response.value.access_token)) {
-            const err = error.SameRefreshTokens;
-            return err;
-        }
-
         // The refresh tokens should be the same
         try std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token);
     }

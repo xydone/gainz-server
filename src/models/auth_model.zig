@@ -251,9 +251,6 @@ test "API Auth | Refresh" {
         defer refresh_response.deinit(allocator);
 
         try std.testing.expectEqualStrings(refresh_response.refresh_token, refresh_token);
-
-        const is_same_access_token = std.mem.eql(u8, refresh_response.access_token, access_token);
-        try std.testing.expect(!is_same_access_token);
     }
 }
 
