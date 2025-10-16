@@ -10,6 +10,8 @@ const Pool = @import("../db.zig").Pool;
 const DatabaseErrors = @import("../db.zig").DatabaseErrors;
 const ErrorHandler = @import("../db.zig").ErrorHandler;
 
+const GoalTargets = @import("../types.zig").GoalTargets;
+
 const log = std.log.scoped(.goals_model);
 
 pub const Create = struct {
@@ -44,7 +46,7 @@ pub const Create = struct {
     const query_string = "INSERT INTO goals (created_by, target, value) VALUES ($1,$2,$3) RETURNING target, value";
 };
 
-pub const Get = struct {
+pub const GetActive = struct {
     pub const Response = struct {
         weight: ?f64 = null,
         calories: ?f64 = null,
@@ -76,7 +78,6 @@ pub const Get = struct {
         OutOfMemory,
     } || DatabaseErrors;
 
-    /// Caller must free
     pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
@@ -89,7 +90,10 @@ pub const Get = struct {
         } orelse return error.CannotGet;
         defer row.deinit() catch {};
         const goals = row.get(?[]u8, 0) orelse return error.NoGoals;
-        return std.json.parseFromSliceLeaky(Response, allocator, goals, .{}) catch return error.CannotParseResult;
+        const response = std.json.parseFromSlice(Response, allocator, goals, .{}) catch return error.CannotParseResult;
+        defer response.deinit();
+
+        return response.value;
     }
 
     const query_string =
@@ -103,12 +107,58 @@ pub const Get = struct {
     ;
 };
 
+pub const GetAll = struct {
+    pub const Response = struct {
+        id: i32,
+        target: GoalTargets,
+        value: f64,
+        created_at: i64,
+    };
+    pub const Errors = error{
+        CannotGet,
+        NoGoals,
+        OutOfMemory,
+    } || DatabaseErrors;
+
+    /// Caller must free
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *pg.Pool) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        var query = conn.queryOpts(
+            query_string, //
+            .{user_id},
+            .{ .column_names = true },
+        ) catch |err| {
+            const error_handler = ErrorHandler{ .conn = conn };
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| ErrorHandler.printErr(data);
+            return error.CannotGet;
+        };
+        defer query.deinit();
+
+        var response: std.ArrayList(Response) = .empty;
+
+        const mapper = query.mapper(Response, .{});
+        while (mapper.next() catch return error.CannotGet) |row| {
+            try response.append(allocator, row);
+        }
+        return response.toOwnedSlice(allocator);
+    }
+
+    const query_string =
+        \\ SELECT *
+        \\ FROM goals
+        \\ WHERE created_by = $1
+        \\ ORDER BY target, id DESC
+    ;
+};
+
 //TESTS
 
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
-test "API Goal | Create" {
+test "API Goals | Create" {
     // SETUP
     const test_env = Tests.test_env;
     const test_name = "API Goal | Create";
@@ -128,11 +178,11 @@ test "API Goal | Create" {
     }
 }
 
-test "API Goal | Get" {
+test "API Goals | Get Active" {
     // SETUP
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
-    const test_name = "API Goal | Get";
+    const test_name = "API Goal | Get Active";
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
@@ -144,8 +194,34 @@ test "API Goal | Get" {
 
     // TEST
     {
-        const result = try Get.call(allocator, setup.user.id, test_env.database);
+        const result = try GetActive.call(allocator, setup.user.id, test_env.database);
 
         try std.testing.expectEqual(goal.value, result.weight);
+    }
+}
+
+test "API Goals | Get All" {
+    // SETUP
+    const allocator = std.testing.allocator;
+    const test_env = Tests.test_env;
+    const test_name = "API Goal | Get All";
+    var setup = try TestSetup.init(test_env.database, test_name);
+    defer setup.deinit(allocator);
+
+    const create_goal = Create.Request{
+        .target = .weight,
+        .value = 85.13,
+    };
+    _ = try Create.call(setup.user.id, test_env.database, create_goal);
+
+    // TEST
+    {
+        const list = try GetAll.call(allocator, setup.user.id, test_env.database);
+        defer allocator.free(list);
+
+        for (list) |response| {
+            try std.testing.expectEqual(response.target, create_goal.target);
+            try std.testing.expectEqual(response.value, create_goal.value);
+        }
     }
 }
