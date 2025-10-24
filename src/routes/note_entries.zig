@@ -2,9 +2,9 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const NoteEntryModel = @import("../models/note_entry_model.zig");
+const Create = @import("../models/note_entry_model.zig").Create;
+const GetInRange = @import("../models/note_entry_model.zig").GetInRange;
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
 const handleResponse = @import("../response.zig").handleResponse;
 const ResponseError = @import("../response.zig").ResponseError;
 
@@ -32,8 +32,8 @@ fn getNoteRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
         return;
     };
-    const request: rq.GetNoteRange = .{ .note_id = note_id, .range_start = start, .range_end = end };
-    const result = NoteEntryModel.getInRange(ctx, request) catch {
+    const request: GetInRange.Request = .{ .note_id = note_id, .range_start = start, .range_end = end };
+    const result = GetInRange.call(ctx, request) catch {
         try handleResponse(res, ResponseError.not_found, null);
         return;
     };
@@ -46,11 +46,11 @@ pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
-    const note = std.json.parseFromSliceLeaky(rq.PostNoteEntry, ctx.app.allocator, body, .{}) catch {
+    const note = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
-    const result = NoteEntryModel.create(ctx, note) catch {
+    const result = Create.call(ctx, note) catch {
         try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };

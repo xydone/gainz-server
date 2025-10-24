@@ -2,9 +2,9 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const NoteModel = @import("../models/note_model.zig");
+const Create = @import("../models/note_model.zig").Create;
+const Get = @import("../models/note_model.zig").Get;
 const Handler = @import("../handler.zig");
-const rq = @import("../request.zig");
 const handleResponse = @import("../response.zig").handleResponse;
 const ResponseError = @import("../response.zig").ResponseError;
 
@@ -21,9 +21,9 @@ pub fn getNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Re
         try handleResponse(res, ResponseError.bad_request, "note_id not valid integer!");
         return;
     };
-    const request = rq.GetNote{ .id = note_id };
+    const request = Get.Request{ .id = note_id };
 
-    const result = NoteModel.get(ctx, request) catch |err| switch (err) {
+    const result = Get.call(ctx, request) catch |err| switch (err) {
         error.NotFound => {
             try handleResponse(res, ResponseError.not_found, null);
             return;
@@ -42,11 +42,11 @@ pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
         try handleResponse(res, ResponseError.body_missing, null);
         return;
     };
-    const note = std.json.parseFromSliceLeaky(rq.PostNote, ctx.app.allocator, body, .{}) catch {
+    const note = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
         try handleResponse(res, ResponseError.body_missing_fields, null);
         return;
     };
-    const result = NoteModel.create(ctx, note) catch {
+    const result = Create.call(ctx, note) catch {
         try handleResponse(res, ResponseError.internal_server_error, null);
         return;
     };
