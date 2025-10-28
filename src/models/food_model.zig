@@ -1,14 +1,3 @@
-const std = @import("std");
-
-const pg = @import("pg");
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.food_model);
 
 /// Have to call .deinit() to free memory after usage
@@ -548,3 +537,14 @@ test "API Food | Search" {
 }
 
 // TODO: test for delete
+
+const std = @import("std");
+
+const pg = @import("pg");
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");

@@ -1,14 +1,4 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
 const log = std.log.scoped(.entry_model);
-const Food = @import("food_model.zig").Food;
 
 pub const Create = struct {
     pub const Request = struct {
@@ -1117,3 +1107,14 @@ test "API Entry | Get breakdown" {
         }
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+const Food = @import("food_model.zig").Food;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");

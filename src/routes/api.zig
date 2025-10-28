@@ -1,18 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../handler.zig");
-
-// ROUTES
-const Auth = @import("auth.zig").init;
-const Entry = @import("entry.zig").init;
-const Food = @import("food.zig").init;
-const User = @import("user.zig").init;
-const Note = @import("note.zig").init;
-const Workout = @import("workout.zig").init;
-const Exercise = @import("exercise/routes.zig").init;
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     // /api/user
     User(router);
@@ -27,3 +12,18 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
     // /api/exercise
     Workout(router);
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../handler.zig");
+
+// ROUTES
+const Auth = @import("auth.zig").init;
+const Entry = @import("entry.zig").init;
+const Food = @import("food.zig").init;
+const User = @import("user.zig").init;
+const Note = @import("note.zig").init;
+const Workout = @import("workout.zig").init;
+const Exercise = @import("exercise/routes.zig").init;

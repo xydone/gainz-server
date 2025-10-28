@@ -1,18 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../../handler.zig");
-const handleResponse = @import("../../response.zig").handleResponse;
-const ResponseError = @import("../../response.zig").ResponseError;
-
-const LogExercise = @import("../../models/exercise/exercise.zig").LogExercise;
-const DeleteExerciseEntry = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
-const EditExerciseEntry = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
-const GetRange = @import("../../models/exercise/exercise.zig").GetRange;
-
-const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/exercise/entry", createEntry, .{ .data = &RouteData });
@@ -375,3 +360,18 @@ test "Endpoint Exercise | Get Range" {
         }
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../../handler.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
+const LogExercise = @import("../../models/exercise/exercise.zig").LogExercise;
+const DeleteExerciseEntry = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
+const EditExerciseEntry = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
+const GetRange = @import("../../models/exercise/exercise.zig").GetRange;
+
+const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;

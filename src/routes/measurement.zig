@@ -1,17 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Get = @import("../models/measurements_model.zig").Get;
-const GetInRange = @import("../models/measurements_model.zig").GetInRange;
-const GetRecent = @import("../models/measurements_model.zig").GetRecent;
-const Create = @import("../models/measurements_model.zig").Create;
-
-const Handler = @import("../handler.zig");
-const ResponseError = @import("../response.zig").ResponseError;
-const handleResponse = @import("../response.zig").handleResponse;
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.measurement);
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
@@ -107,3 +93,17 @@ fn postMeasurement(ctx: *Handler.RequestContext, req: *httpz.Request, res: *http
     res.status = 200;
     try res.json(result, .{});
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Get = @import("../models/measurements_model.zig").Get;
+const GetInRange = @import("../models/measurements_model.zig").GetInRange;
+const GetRecent = @import("../models/measurements_model.zig").GetRecent;
+const Create = @import("../models/measurements_model.zig").Create;
+
+const Handler = @import("../handler.zig");
+const ResponseError = @import("../response.zig").ResponseError;
+const handleResponse = @import("../response.zig").handleResponse;
+const types = @import("../types.zig");

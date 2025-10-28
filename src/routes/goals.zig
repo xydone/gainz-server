@@ -1,16 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../handler.zig");
-const ResponseError = @import("../response.zig").ResponseError;
-const handleResponse = @import("../response.zig").handleResponse;
-
-const types = @import("../types.zig");
-const Create = @import("../models/goals_model.zig").Create;
-const GetActive = @import("../models/goals_model.zig").GetActive;
-const GetAll = @import("../models/goals_model.zig").GetAll;
-
 const log = std.log.scoped(.goals);
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
@@ -199,3 +186,16 @@ test "Endpoint Goals | Get All" {
         }
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../handler.zig");
+const ResponseError = @import("../response.zig").ResponseError;
+const handleResponse = @import("../response.zig").handleResponse;
+
+const types = @import("../types.zig");
+const Create = @import("../models/goals_model.zig").Create;
+const GetActive = @import("../models/goals_model.zig").GetActive;
+const GetAll = @import("../models/goals_model.zig").GetAll;

@@ -1,21 +1,4 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const GetFood = @import("../models/food_model.zig").Get;
-const Search = @import("../models/food_model.zig").Search;
-const CreateFood = @import("../models/food_model.zig").Create;
-const CreateServing = @import("../models/servings_model.zig").Create;
-const GetServing = @import("../models/servings_model.zig").Get;
-
-const Handler = @import("../handler.zig");
-const ResponseError = @import("../response.zig").ResponseError;
-const handleResponse = @import("../response.zig").handleResponse;
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.food);
-
-const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
@@ -550,3 +533,19 @@ test "Endpoint Food | Get Serving Invalid Food ID" {
         try std.testing.expectEqualStrings("Invalid food ID!", error_response.value.details.?);
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const GetFood = @import("../models/food_model.zig").Get;
+const Search = @import("../models/food_model.zig").Search;
+const CreateFood = @import("../models/food_model.zig").Create;
+const CreateServing = @import("../models/servings_model.zig").Create;
+const GetServing = @import("../models/servings_model.zig").Get;
+
+const Handler = @import("../handler.zig");
+const ResponseError = @import("../response.zig").ResponseError;
+const handleResponse = @import("../response.zig").handleResponse;
+const types = @import("../types.zig");
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;

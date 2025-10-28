@@ -1,14 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../../handler.zig");
-const handleResponse = @import("../../response.zig").handleResponse;
-const ResponseError = @import("../../response.zig").ResponseError;
-
-const Create = @import("../../models/exercise/exercise.zig").Create;
-const GetAll = @import("../../models/exercise/exercise.zig").GetAll;
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.get("/api/exercise/", getExercises, .{ .data = &RouteData });
@@ -43,3 +32,14 @@ pub fn createExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *h
 
     return res.json(exercise, .{});
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../../handler.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
+const Create = @import("../../models/exercise/exercise.zig").Create;
+const GetAll = @import("../../models/exercise/exercise.zig").GetAll;

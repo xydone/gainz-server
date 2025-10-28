@@ -1,9 +1,3 @@
-const std = @import("std");
-
-const pg = @import("pg");
-
-const dotenv = @import("util/dotenv.zig").dotenv;
-
 pub const Pool = pg.Pool;
 pub const DatabaseErrors = error{
     GenericDatabaseError,
@@ -53,3 +47,9 @@ pub const ErrorHandler = struct {
         std.log.err("severity: {s} |code: {s} | failure: {s}", .{ err.severity, err.code, err.message });
     }
 };
+
+const std = @import("std");
+
+const pg = @import("pg");
+
+const dotenv = @import("util/dotenv.zig").dotenv;

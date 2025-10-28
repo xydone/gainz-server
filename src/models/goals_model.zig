@@ -1,17 +1,3 @@
-const std = @import("std");
-
-const pg = @import("pg");
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const GoalTargets = @import("../types.zig").GoalTargets;
-
 const log = std.log.scoped(.goals_model);
 
 pub const Create = struct {
@@ -225,3 +211,17 @@ test "API Goals | Get All" {
         }
     }
 }
+
+const std = @import("std");
+
+const pg = @import("pg");
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const GoalTargets = @import("../types.zig").GoalTargets;

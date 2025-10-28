@@ -1,11 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../../db.zig").Pool;
-const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../../db.zig").ErrorHandler;
-
-const Handler = @import("../../handler.zig");
-
 const log = std.log.scoped(.unit_model);
 
 pub const Create = struct {
@@ -144,3 +136,11 @@ test "API Exercise Unit | Get All" {
         }
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../../db.zig").Pool;
+const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../../db.zig").ErrorHandler;
+
+const Handler = @import("../../handler.zig");

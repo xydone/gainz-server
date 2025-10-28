@@ -1,16 +1,3 @@
-const std = @import("std");
-
-const pg = @import("pg");
-
-const Handler = @import("../handler.zig");
-const rs = @import("../response.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
 const log = std.log.scoped(.note_model);
 
 pub const Create = struct {
@@ -79,3 +66,16 @@ pub const Get = struct {
     }
     const query_string = "SELECT * FROM notes WHERE created_by=$1 AND id=$2";
 };
+
+const std = @import("std");
+
+const pg = @import("pg");
+
+const Handler = @import("../handler.zig");
+const rs = @import("../response.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;

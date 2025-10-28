@@ -1,21 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Create = @import("../models/entry_model.zig").Create;
-const Get = @import("../models/entry_model.zig").Get;
-const Delete = @import("../models/entry_model.zig").Delete;
-const Edit = @import("../models/entry_model.zig").Edit;
-const GetAverage = @import("../models/entry_model.zig").GetAverage;
-const GetBreakdown = @import("../models/entry_model.zig").GetBreakdown;
-const GetInRange = @import("../models/entry_model.zig").GetInRange;
-const GetRecent = @import("../models/entry_model.zig").GetRecent;
-
-const Handler = @import("../handler.zig");
-const handleResponse = @import("../response.zig").handleResponse;
-const ResponseError = @import("../response.zig").ResponseError;
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.entry);
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
@@ -186,3 +168,21 @@ fn postEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Resp
     res.status = 200;
     try res.json(response, .{});
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Create = @import("../models/entry_model.zig").Create;
+const Get = @import("../models/entry_model.zig").Get;
+const Delete = @import("../models/entry_model.zig").Delete;
+const Edit = @import("../models/entry_model.zig").Edit;
+const GetAverage = @import("../models/entry_model.zig").GetAverage;
+const GetBreakdown = @import("../models/entry_model.zig").GetBreakdown;
+const GetInRange = @import("../models/entry_model.zig").GetInRange;
+const GetRecent = @import("../models/entry_model.zig").GetRecent;
+
+const Handler = @import("../handler.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+const types = @import("../types.zig");

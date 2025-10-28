@@ -1,4 +1,3 @@
-const std = @import("std");
 const log = std.log.scoped(.redis);
 
 pub const RedisClient = struct {
@@ -67,3 +66,5 @@ pub const RedisClient = struct {
         return try self.sendCommand(command);
     }
 };
+
+const std = @import("std");

@@ -1,5 +1,3 @@
-const std = @import("std");
-
 pub const QueryBuildError = error{
     MismatchedParameters, // If total_parameters is not divisible by params_per_entry
     ZeroParametersPerEntry, // If params_per_entry is 0
@@ -80,3 +78,5 @@ pub const Query = struct {
         return try std.mem.join(self.allocator, "", &[_][]const u8{ self.prefix, self.root.?, self.suffix });
     }
 };
+
+const std = @import("std");

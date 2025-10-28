@@ -1,12 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-
 const log = std.log.scoped(.user_model);
 
 const UserErrors = error{UsernameNotUnique};
@@ -177,3 +168,12 @@ test "API User | Delete" {
         );
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");

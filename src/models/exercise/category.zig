@@ -1,11 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../../db.zig").Pool;
-const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../../db.zig").ErrorHandler;
-
-const Handler = @import("../../handler.zig");
-
 const log = std.log.scoped(.category_model);
 
 pub const Create = struct {
@@ -101,3 +93,11 @@ test "API Exercise Category | Create" {
         try std.testing.expectEqualStrings(request.name, response.name);
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../../db.zig").Pool;
+const DatabaseErrors = @import("../../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../../db.zig").ErrorHandler;
+
+const Handler = @import("../../handler.zig");

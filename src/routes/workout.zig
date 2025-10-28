@@ -1,18 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../handler.zig");
-const handleResponse = @import("../response.zig").handleResponse;
-const ResponseError = @import("../response.zig").ResponseError;
-
-const Create = @import("../models/workout.zig").Create;
-const Get = @import("../models/workout.zig").Get;
-const GetExerciseList = @import("../models/workout.zig").GetExerciseList;
-const AddExercise = @import("../models/workout.zig").AddExercise;
-
-const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.get("/api/workout", getWorkout, .{ .data = &RouteData });
@@ -384,3 +369,18 @@ test "Endpoint Workout | Get Exercises List" {
         }
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../handler.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+
+const Create = @import("../models/workout.zig").Create;
+const Get = @import("../models/workout.zig").Get;
+const GetExerciseList = @import("../models/workout.zig").GetExerciseList;
+const AddExercise = @import("../models/workout.zig").AddExercise;
+
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;

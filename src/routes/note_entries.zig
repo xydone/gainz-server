@@ -1,13 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Create = @import("../models/note_entry_model.zig").Create;
-const GetInRange = @import("../models/note_entry_model.zig").GetInRange;
-const Handler = @import("../handler.zig");
-const handleResponse = @import("../response.zig").handleResponse;
-const ResponseError = @import("../response.zig").ResponseError;
-
 const log = std.log.scoped(.users);
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
@@ -56,3 +46,13 @@ pub fn postNote(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.R
     };
     try res.json(result, .{});
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Create = @import("../models/note_entry_model.zig").Create;
+const GetInRange = @import("../models/note_entry_model.zig").GetInRange;
+const Handler = @import("../handler.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;

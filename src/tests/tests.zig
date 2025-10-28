@@ -1,10 +1,3 @@
-const std = @import("std");
-const pg = @import("pg");
-const dotenv = @import("../util/dotenv.zig").dotenv;
-const Database = @import("../db.zig");
-const redis = @import("../util/redis.zig");
-const Handler = @import("../handler.zig");
-
 pub var test_env: TestEnvironment = undefined;
 
 pub const TestEnvironment = struct {
@@ -113,3 +106,10 @@ pub const TestSetup = struct {
         self.user.deinit(allocator);
     }
 };
+
+const std = @import("std");
+const pg = @import("pg");
+const dotenv = @import("../util/dotenv.zig").dotenv;
+const Database = @import("../db.zig");
+const redis = @import("../util/redis.zig");
+const Handler = @import("../handler.zig");

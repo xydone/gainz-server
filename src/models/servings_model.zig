@@ -1,12 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-
 const log = std.log.scoped(.servings_model);
 
 pub const Create = struct {
@@ -92,3 +83,12 @@ pub const Get = struct {
     }
     const query_string = "SELECT * from servings WHERE food_id=$1";
 };
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");

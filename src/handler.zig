@@ -1,16 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-const jwt = @import("jwt");
-const pg = @import("pg");
-const handleResponse = @import("response.zig").handleResponse;
-const ResponseError = @import("response.zig").ResponseError;
-
-const types = @import("types.zig");
-const auth = @import("util/auth.zig");
-const dotenv = @import("util/dotenv.zig").dotenv;
-const redis = @import("util/redis.zig");
-
 allocator: std.mem.Allocator,
 db: *pg.Pool,
 env: dotenv,
@@ -141,3 +128,16 @@ const Logging = struct {
         });
     }
 };
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+const jwt = @import("jwt");
+const pg = @import("pg");
+const handleResponse = @import("response.zig").handleResponse;
+const ResponseError = @import("response.zig").ResponseError;
+
+const types = @import("types.zig");
+const auth = @import("util/auth.zig");
+const dotenv = @import("util/dotenv.zig").dotenv;
+const redis = @import("util/redis.zig");

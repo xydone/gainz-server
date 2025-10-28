@@ -1,8 +1,3 @@
-const std = @import("std");
-
-const types = @import("types.zig");
-const httpz = @import("httpz");
-
 pub const ResponseError = struct {
     code: u16,
     message: []const u8,
@@ -45,3 +40,8 @@ pub fn handleResponse(httpz_res: *httpz.Response, response_error: ResponseError,
     try httpz_res.json(response, .{ .emit_null_optional_fields = false });
     return;
 }
+
+const std = @import("std");
+
+const types = @import("types.zig");
+const httpz = @import("httpz");

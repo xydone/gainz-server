@@ -1,13 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-const redis = @import("../util/redis.zig");
-
 const log = std.log.scoped(.auth_model);
 
 const ACCESS_TOKEN_EXPIRY = 15 * 60;
@@ -289,3 +279,13 @@ test "API Auth | Invalidate" {
         try std.testing.expect(invalidate_response);
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");
+const redis = @import("../util/redis.zig");

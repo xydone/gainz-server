@@ -1,19 +1,4 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../handler.zig");
-const handleResponse = @import("../response.zig").handleResponse;
-const ResponseError = @import("../response.zig").ResponseError;
-
-const types = @import("../types.zig");
-const Auth = @import("../models/auth_model.zig").Auth;
-const Create = @import("../models/auth_model.zig").Create;
-const Refresh = @import("../models/auth_model.zig").Refresh;
-
 const log = std.log.scoped(.auth);
-
-const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .refresh = true };
@@ -183,3 +168,18 @@ test "Endpoint Auth | Refresh" {
         try std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token);
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../handler.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
+const types = @import("../types.zig");
+const Auth = @import("../models/auth_model.zig").Auth;
+const Create = @import("../models/auth_model.zig").Create;
+const Refresh = @import("../models/auth_model.zig").Refresh;

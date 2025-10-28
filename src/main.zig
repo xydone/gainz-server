@@ -1,19 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-const pg = @import("pg");
-
-const db = @import("db.zig");
-const Handler = @import("handler.zig");
-
-const API = @import("routes/api.zig");
-const Cors = @import("middleware/cors.zig");
-
-// UTIL
-const dotenv = @import("util/dotenv.zig").dotenv;
-const redis = @import("util/redis.zig");
-const types = @import("types.zig");
-
 const allocator = std.heap.smp_allocator;
 const log = std.log.scoped(.main);
 const PORT = 3000;
@@ -69,3 +53,18 @@ test "tests:afterAll" {
 
     defer test_env.deinit();
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+const pg = @import("pg");
+
+const db = @import("db.zig");
+const Handler = @import("handler.zig");
+
+const API = @import("routes/api.zig");
+const Cors = @import("middleware/cors.zig");
+
+const dotenv = @import("util/dotenv.zig").dotenv;
+const redis = @import("util/redis.zig");
+const types = @import("types.zig");

@@ -1,16 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Handler = @import("../../handler.zig");
-const handleResponse = @import("../../response.zig").handleResponse;
-const ResponseError = @import("../../response.zig").ResponseError;
-
-const Create = @import("../../models/exercise/unit.zig").Create;
-const GetAll = @import("../../models/exercise/unit.zig").GetAll;
-
-const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     const RouteData = Handler.RouteData{ .restricted = true };
     router.*.post("/api/exercise/unit", createUnit, .{ .data = &RouteData });
@@ -124,3 +111,16 @@ test "Endpoint Exercise Unit | Get All" {
         }
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Handler = @import("../../handler.zig");
+const handleResponse = @import("../../response.zig").handleResponse;
+const ResponseError = @import("../../response.zig").ResponseError;
+
+const Create = @import("../../models/exercise/unit.zig").Create;
+const GetAll = @import("../../models/exercise/unit.zig").GetAll;
+
+const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;

@@ -1,8 +1,5 @@
 //! Fork of https://gist.github.com/karlseguin/c6bea5b35e4e8d26af6f81c22cb5d76b
 
-const std = @import("std");
-const builtin = @import("builtin");
-
 const Allocator = std.mem.Allocator;
 
 const BORDER = "=" ** 80;
@@ -282,3 +279,6 @@ pub const Status = enum {
     skip,
     text,
 };
+
+const std = @import("std");
+const builtin = @import("builtin");

@@ -1,7 +1,3 @@
-const std = @import("std");
-
-const jwt = @import("jwt");
-
 pub const JWTClaims = struct {
     user_id: i32,
     exp: i64,
@@ -70,3 +66,7 @@ pub fn createSessionToken(allocator: std.mem.Allocator) ![]const u8 {
 
     return allocator.dupe(u8, temp);
 }
+
+const std = @import("std");
+
+const jwt = @import("jwt");

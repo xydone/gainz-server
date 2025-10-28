@@ -1,14 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const rs = @import("../response.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.note_entry_model);
 
 pub const Create = struct {
@@ -94,3 +83,14 @@ pub const GetInRange = struct {
 
     const query_string = "SELECT * FROM note_entry WHERE created_by=$1 AND note_id=$2 AND created_at >=$3 AND created_at<$4";
 };
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const rs = @import("../response.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");

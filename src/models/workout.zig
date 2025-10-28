@@ -1,11 +1,4 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
 const log = std.log.scoped(.workout_model);
-const Query = @import("../util/query_builder.zig").Query;
 
 pub const Create = struct {
     pub const Request = struct {
@@ -353,3 +346,10 @@ test "API Workout | Get Exercise List" {
         }
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+const Query = @import("../util/query_builder.zig").Query;

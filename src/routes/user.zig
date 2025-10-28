@@ -1,21 +1,4 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-
-const Create = @import("../models/users_model.zig").Create;
-const Handler = @import("../handler.zig");
-const handleResponse = @import("../response.zig").handleResponse;
-const ResponseError = @import("../response.zig").ResponseError;
-
-const types = @import("../types.zig");
-const Measurement = @import("./measurement.zig");
-const NoteEntries = @import("note_entries.zig");
-const Goals = @import("goals.zig");
-const Entry = @import("entry.zig");
-
 const log = std.log.scoped(.users);
-
-const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     router.*.post("/api/user", createUser, .{});
@@ -88,3 +71,19 @@ test "Endpoint User | Create" {
         try std.testing.expectEqualStrings(body.display_name, response.value.display_name);
     }
 }
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+
+const Create = @import("../models/users_model.zig").Create;
+const Handler = @import("../handler.zig");
+const handleResponse = @import("../response.zig").handleResponse;
+const ResponseError = @import("../response.zig").ResponseError;
+const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
+const types = @import("../types.zig");
+const Measurement = @import("./measurement.zig");
+const NoteEntries = @import("note_entries.zig");
+const Goals = @import("goals.zig");
+const Entry = @import("entry.zig");

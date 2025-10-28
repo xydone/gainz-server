@@ -1,8 +1,3 @@
-const std = @import("std");
-
-const httpz = @import("httpz");
-const pg = @import("pg");
-
 pub const App = struct {
     db: *pg.Pool,
     allocator: std.mem.Allocator,
@@ -81,3 +76,8 @@ pub const Servings = struct {
 pub const MeasurementType = enum { weight, waist, hips, neck, height };
 
 pub const MealCategory = enum { breakfast, lunch, dinner, misc };
+
+const std = @import("std");
+
+const httpz = @import("httpz");
+const pg = @import("pg");

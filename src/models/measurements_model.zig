@@ -1,13 +1,3 @@
-const std = @import("std");
-
-const Pool = @import("../db.zig").Pool;
-const DatabaseErrors = @import("../db.zig").DatabaseErrors;
-const ErrorHandler = @import("../db.zig").ErrorHandler;
-
-const Handler = @import("../handler.zig");
-const auth = @import("../util/auth.zig");
-const types = @import("../types.zig");
-
 const log = std.log.scoped(.measurements_model);
 
 pub const Create = struct {
@@ -613,3 +603,13 @@ test "API Measurement | Get recent" {
         try std.testing.expectEqual(last_weight_measurement.type, measurement.type);
     }
 }
+
+const std = @import("std");
+
+const Pool = @import("../db.zig").Pool;
+const DatabaseErrors = @import("../db.zig").DatabaseErrors;
+const ErrorHandler = @import("../db.zig").ErrorHandler;
+
+const Handler = @import("../handler.zig");
+const auth = @import("../util/auth.zig");
+const types = @import("../types.zig");
