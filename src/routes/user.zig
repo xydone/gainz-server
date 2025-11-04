@@ -24,8 +24,15 @@ pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz
         try handleResponse(res, ResponseError.not_found, null);
         return;
     };
-    const response = Create.call(ctx.app.db, allocator, json) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
+    const response = Create.call(ctx.app.db, allocator, json) catch |err| {
+        switch (err) {
+            Create.Errors.UsernameNotUnique => {
+                try handleResponse(res, ResponseError.unauthorized, "Username already exists");
+            },
+            else => {
+                try handleResponse(res, ResponseError.internal_server_error, null);
+            },
+        }
         return;
     };
     defer response.deinit(allocator);
