@@ -54,6 +54,7 @@ services:
       - "config_file=/etc/postgresql/postgresql.conf"
 
   redis:
+    profiles: [prod]
     image: redis:latest
     container_name: gainz_redis
     restart: always
@@ -62,7 +63,19 @@ services:
     volumes:
       - redis_data:/data
 
+  test_redis:
+    profiles: [test]
+    image: redis:latest
+    container_name: test_gainz_redis
+    restart: always
+    ports:
+      - "6380:6379"
+    volumes:
+      - test_redis_data:/data
+
+
 volumes:
   pgdata:
   test_pgdata:
   redis_data:
+  test_redis_data:
