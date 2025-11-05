@@ -64,7 +64,8 @@ pub const Create = struct {
         const value = std.fmt.allocPrint(props.allocator, "{}", .{user_id}) catch return error.OutOfMemory;
         defer props.allocator.free(value);
 
-        _ = props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY) catch return error.RedisError;
+        const response = props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY) catch return error.RedisError;
+        defer props.allocator.free(response);
 
         return Response{
             .access_token = access_token,
