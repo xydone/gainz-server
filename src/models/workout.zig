@@ -265,8 +265,10 @@ test "API Workout | Add Exercise" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+
+    var category_ids = [_]i32{category.id};
     const exercise = try CreateExercise.call(setup.user.id, test_env.database, .{
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
         .name = "Bench press",
@@ -309,8 +311,9 @@ test "API Workout | Get Exercise List" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const exercise = try CreateExercise.call(setup.user.id, test_env.database, .{
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
         .name = "Bench press",

@@ -108,11 +108,12 @@ test "Endpoint Exercise | Log Entry" {
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
 
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
         .base_amount = 1,
         .base_unit = test_name ++ "'s plates",
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
     };
 
     const exercise = try Create.call(user.id, test_env.database, create_request);
@@ -163,11 +164,12 @@ test "Endpoint Exercise | Edit Entry" {
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
 
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
         .base_amount = 1,
         .base_unit = test_name ++ "'s plates",
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
     };
 
     const exercise = try Create.call(user.id, test_env.database, create_request);
@@ -232,11 +234,12 @@ test "Endpoint Exercise | Delete Entry" {
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
 
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
         .base_amount = 1,
         .base_unit = test_name ++ "'s plates",
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
     };
 
     const exercise = try Create.call(user.id, test_env.database, create_request);
@@ -299,11 +302,13 @@ test "Endpoint Exercise | Get Range" {
     defer create_exercise_web.deinit();
 
     const CreateExercise = @import("../../models/exercise/exercise.zig").Create;
+
+    var category_ids = [_]i32{create_category.id};
     const create_exercise_request = CreateExercise.Request{
         .name = test_name,
         .base_amount = 123,
         .base_unit = test_name ++ "'s unit",
-        .category_id = @intCast(create_category.id),
+        .category_ids = &category_ids,
     };
 
     const create_exercise = try CreateExercise.call(user.id, test_env.database, create_exercise_request);

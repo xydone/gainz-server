@@ -182,10 +182,11 @@ test "Endpoint Workout | Add Exercises" {
     // Create exercise category
     const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
 
+    var category_ids = [_]i32{category.id};
     // Create exercise
     const exercise = try CreateExercise.call(user.id, test_env.database, .{
         .name = test_name ++ "'s exercise",
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     });
@@ -304,10 +305,12 @@ test "Endpoint Workout | Get Exercises List" {
     // Create exercise category
     const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
 
+    var category_ids = [_]i32{category.id};
+
     // Create exercise
     const exercise = try CreateExercise.call(user.id, test_env.database, .{
         .name = test_name ++ "'s exercise",
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     });

@@ -6,7 +6,7 @@ pub const Create = struct {
         description: ?[]const u8 = null,
         base_amount: f64,
         base_unit: []const u8,
-        category_id: u32,
+        category_ids: []i32,
     };
     pub const Response = struct {
         id: i32,
@@ -22,7 +22,7 @@ pub const Create = struct {
         defer conn.release();
 
         var row = conn.row(query_string, //
-            .{ user_id, request.name, request.description, request.base_amount, request.base_unit, request.category_id }) catch |err| {
+            .{ user_id, request.name, request.description, request.base_amount, request.base_unit, request.category_ids }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -47,8 +47,9 @@ pub const Create = struct {
         \\),
         \\inserted_category AS (
         \\INSERT INTO training.exercise_has_category (exercise_id, category_id)
-        \\SELECT id, $6
-        \\FROM inserted_exercise
+        \\SELECT id, c.category_id
+        \\FROM inserted_exercise e 
+        \\CROSS JOIN UNNEST($6::int[]) AS c(category_id)
         \\)
         \\SELECT e.*, u.unit_id
         \\FROM inserted_exercise e, inserted_unit u;
@@ -348,11 +349,12 @@ test "API Exercise | Create" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     // TEST
     {
         const request = Create.Request{
             .name = test_name,
-            .category_id = @intCast(category.id),
+            .category_ids = &category_ids,
             .base_amount = 1,
             .base_unit = "kg",
         };
@@ -375,9 +377,10 @@ test "API Exercise | Log Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
@@ -414,9 +417,10 @@ test "API Exercise | Edit Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
@@ -465,9 +469,10 @@ test "API Exercise | Delete Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
@@ -505,9 +510,10 @@ test "API Exercise | Get Range" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
@@ -589,9 +595,10 @@ test "API Exercise | Get Range Upper Bound" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
@@ -674,9 +681,10 @@ test "API Exercise | Get Range Lower Bound" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
-        .category_id = @intCast(category.id),
+        .category_ids = &category_ids,
         .base_amount = 1,
         .base_unit = "kg",
     };
