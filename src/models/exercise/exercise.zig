@@ -4,16 +4,14 @@ pub const Create = struct {
     pub const Request = struct {
         name: []const u8,
         description: ?[]const u8 = null,
-        base_amount: f64,
-        base_unit: []const u8,
         category_ids: []i32,
+        unit_ids: []i32,
     };
     pub const Response = struct {
         id: i32,
         created_by: i32,
         name: []const u8,
         description: ?[]const u8,
-        base_unit_id: i32,
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
 
@@ -22,7 +20,7 @@ pub const Create = struct {
         defer conn.release();
 
         var row = conn.row(query_string, //
-            .{ user_id, request.name, request.description, request.base_amount, request.base_unit, request.category_ids }) catch |err| {
+            .{ user_id, request.name, request.description, request.unit_ids, request.category_ids }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -40,19 +38,19 @@ pub const Create = struct {
         \\RETURNING id, created_by, name, description
         \\),
         \\inserted_unit AS (
-        \\INSERT INTO training.exercise_unit (created_by, amount, unit, multiplier)
-        \\SELECT $1, $4, $5, 1
-        \\FROM inserted_exercise
-        \\RETURNING id AS unit_id
+        \\INSERT INTO training.exercise_has_unit (exercise_id, unit_id)
+        \\SELECT e.id, u.unit_id
+        \\FROM inserted_exercise e
+        \\CROSS JOIN UNNEST($4::int[]) AS u(unit_id)
         \\),
         \\inserted_category AS (
         \\INSERT INTO training.exercise_has_category (exercise_id, category_id)
-        \\SELECT id, c.category_id
-        \\FROM inserted_exercise e 
-        \\CROSS JOIN UNNEST($6::int[]) AS c(category_id)
+        \\SELECT e.id, c.category_id
+        \\FROM inserted_exercise e
+        \\CROSS JOIN UNNEST($5::int[]) AS c(category_id)
         \\)
-        \\SELECT e.*, u.unit_id
-        \\FROM inserted_exercise e, inserted_unit u;
+        \\SELECT e.*
+        \\FROM inserted_exercise e;
     ;
 };
 
@@ -341,6 +339,7 @@ test "API Exercise | Create" {
     const test_name = "API Exercise | Create";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -349,14 +348,20 @@ test "API Exercise | Create" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     // TEST
     {
         const request = Create.Request{
             .name = test_name,
             .category_ids = &category_ids,
-            .base_amount = 1,
-            .base_unit = "kg",
+            .unit_ids = &unit_ids,
         };
         const response = try Create.call(setup.user.id, test_env.database, request);
 
@@ -369,6 +374,7 @@ test "API Exercise | Log Entry" {
     const test_name = "API Exercise | Log Entry";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -377,12 +383,18 @@ test "API Exercise | Log Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
@@ -390,7 +402,7 @@ test "API Exercise | Log Entry" {
     {
         const request = LogExercise.Request{
             .exercise_id = @intCast(create_response.id),
-            .unit_id = @intCast(create_response.base_unit_id),
+            .unit_id = @intCast(unit.id),
             .value = 15,
         };
         const response = try LogExercise.call(setup.user.id, test_env.database, request);
@@ -417,18 +429,24 @@ test "API Exercise | Edit Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
     const log_request = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 15,
     };
     const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
@@ -461,6 +479,7 @@ test "API Exercise | Delete Entry" {
     const test_name = "API Exercise | Delete Entry";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -469,18 +488,24 @@ test "API Exercise | Delete Entry" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
     const log_request = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 15,
     };
     const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
@@ -502,6 +527,7 @@ test "API Exercise | Get Range" {
     const test_name = "API Exercise | Get Range";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -510,24 +536,30 @@ test "API Exercise | Get Range" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
     const log_request_1 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 15,
     };
 
     const log_request_2 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 8,
     };
     const log_response_1 = try LogExercise.call(setup.user.id, test_env.database, log_request_1);
@@ -587,6 +619,7 @@ test "API Exercise | Get Range Upper Bound" {
     const test_name = "API Exercise | Get Range Upper Bound";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -595,24 +628,30 @@ test "API Exercise | Get Range Upper Bound" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
     const log_request_1 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 15,
     };
 
     const log_request_2 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 8,
     };
     const log_response_1 = try LogExercise.call(setup.user.id, test_env.database, log_request_1);
@@ -623,7 +662,6 @@ test "API Exercise | Get Range Upper Bound" {
     // setup dates
     const now = try zdt.Datetime.now(null);
     const now_day = try now.floorTo(.day);
-
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = now_day;
 
@@ -673,6 +711,7 @@ test "API Exercise | Get Range Lower Bound" {
     const test_name = "API Exercise | Get Range Lower Bound";
     //SETUP
     const CreateCategory = @import("category.zig").Create;
+    const CreateUnit = @import("unit.zig").Create;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
     const allocator = std.testing.allocator;
@@ -681,24 +720,30 @@ test "API Exercise | Get Range Lower Bound" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name,
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     };
     const create_response = try Create.call(setup.user.id, test_env.database, create_request);
 
     const log_request_1 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 15,
     };
 
     const log_request_2 = LogExercise.Request{
         .exercise_id = @intCast(create_response.id),
-        .unit_id = @intCast(create_response.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 8,
     };
     const log_response_1 = try LogExercise.call(setup.user.id, test_env.database, log_request_1);

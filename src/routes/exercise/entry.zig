@@ -98,6 +98,7 @@ test "Endpoint Exercise | Log Entry" {
     const ht = @import("httpz").testing;
     const Create = @import("../../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
+    const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -107,12 +108,17 @@ test "Endpoint Exercise | Log Entry" {
     const category_request = CreateCategory.Request{ .name = "Chest" };
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
 
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
-        .base_amount = 1,
-        .base_unit = test_name ++ "'s plates",
+        .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
@@ -120,7 +126,7 @@ test "Endpoint Exercise | Log Entry" {
 
     const body = LogExercise.Request{
         .exercise_id = @intCast(exercise.id),
-        .unit_id = @intCast(exercise.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 123,
     };
     const body_string = try jsonStringify(allocator, body);
@@ -142,7 +148,7 @@ test "Endpoint Exercise | Log Entry" {
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
-        try std.testing.expectEqual(exercise.base_unit_id, response.value.unit_id);
+        try std.testing.expectEqual(unit.id, response.value.unit_id);
         try std.testing.expectEqual(exercise.id, response.value.exercise_id);
         try std.testing.expectEqual(body.value, response.value.value);
     }
@@ -153,6 +159,7 @@ test "Endpoint Exercise | Edit Entry" {
     const test_name = "Endpoint Exercise | Edit Entry";
     const ht = @import("httpz").testing;
     const Create = @import("../../models/exercise/exercise.zig").Create;
+    const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
@@ -164,11 +171,17 @@ test "Endpoint Exercise | Edit Entry" {
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
 
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
-        .base_amount = 1,
-        .base_unit = test_name ++ "'s plates",
+        .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
@@ -176,7 +189,7 @@ test "Endpoint Exercise | Edit Entry" {
 
     const log_request = LogExercise.Request{
         .exercise_id = @intCast(exercise.id),
-        .unit_id = @intCast(exercise.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 123,
     };
     const log_response = try LogExercise.call(user.id, test_env.database, log_request);
@@ -209,7 +222,7 @@ test "Endpoint Exercise | Edit Entry" {
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
-        try std.testing.expectEqual(exercise.base_unit_id, response.value.unit_id);
+        try std.testing.expectEqual(unit.id, response.value.unit_id);
         try std.testing.expectEqual(exercise.id, response.value.exercise_id);
         try std.testing.expectEqual(body.value, response.value.value);
         if (response.value.notes) |notes| {
@@ -224,6 +237,7 @@ test "Endpoint Exercise | Delete Entry" {
     const ht = @import("httpz").testing;
     const Create = @import("../../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
+    const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -234,11 +248,17 @@ test "Endpoint Exercise | Delete Entry" {
 
     const category = try CreateCategory.call(user.id, test_env.database, category_request);
 
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const create_request = Create.Request{
         .name = test_name ++ " exercise",
-        .base_amount = 1,
-        .base_unit = test_name ++ "'s plates",
+        .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
@@ -246,7 +266,7 @@ test "Endpoint Exercise | Delete Entry" {
 
     const log_request = LogExercise.Request{
         .exercise_id = @intCast(exercise.id),
-        .unit_id = @intCast(exercise.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 123,
     };
 
@@ -271,7 +291,7 @@ test "Endpoint Exercise | Delete Entry" {
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
-        try std.testing.expectEqual(exercise.base_unit_id, response.value.unit_id);
+        try std.testing.expectEqual(unit.id, response.value.unit_id);
         try std.testing.expectEqual(exercise.id, response.value.exercise_id);
         try std.testing.expectEqual(log_request.value, response.value.value);
     }
@@ -284,6 +304,7 @@ test "Endpoint Exercise | Get Range" {
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
+    const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     var user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
@@ -297,6 +318,13 @@ test "Endpoint Exercise | Get Range" {
     };
     const create_category = try CreateCategory.call(user.id, test_env.database, create_category_request);
 
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     // create exercise
     var create_exercise_web = ht.init(.{});
     defer create_exercise_web.deinit();
@@ -306,8 +334,7 @@ test "Endpoint Exercise | Get Range" {
     var category_ids = [_]i32{create_category.id};
     const create_exercise_request = CreateExercise.Request{
         .name = test_name,
-        .base_amount = 123,
-        .base_unit = test_name ++ "'s unit",
+        .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
@@ -337,7 +364,7 @@ test "Endpoint Exercise | Get Range" {
     // log exercise
     const log_exercise = try LogExercise.call(user.id, test_env.database, .{
         .exercise_id = @intCast(create_exercise.id),
-        .unit_id = @intCast(create_exercise.base_unit_id),
+        .unit_id = @intCast(unit.id),
         .value = 123,
     });
 

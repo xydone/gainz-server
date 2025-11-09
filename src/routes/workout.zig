@@ -170,6 +170,7 @@ test "Endpoint Workout | Add Exercises" {
     const ht = @import("httpz").testing;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
+    const CreateUnit = @import("../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -178,7 +179,13 @@ test "Endpoint Workout | Add Exercises" {
 
     // Create workout
     const workout = try Create.call(user.id, test_env.database, .{ .name = test_name });
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
 
+    var unit_ids = [_]i32{unit.id};
     // Create exercise category
     const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
 
@@ -187,8 +194,7 @@ test "Endpoint Workout | Add Exercises" {
     const exercise = try CreateExercise.call(user.id, test_env.database, .{
         .name = test_name ++ "'s exercise",
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     });
 
     const body = [_]AddExercise.Request{
@@ -293,6 +299,7 @@ test "Endpoint Workout | Get Exercises List" {
     const ht = @import("httpz").testing;
     const CreateExercise = @import("../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../models/exercise/category.zig").Create;
+    const CreateUnit = @import("../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
@@ -301,7 +308,13 @@ test "Endpoint Workout | Get Exercises List" {
 
     // Create workout
     const workout = try Create.call(user.id, test_env.database, .{ .name = test_name });
+    const unit = try CreateUnit.call(user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
 
+    var unit_ids = [_]i32{unit.id};
     // Create exercise category
     const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
 
@@ -311,8 +324,7 @@ test "Endpoint Workout | Get Exercises List" {
     const exercise = try CreateExercise.call(user.id, test_env.database, .{
         .name = test_name ++ "'s exercise",
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
     });
 
     const body = [_]AddExercise.Request{

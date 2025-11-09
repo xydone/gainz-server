@@ -560,6 +560,19 @@ CREATE TABLE training.exercise_has_category (
 ALTER TABLE training.exercise_has_category OWNER TO postgres;
 
 --
+-- Name: exercise_has_category; Type: TABLE; Schema: training; Owner: postgres
+--
+
+CREATE TABLE training.exercise_has_unit (
+    exercise_id integer NOT NULL,
+    unit_id integer NOT NULL
+);
+
+
+ALTER TABLE training.exercise_has_unit OWNER TO postgres;
+
+
+--
 -- Name: exercise_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
 --
 
@@ -910,6 +923,9 @@ ALTER TABLE ONLY training.exercise_entry
 ALTER TABLE ONLY training.exercise_has_category
     ADD CONSTRAINT exercise_has_category_pkey PRIMARY KEY (exercise_id, category_id);
 
+ALTER TABLE ONLY training.exercise_has_unit
+    ADD CONSTRAINT exercise_has_unit_pkey PRIMARY KEY (exercise_id, unit_id);
+
 
 --
 -- Name: exercise exercise_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
@@ -1103,6 +1119,12 @@ ALTER TABLE ONLY training.exercise_has_category
 
 ALTER TABLE ONLY training.exercise_has_category
     ADD CONSTRAINT exercise_has_category_relation_2 FOREIGN KEY (category_id) REFERENCES training.exercise_category(id);
+
+ALTER TABLE ONLY training.exercise_has_unit
+    ADD CONSTRAINT exercise_has_unit_relation_1 FOREIGN KEY (exercise_id) REFERENCES training.exercise(id);
+
+ALTER TABLE ONLY training.exercise_has_unit
+    ADD CONSTRAINT exercise_has_unit_relation_2 FOREIGN KEY (unit_id) REFERENCES training.exercise_unit(id);
 
 
 --

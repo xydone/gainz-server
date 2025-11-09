@@ -256,6 +256,7 @@ test "API Workout | Add Exercise" {
     //SETUP
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
+    const CreateUnit = @import("exercise/unit.zig").Create;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -265,12 +266,17 @@ test "API Workout | Add Exercise" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
 
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const exercise = try CreateExercise.call(setup.user.id, test_env.database, .{
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
         .name = "Bench press",
     });
     var request = [_]AddExercise.Request{
@@ -302,6 +308,7 @@ test "API Workout | Get Exercise List" {
     //SETUP
     const CreateExercise = @import("exercise/exercise.zig").Create;
     const CreateCategory = @import("exercise/category.zig").Create;
+    const CreateUnit = @import("exercise/unit.zig").Create;
     const allocator = std.testing.allocator;
     const test_env = Tests.test_env;
     var setup = try TestSetup.init(test_env.database, test_name);
@@ -311,11 +318,17 @@ test "API Workout | Get Exercise List" {
     const category = try CreateCategory.call(setup.user.id, test_env.database, .{
         .name = "Chest",
     });
+    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+        .amount = 1,
+        .unit = "kg",
+        .multiplier = 1,
+    });
+
+    var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
     const exercise = try CreateExercise.call(setup.user.id, test_env.database, .{
         .category_ids = &category_ids,
-        .base_amount = 1,
-        .base_unit = "kg",
+        .unit_ids = &unit_ids,
         .name = "Bench press",
     });
     var add_exercise_request = [_]AddExercise.Request{
