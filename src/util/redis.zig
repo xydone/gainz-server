@@ -32,8 +32,8 @@ pub const RedisClient = struct {
 
         var slice: [1024]u8 = undefined;
         var slices = [_][]u8{&slice};
-        // const read_bytes = try reader.readSliceShort(&buf);
         const read_bytes = try reader.readVec(&slices);
+
         return self.allocator.dupe(u8, try trimResponse(slice[0..read_bytes])) catch @panic("OOM");
     }
 
@@ -53,14 +53,15 @@ pub const RedisClient = struct {
     }
 
     /// Caller must free slice.
-    pub fn get(self: *RedisClient, key: []const u8) ![]const u8 {
+    pub fn get(self: *RedisClient, key: []const u8) ![]u8 {
         var buf: [1024]u8 = undefined;
         const command = try std.fmt.bufPrint(&buf, "*2\r\n$3\r\nGET\r\n${d}\r\n{s}\r\n", .{ key.len, key });
         const response = try self.sendCommand(command);
+        defer self.allocator.free(response);
         var it = std.mem.tokenizeSequence(u8, response, "\r\n");
         const length = it.next().?;
         if (std.mem.eql(u8, length, "$-1")) return error.KeyValuePairNotFound;
-        return it.next() orelse return error.RedisError;
+        return self.allocator.dupe(u8, it.next() orelse return error.RedisError);
     }
     /// Caller must free slice.
     pub fn delete(self: *RedisClient, key: []const u8) ![]u8 {

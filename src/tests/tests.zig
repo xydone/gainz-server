@@ -15,7 +15,7 @@ pub const TestEnvironment = struct {
         const database = Database.init(alloc, env) catch return InitErrors.CouldntInitializeDB;
 
         const redis_port = std.fmt.parseInt(u16, env.get("REDIS_PORT") orelse return InitErrors.CouldntInitializeRedis, 10) catch return InitErrors.CouldntInitializeRedis;
-        const redis_client = redis.RedisClient.init(alloc, "127.0.0.1", redis_port) catch return InitErrors.CouldntInitializeRedis;
+        const redis_client = redis.RedisClient.init(std.testing.allocator, "127.0.0.1", redis_port) catch return InitErrors.CouldntInitializeRedis;
 
         test_env = TestEnvironment{ .database = database, .env = env, .redis_client = redis_client };
 

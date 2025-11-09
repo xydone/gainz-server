@@ -100,6 +100,7 @@ pub const Refresh = struct {
             error.KeyValuePairNotFound => return error.UserNotFound,
             else => return error.RedisError,
         };
+        defer props.allocator.free(result);
         const number = std.fmt.parseInt(i32, result, 10) catch return error.ParseError;
         const claims = auth.JWTClaims{ .user_id = number, .exp = generateAccessTokenExpiry() };
 
@@ -131,6 +132,7 @@ pub const Auth = struct {
 
     pub fn invalidate(props: InvalidateProps) anyerror!bool {
         const response = try props.redis_client.delete(props.refresh_token);
+        defer props.redis_client.allocator.free(response);
         return if (std.mem.eql(u8, response, ":0")) false else true;
     }
 
