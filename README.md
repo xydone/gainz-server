@@ -2,6 +2,9 @@
 
 Gainz is an unopinionated diet and exercise management platform.
 
+> [!IMPORTANT]
+> Gainz is currently pre 1.0. The API is not stable and changes may be made at any time. 
+
 # Features
 
 - Calorie and macronutrient tracking.
