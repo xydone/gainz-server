@@ -40,6 +40,9 @@ pub const Create = struct {
 };
 
 pub const Get = struct {
+    pub const Request = struct {
+        measurement_id: u32,
+    };
     pub const Response = struct {
         id: i32,
         created_at: i64,
@@ -51,11 +54,11 @@ pub const Get = struct {
         NotFound,
         CannotParseResult,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, measurement_id: u32) Errors!Response {
+    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var row = conn.row(query_string, //
-            .{ user_id, measurement_id }) catch |err| {
+            .{ user_id, request.measurement_id }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -70,6 +73,9 @@ pub const Get = struct {
 };
 
 pub const GetRecent = struct {
+    pub const Request = struct {
+        measurement_type: types.MeasurementType,
+    };
     pub const Response = struct {
         id: i32,
         created_at: i64,
@@ -81,11 +87,11 @@ pub const GetRecent = struct {
         NotFound,
         CannotParseResult,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, measurement_type: types.MeasurementType) Errors!Response {
+    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var row = conn.row(query_string, //
-            .{ user_id, measurement_type }) catch |err| {
+            .{ user_id, request.measurement_type }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -105,6 +111,7 @@ pub const GetInRange = struct {
         range_start: []const u8,
         /// datetime string (ex: 2024-01-01)
         range_end: []const u8,
+        measurement_type: types.MeasurementType,
     };
     pub const Response = struct {
         id: i32,
@@ -118,11 +125,11 @@ pub const GetInRange = struct {
         CannotParseResult,
         OutOfMemory,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, allocator: std.mem.Allocator, database: *Pool, measurement_type: types.MeasurementType, request: Request) Errors![]Response {
+    pub fn call(user_id: i32, allocator: std.mem.Allocator, database: *Pool, request: Request) Errors![]Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var result = conn.query(query_string, //
-            .{ user_id, request.range_start, request.range_end, measurement_type }) catch |err| {
+            .{ user_id, request.range_start, request.range_end, request.measurement_type }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -286,6 +293,7 @@ test "API Measurement | Get in range (lower bound)" {
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
         .range_end = "2025-01-04",
+        .measurement_type = types.MeasurementType.neck,
     };
 
     // Only one measurement is expected to be in the range, as the others that follow
@@ -298,7 +306,6 @@ test "API Measurement | Get in range (lower bound)" {
             setup.user.id,
             allocator,
             test_env.database,
-            types.MeasurementType.neck,
             get_range_request,
         );
         defer allocator.free(measurements);
@@ -343,6 +350,7 @@ test "API Measurement | Get in range (upper bound)" {
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
         .range_end = "2025-01-02",
+        .measurement_type = types.MeasurementType.neck,
     };
     // Only one measurement is expected to be in the range, as the others that follow
     // range_start <= date of insertion <= range_end
@@ -351,7 +359,7 @@ test "API Measurement | Get in range (upper bound)" {
 
     // TEST
     {
-        const measurements = try GetInRange.call(setup.user.id, allocator, test_env.database, types.MeasurementType.neck, get_range_request);
+        const measurements = try GetInRange.call(setup.user.id, allocator, test_env.database, get_range_request);
         defer allocator.free(measurements);
 
         try std.testing.expectEqual(in_range_measurements.len, measurements.len);
@@ -394,6 +402,7 @@ test "API Measurement | Get in range (overlap)" {
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
         .range_end = "2025-01-02",
+        .measurement_type = types.MeasurementType.weight,
     };
     // Only one measurement is expected to be in the range, as the others that follow
     // range_start <= date of insertion <= range_end
@@ -406,7 +415,6 @@ test "API Measurement | Get in range (overlap)" {
             setup.user.id,
             allocator,
             test_env.database,
-            types.MeasurementType.weight,
             get_range_request,
         );
         defer allocator.free(measurements);
@@ -451,6 +459,7 @@ test "API Measurement | Get in range (multiple)" {
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
         .range_end = "2025-01-04",
+        .measurement_type = types.MeasurementType.weight,
     };
     const in_range_measurements = [_]Create.Response{ measurement_1, measurement_2, measurement_3, measurement_4 };
     // TEST
@@ -459,7 +468,6 @@ test "API Measurement | Get in range (multiple)" {
             setup.user.id,
             allocator,
             test_env.database,
-            types.MeasurementType.weight,
             get_range_request,
         );
         defer allocator.free(measurements);
@@ -504,6 +512,7 @@ test "API Measurement | Get in range (empty)" {
     const get_range_request = GetInRange.Request{
         .range_start = "2099-01-01",
         .range_end = "2099-01-01",
+        .measurement_type = types.MeasurementType.neck,
     };
     // TEST
 
@@ -511,7 +520,6 @@ test "API Measurement | Get in range (empty)" {
         setup.user.id,
         allocator,
         test_env.database,
-        types.MeasurementType.neck,
         get_range_request,
     )) |*measurement_list| {
         const list = @constCast(measurement_list);
@@ -553,7 +561,7 @@ test "API Measurement | Get by ID" {
 
     // TEST
     {
-        const measurement = try Get.call(setup.user.id, test_env.database, @intCast(measurement_1.id));
+        const measurement = try Get.call(setup.user.id, test_env.database, .{ .measurement_id = @intCast(measurement_1.id) });
         try std.testing.expectEqual(measurement_1.id, measurement.id);
         try std.testing.expectEqual(measurement_1.value, measurement.value);
         try std.testing.expectEqual(measurement_1.type, measurement.type);
@@ -595,7 +603,7 @@ test "API Measurement | Get recent" {
         const measurement = try GetRecent.call(
             setup.user.id,
             test_env.database,
-            .weight,
+            .{ .measurement_type = .weight },
         );
 
         try std.testing.expectEqual(last_weight_measurement.id, measurement.id);

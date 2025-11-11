@@ -1,62 +1,86 @@
 const log = std.log.scoped(.goals);
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .restricted = true };
-    router.*.post("/api/user/goals", createGoal, .{ .data = &RouteData });
-    router.*.get("/api/user/goals", getAllGoals, .{ .data = &RouteData });
-    router.*.get("/api/user/goals/active", getActiveGoals, .{ .data = &RouteData });
+    Create.init(router);
+    GetActive.init(router);
+    GetAll.init(router);
+    // router.*.post("/api/user/goals", createGoal, .{ .data = &RouteData });
+    // router.*.get("/api/user/goals", GetAll.call, .{ .data = &RouteData });
+    // router.*.get("/api/user/goals/active", GetActive.call, .{ .data = &RouteData });
 }
 
-pub fn createGoal(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
-    };
-    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.bad_request, null);
-        return;
-    };
-    const goal = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
+const Create = Endpoint(struct {
+    const Body = CreateModel.Request;
 
-    try res.json(goal, .{});
-}
-
-pub fn getActiveGoals(ctx: *Handler.RequestContext, _: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const response = GetActive.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
-        error.NoGoals => {
-            try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
-            return;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
         },
-        else => {
+        .Response = CreateModel.Response,
+        .method = .POST,
+        .path = "/api/user/goals",
+        .route_data = .{ .restricted = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const goal = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
             try handleResponse(res, ResponseError.internal_server_error, null);
             return;
-        },
+        };
+        res.status = 200;
+
+        try res.json(goal, .{});
+    }
+});
+
+const GetActive = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = GetActiveModel.Response,
+        .method = .GET,
+        .path = "/api/user/goals/active",
+        .route_data = .{ .restricted = true },
     };
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const response = GetActiveModel.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
+            error.NoGoals => {
+                try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
+                return;
+            },
+            else => {
+                try handleResponse(res, ResponseError.internal_server_error, null);
+                return;
+            },
+        };
 
-    res.status = 200;
-    return res.json(response, .{});
-}
-
-pub fn getAllGoals(ctx: *Handler.RequestContext, _: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const response = GetAll.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
-        error.NoGoals => {
-            try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
-            return;
-        },
-        else => {
-            try handleResponse(res, ResponseError.internal_server_error, null);
-            return;
-        },
+        res.status = 200;
+        return res.json(response, .{});
+    }
+});
+const GetAll = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = GetAllModel.Response,
+        .method = .GET,
+        .path = "/api/user/goals",
+        .route_data = .{ .restricted = true },
     };
-    defer ctx.app.allocator.free(response);
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const response = GetAllModel.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
+            error.NoGoals => {
+                try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
+                return;
+            },
+            else => {
+                try handleResponse(res, ResponseError.internal_server_error, null);
+                return;
+            },
+        };
+        defer ctx.app.allocator.free(response);
 
-    res.status = 200;
-    return res.json(response, .{});
-}
+        res.status = 200;
+        return res.json(response, .{});
+    }
+});
 
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
@@ -72,7 +96,7 @@ test "Endpoint Goals | Create" {
     var user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
-    const body = Create.Request{
+    const body = CreateModel.Request{
         .target = .weight,
         .value = 123.45,
     };
@@ -89,10 +113,10 @@ test "Endpoint Goals | Create" {
 
         web_test.body(body_string);
 
-        try createGoal(&context, web_test.req, web_test.res);
+        try Create.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response: std.json.Parsed(Create.Response) = try std.json.parseFromSlice(Create.Response, allocator, response_body, .{});
+        const response: std.json.Parsed(CreateModel.Response) = try std.json.parseFromSlice(CreateModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(response.value.target, body.target);
@@ -111,7 +135,7 @@ test "Endpoint Goals | Get Active" {
     var user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
-    const create_goal = Create.Request{
+    const create_goal = CreateModel.Request{
         .target = .weight,
         .value = 123.45,
     };
@@ -122,7 +146,7 @@ test "Endpoint Goals | Get Active" {
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
 
-    _ = try Create.call(user.id, context.app.db, create_goal);
+    _ = try CreateModel.call(user.id, context.app.db, create_goal);
     // TEST
     {
         var web_test = ht.init(.{});
@@ -130,10 +154,10 @@ test "Endpoint Goals | Get Active" {
 
         web_test.body(body_string);
 
-        try getActiveGoals(&context, web_test.req, web_test.res);
+        try GetActive.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response: std.json.Parsed(GetActive.Response) = try std.json.parseFromSlice(GetActive.Response, allocator, response_body, .{});
+        const response: std.json.Parsed(GetActiveModel.Response) = try std.json.parseFromSlice(GetActiveModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(response.value.weight, create_goal.value);
@@ -151,12 +175,12 @@ test "Endpoint Goals | Get All" {
     var user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
-    const create_goal = Create.Request{
+    const create_goal = CreateModel.Request{
         .target = .weight,
         .value = 123.45,
     };
 
-    const created_goals = [_]Create.Request{create_goal};
+    const created_goals = [_]CreateModel.Request{create_goal};
 
     const body_string = try jsonStringify(allocator, create_goal);
     defer allocator.free(body_string);
@@ -164,7 +188,7 @@ test "Endpoint Goals | Get All" {
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
 
-    _ = try Create.call(user.id, context.app.db, create_goal);
+    _ = try CreateModel.call(user.id, context.app.db, create_goal);
     // TEST
     {
         var web_test = ht.init(.{});
@@ -172,10 +196,10 @@ test "Endpoint Goals | Get All" {
 
         web_test.body(body_string);
 
-        try getAllGoals(&context, web_test.req, web_test.res);
+        try GetAll.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const list: std.json.Parsed([]GetAll.Response) = try std.json.parseFromSlice([]GetAll.Response, allocator, response_body, .{});
+        const list: std.json.Parsed([]GetAllModel.Response) = try std.json.parseFromSlice([]GetAllModel.Response, allocator, response_body, .{});
         defer list.deinit();
 
         try std.testing.expectEqual(list.value.len, created_goals.len);
@@ -196,6 +220,10 @@ const ResponseError = @import("../response.zig").ResponseError;
 const handleResponse = @import("../response.zig").handleResponse;
 
 const types = @import("../types.zig");
-const Create = @import("../models/goals_model.zig").Create;
-const GetActive = @import("../models/goals_model.zig").GetActive;
-const GetAll = @import("../models/goals_model.zig").GetAll;
+const CreateModel = @import("../models/goals_model.zig").Create;
+const GetActiveModel = @import("../models/goals_model.zig").GetActive;
+const GetAllModel = @import("../models/goals_model.zig").GetAll;
+
+const Endpoint = @import("../handler.zig").Endpoint;
+const EndpointRequest = @import("../handler.zig").EndpointRequest;
+const EndpointData = @import("../handler.zig").EndpointData;

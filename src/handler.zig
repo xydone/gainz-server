@@ -2,6 +2,7 @@ allocator: std.mem.Allocator,
 db: *pg.Pool,
 env: dotenv,
 redis_client: *redis.RedisClient,
+
 const Handler = @This();
 const log = std.log.scoped(.handler);
 
@@ -87,6 +88,138 @@ fn verifyToken(req: *httpz.Request, res: *httpz.Response, ctx: *RequestContext) 
             ctx.refresh_token = json.refresh_token;
         }
     }
+}
+
+pub const Router = httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void);
+
+pub const EndpointRequestType = struct {
+    Body: type = void,
+    Params: type = void,
+    Query: type = void,
+};
+
+pub fn EndpointRequest(comptime Body: type, comptime Params: type, comptime Query: type) type {
+    return struct {
+        body: Body,
+        params: Params,
+        query: Query,
+    };
+}
+
+pub const EndpointData = struct {
+    Request: EndpointRequestType,
+    Response: type,
+    path: []const u8,
+    method: httpz.Method,
+    route_data: RouteData,
+    config: RouteData = .{},
+};
+
+pub fn Endpoint(
+    comptime T: type,
+) type {
+    return struct {
+        pub const endpoint_data: EndpointData = T.endpoint_data;
+        const callImpl: *const fn (*Handler.RequestContext, T.Request, *httpz.response.Response) anyerror!void = T.call;
+
+        pub fn init(router: *Router) void {
+            const path = T.endpoint_data.path;
+            const route_data = T.endpoint_data.route_data;
+            switch (T.endpoint_data.method) {
+                .GET => {
+                    router.*.get(path, call, .{ .data = &route_data });
+                },
+                .POST => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .PATCH => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .PUT => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .OPTIONS => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .CONNECT => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .DELETE => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                .HEAD => {
+                    router.*.post(path, call, .{ .data = &route_data });
+                },
+                // NOTE: http.zig supports non-standard http methods. For now, creating routes with a non-standard method is not supported.
+                .OTHER => {
+                    @compileError("Method OTHER is not supported!");
+                },
+            }
+        }
+
+        pub fn call(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) !void {
+            const allocator = res.arena;
+            // TODO: Make this handle missing data!!!
+            const request: EndpointRequest(T.endpoint_data.Request.Body, T.endpoint_data.Request.Params, T.endpoint_data.Request.Query) = .{
+                .body = blk: {
+                    switch (@typeInfo(T.endpoint_data.Request.Body)) {
+                        .void => break :blk {},
+                        else => {
+                            const body = req.body() orelse {
+                                try handleResponse(res, ResponseError.body_missing, null);
+                                return;
+                            };
+                            break :blk std.json.parseFromSliceLeaky(T.endpoint_data.Request.Body, allocator, body, .{}) catch {
+                                try handleResponse(res, ResponseError.not_found, null);
+                                return;
+                            };
+                        },
+                    }
+                },
+
+                .params = blk: {
+                    switch (@typeInfo(T.endpoint_data.Request.Params)) {
+                        .void => {},
+                        else => |type_info| {
+                            var params: T.endpoint_data.Request.Params = undefined;
+                            inline for (type_info.@"struct".fields) |field| {
+                                switch (field.type) {
+                                    u16, u32, u64 => |t| @field(params, field.name) = try std.fmt.parseInt(t, req.param(field.name).?, 10),
+                                    f16, f32, f64 => |t| @field(params, field.name) = try std.fmt.parseFloat(t, req.param(field.name).?),
+                                    []const u8, []u8 => @field(params, field.name) = req.param(field.name).?,
+                                    else => |t| @compileError(std.fmt.comptimePrint("{} not supported!", .{t})),
+                                }
+                            }
+                            break :blk params;
+                        },
+                    }
+                },
+
+                .query = blk: {
+                    switch (@typeInfo(T.endpoint_data.Request.Query)) {
+                        .void => {},
+                        else => |type_info| {
+                            var query: T.endpoint_data.Request.Query = undefined;
+                            inline for (type_info.@"struct".fields) |field| {
+                                var q = try req.query();
+                                switch (field.type) {
+                                    u16, u32, u64 => |t| @field(query, field.name) = try std.fmt.parseInt(t, q.get(field.name).?, 10),
+                                    f16, f32, f64 => |t| @field(query, field.name) = try std.fmt.parseFloat(t, q.get(field.name).?),
+                                    []const u8, []u8 => @field(query, field.name) = q.get(field.name) orelse std.debug.panic("{s} wasn't found", .{field.name}),
+                                    types.MeasurementType => @field(query, field.name) = std.meta.stringToEnum(types.MeasurementType, q.get(field.name).?) orelse std.debug.panic("{s} wasn't found in MeasurementType", .{field.name}),
+                                    else => |t| @compileError(std.fmt.comptimePrint("{} not supported!", .{t})),
+                                }
+                            }
+
+                            break :blk query;
+                        },
+                    }
+                },
+            };
+
+            try T.call(ctx, request, res);
+        }
+    };
 }
 
 const zdt = @import("zdt");

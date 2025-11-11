@@ -1,16 +1,18 @@
+const endpoint_list: []Handler.Endpoint = &.{ User.endpoint_list, Food.endpoint_list };
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     // /api/user
-    User(router);
+    User.init(router);
     // /api/food
-    Food(router);
+    Food.init(router);
     // /api/auth
-    Auth(router);
+    Auth.init(router);
     // /api/note
-    Note(router);
+    Note.init(router);
     // /api/exercise
-    Exercise(router);
+    Exercise.init(router);
     // /api/exercise
-    Workout(router);
+    Workout.init(router);
 }
 
 const std = @import("std");
@@ -20,10 +22,10 @@ const httpz = @import("httpz");
 const Handler = @import("../handler.zig");
 
 // ROUTES
-const Auth = @import("auth.zig").init;
-const Entry = @import("entry.zig").init;
-const Food = @import("food.zig").init;
-const User = @import("user.zig").init;
-const Note = @import("note.zig").init;
-const Workout = @import("workout.zig").init;
-const Exercise = @import("exercise/routes.zig").init;
+const Auth = @import("auth.zig");
+const Entry = @import("entry.zig");
+const Food = @import("food.zig");
+const User = @import("user.zig");
+const Note = @import("note.zig");
+const Workout = @import("workout.zig");
+const Exercise = @import("exercise/routes.zig");

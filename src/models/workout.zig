@@ -77,9 +77,12 @@ pub const Get = struct {
     ;
 };
 
+// NOTE: Reason for AddExercise not following the standard way of implementing the request structure.
+// The reason behind the decision is due to the fact we accept a list of mulitple exercises for the same workout ID.
+// This would either require data duplication or unneccesary expensive loop operations per call inside the HTTP client.
 pub const AddExercise = struct {
     pub const Request = struct {
-        exercise_id: i32,
+        exercise_id: u32,
         notes: []const u8,
         sets: i32,
         reps: i32,
@@ -100,7 +103,7 @@ pub const AddExercise = struct {
     } || DatabaseErrors;
 
     /// Caller must free slice
-    pub fn call(allocator: std.mem.Allocator, workout_id: i32, database: *Pool, request: []Request) Errors![]Response {
+    pub fn call(allocator: std.mem.Allocator, database: *Pool, workout_id: u32, request: []Request) Errors![]Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         const error_handler = ErrorHandler{ .conn = conn };
@@ -153,6 +156,9 @@ pub const AddExercise = struct {
 };
 
 pub const GetExerciseList = struct {
+    pub const Request = struct {
+        workout_id: u32,
+    };
     pub const Response = struct {
         workout_id: i32,
         workout_name: []const u8,
@@ -166,12 +172,12 @@ pub const GetExerciseList = struct {
         CannotParseResult,
         OutOfMemory,
     } || DatabaseErrors;
-    pub fn call(allocator: std.mem.Allocator, workout_id: i32, database: *Pool) Errors![]Response {
+    pub fn call(allocator: std.mem.Allocator, request: Request, database: *Pool) Errors![]Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         const error_handler = ErrorHandler{ .conn = conn };
 
-        var query = conn.query(query_string, .{workout_id}) catch |err| {
+        var query = conn.query(query_string, .{request.workout_id}) catch |err| {
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
             return error.CannotGet;
@@ -290,11 +296,11 @@ test "API Workout | Add Exercise" {
 
     // TEST
     {
-        const response = try AddExercise.call(allocator, workout.id, test_env.database, &request);
+        const response = try AddExercise.call(allocator, test_env.database, @intCast(workout.id), &request);
         defer allocator.free(response);
 
         for (request, response) |req, res| {
-            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
+            try std.testing.expectEqual(req.exercise_id, @as(u32, @intCast(res.exercise_id)));
             try std.testing.expectEqual(workout.id, res.workout_id);
             try std.testing.expectEqual(req.reps, res.reps);
             try std.testing.expectEqual(req.sets, res.sets);
@@ -345,16 +351,18 @@ test "API Workout | Get Exercise List" {
             .reps = 15,
         },
     };
-    const add_exercise_response = try AddExercise.call(allocator, workout.id, test_env.database, &add_exercise_request);
+
+    const add_exercise_response = try AddExercise.call(allocator, test_env.database, @intCast(workout.id), &add_exercise_request);
     defer allocator.free(add_exercise_response);
 
     // TEST
     {
-        const response = try GetExerciseList.call(allocator, workout.id, test_env.database);
+        const request: GetExerciseList.Request = .{ .workout_id = @intCast(workout.id) };
+        const response = try GetExerciseList.call(allocator, request, test_env.database);
         defer allocator.free(response);
 
         for (add_exercise_request, response) |req, res| {
-            try std.testing.expectEqual(req.exercise_id, res.exercise_id);
+            try std.testing.expectEqual(req.exercise_id, @as(u32, @intCast(res.exercise_id)));
             try std.testing.expectEqual(workout.id, res.workout_id);
             try std.testing.expectEqual(req.reps, res.reps);
             try std.testing.expectEqual(req.sets, res.sets);

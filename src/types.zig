@@ -81,3 +81,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 const pg = @import("pg");
+const Handler = @import("handler.zig");
+
+const handleResponse = @import("response.zig").handleResponse;
+const ResponseError = @import("response.zig").ResponseError;

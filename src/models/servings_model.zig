@@ -1,8 +1,8 @@
 const log = std.log.scoped(.servings_model);
-
+//TODO: tests for these models
 pub const Create = struct {
     pub const Request = struct {
-        food_id: i32,
+        food_id: u32,
         amount: f64,
         unit: []const u8,
         multiplier: f64,
@@ -38,7 +38,7 @@ pub const Create = struct {
 
 pub const Get = struct {
     pub const Request = struct {
-        food_id: i32,
+        food_id: u32,
     };
     pub const Response = struct {
         id: i32,
@@ -56,8 +56,8 @@ pub const Get = struct {
         OutOfMemory,
     } || DatabaseErrors;
     // Caller must free list
-    pub fn call(ctx: *Handler.RequestContext, request: Request) Errors![]Response {
-        var conn = ctx.app.db.acquire() catch return error.CannotAcquireConnection;
+    pub fn call(allocator: std.mem.Allocator, database: *Pool, request: Request) Errors![]Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var result = conn.queryOpts(query_string, //
             .{request.food_id}, .{ .column_names = true }) catch |err| {
@@ -68,7 +68,7 @@ pub const Get = struct {
         };
         defer result.deinit();
         var response: std.ArrayList(Response) = .empty;
-        defer response.deinit(ctx.app.allocator);
+        defer response.deinit(allocator);
 
         while (result.next() catch return error.CannotGet) |row| {
             const id = row.get(i32, 0);
@@ -76,10 +76,10 @@ pub const Get = struct {
             const unit = row.get([]u8, 4);
             const multiplier = row.get(f64, 5);
 
-            response.append(ctx.app.allocator, Response{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier }) catch return error.OutOfMemory;
+            response.append(allocator, Response{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier }) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) return error.InvalidFoodID;
-        return response.toOwnedSlice(ctx.app.allocator) catch return error.OutOfMemory;
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
     const query_string = "SELECT * from servings WHERE food_id=$1";
 };

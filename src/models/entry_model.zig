@@ -53,14 +53,16 @@ pub const Create = struct {
 };
 
 pub const Delete = struct {
-    pub const Request = struct {};
+    pub const Request = struct {
+        entry_id: u32,
+    };
     pub const Response = struct {};
     pub const Errors = error{ CannotDelete, CannotParseResult } || DatabaseErrors;
 
-    pub fn call(database: *Pool, entry_id: u32) Errors!void {
+    pub fn call(database: *Pool, request: Request) Errors!void {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
-        const deleted = conn.exec(query_string, .{entry_id}) catch |err| {
+        const deleted = conn.exec(query_string, .{request.entry_id}) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -75,7 +77,7 @@ pub const Edit = struct {
     pub const Request = struct {
         meal_category: types.MealCategory,
         amount: f64,
-        serving_id: i32,
+        serving_id: u32,
     };
     pub const Response = struct {};
     pub const Errors = error{ CannotEdit, CannotParseResult } || DatabaseErrors;
@@ -96,7 +98,9 @@ pub const Edit = struct {
 };
 
 pub const Get = struct {
-    pub const Request = struct {};
+    pub const Request = struct {
+        entry_id: u32,
+    };
     pub const Response = struct {
         id: i32,
         created_at: i64,
@@ -111,12 +115,12 @@ pub const Get = struct {
     pub fn call(
         user_id: i32,
         database: *Pool,
-        entry_id: u32,
+        request: Request,
     ) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var row = conn.row(query_string, //
-            .{ user_id, entry_id }) catch |err| {
+            .{ user_id, request.entry_id }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -130,6 +134,7 @@ pub const Get = struct {
 };
 
 pub const GetRecent = struct {
+    pub const Request = struct { limit: u32 };
     pub const Response = struct {
         id: i32,
         user_id: i32,
@@ -153,10 +158,10 @@ pub const GetRecent = struct {
         CannotParseResult,
     } || DatabaseErrors;
 
-    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, limit: u32) Errors![]Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors![]Response {
         var conn = database.acquire() catch return error.CannotGet;
         defer conn.release();
-        var result = conn.queryOpts(query_string, .{ user_id, limit }, .{ .column_names = true, .allocator = allocator }) catch |err| {
+        var result = conn.queryOpts(query_string, .{ user_id, request.limit }, .{ .column_names = true, .allocator = allocator }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -385,6 +390,7 @@ pub const GetAverage = struct {
         defer conn.release();
         var row = conn.rowOpts(query_string, //
             .{ user_id, request.range_start, request.range_end }, .{ .column_names = true }) catch |err| {
+            std.debug.print("Error encountered: {}\n", .{err});
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -628,7 +634,11 @@ test "API Entry | Get" {
     const entry = try Create.call(setup.user.id, test_env.database, create_entry);
     // TEST
     {
-        const result = try Get.call(setup.user.id, test_env.database, @intCast(entry.id));
+        const result = try Get.call(
+            setup.user.id,
+            test_env.database,
+            .{ .entry_id = @intCast(entry.id) },
+        );
 
         try std.testing.expectEqual(entry.food_id, result.food_id);
         try std.testing.expectEqual(entry.serving_id, result.serving_id);
@@ -821,7 +831,7 @@ test "API Entry | Get recent (all)" {
     const limit: u32 = 50;
     // TEST
     {
-        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, limit);
+        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, .{ .limit = limit });
 
         defer {
             for (entry_list) |entry| {
@@ -884,7 +894,7 @@ test "API Entry | Get recent (partial)" {
     const inserted_entries = [_]Create.Response{ entry_2, entry_1 };
     // TEST
     {
-        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, limit);
+        const entry_list = try GetRecent.call(allocator, setup.user.id, test_env.database, .{ .limit = limit });
         defer {
             for (entry_list) |entry| {
                 entry.deinit(allocator);
@@ -939,7 +949,7 @@ test "API Entry | Get recent (empty)" {
     const limit: u32 = 0;
     // TEST
     {
-        if (GetRecent.call(allocator, setup.user.id, test_env.database, limit)) |*entry_list| {
+        if (GetRecent.call(allocator, setup.user.id, test_env.database, .{ .limit = limit })) |*entry_list| {
             const list = @constCast(entry_list);
             for (list.*) |entry| {
                 entry.deinit(allocator);

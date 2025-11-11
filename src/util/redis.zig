@@ -1,13 +1,11 @@
 const log = std.log.scoped(.redis);
 
 pub const RedisClient = struct {
-    allocator: std.mem.Allocator,
     connection: std.net.Stream,
 
     pub fn init(allocator: std.mem.Allocator, host: []const u8, port: u16) !RedisClient {
         const conn = try std.net.tcpConnectToHost(allocator, host, port);
         return RedisClient{
-            .allocator = allocator,
             .connection = conn,
         };
     }
@@ -21,7 +19,7 @@ pub const RedisClient = struct {
         return response[0 .. response.len - 2];
     }
     /// Caller must free slice.
-    pub fn sendCommand(self: *RedisClient, command: []const u8) ![]u8 {
+    pub fn sendCommand(self: *RedisClient, allocator: std.mem.Allocator, command: []const u8) ![]u8 {
         var writer = self.connection.writer(&.{});
         try writer.interface.writeAll(command);
 
@@ -34,40 +32,40 @@ pub const RedisClient = struct {
         var slices = [_][]u8{&slice};
         const read_bytes = try reader.readVec(&slices);
 
-        return self.allocator.dupe(u8, try trimResponse(slice[0..read_bytes])) catch @panic("OOM");
+        return allocator.dupe(u8, try trimResponse(slice[0..read_bytes])) catch @panic("OOM");
     }
 
     /// Caller must free slice.
-    pub fn set(self: *RedisClient, key: []const u8, value: []const u8) ![]u8 {
+    pub fn set(self: *RedisClient, allocator: std.mem.Allocator, key: []const u8, value: []const u8) ![]u8 {
         var buf: [1024]u8 = undefined;
         const command = try std.fmt.bufPrint(&buf, "*3\r\n$3\r\nSET\r\n${d}\r\n{s}\r\n${d}\r\n{s}\r\n$2\r\n", .{ key.len, key, value.len, value });
-        return try sendCommand(self.connection, command);
+        return try self.sendCommand(allocator, command);
     }
 
     /// Caller must free slice.
-    pub fn setWithExpiry(self: *RedisClient, key: []const u8, value: []const u8, expiry: u32) ![]u8 {
+    pub fn setWithExpiry(self: *RedisClient, allocator: std.mem.Allocator, key: []const u8, value: []const u8, expiry: u32) ![]u8 {
         if (expiry == 0) return error.BadExpiry;
         var buf: [1024]u8 = undefined;
         const command = try std.fmt.bufPrint(&buf, "*5\r\n$3\r\nSET\r\n${d}\r\n{s}\r\n${d}\r\n{s}\r\n$2\r\nEX\r\n${d}\r\n{}\r\n", .{ key.len, key, value.len, value, std.math.log10(expiry) + 1, expiry });
-        return try self.sendCommand(command);
+        return try self.sendCommand(allocator, command);
     }
 
     /// Caller must free slice.
-    pub fn get(self: *RedisClient, key: []const u8) ![]u8 {
+    pub fn get(self: *RedisClient, allocator: std.mem.Allocator, key: []const u8) ![]u8 {
         var buf: [1024]u8 = undefined;
         const command = try std.fmt.bufPrint(&buf, "*2\r\n$3\r\nGET\r\n${d}\r\n{s}\r\n", .{ key.len, key });
-        const response = try self.sendCommand(command);
-        defer self.allocator.free(response);
+        const response = try self.sendCommand(allocator, command);
+        defer allocator.free(response);
         var it = std.mem.tokenizeSequence(u8, response, "\r\n");
         const length = it.next().?;
         if (std.mem.eql(u8, length, "$-1")) return error.KeyValuePairNotFound;
-        return self.allocator.dupe(u8, it.next() orelse return error.RedisError);
+        return allocator.dupe(u8, it.next() orelse return error.RedisError);
     }
     /// Caller must free slice.
-    pub fn delete(self: *RedisClient, key: []const u8) ![]u8 {
+    pub fn delete(self: *RedisClient, allocator: std.mem.Allocator, key: []const u8) ![]u8 {
         var buf: [1024]u8 = undefined;
         const command = try std.fmt.bufPrint(&buf, "*2\r\n$3\r\nDEL\r\n${d}\r\n{s}\r\n", .{ key.len, key });
-        return try self.sendCommand(command);
+        return try self.sendCommand(allocator, command);
     }
 };
 

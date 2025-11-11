@@ -36,7 +36,7 @@ pub const Create = struct {
 
 pub const Get = struct {
     pub const Request = struct {
-        id: u32,
+        note_id: u32,
     };
     pub const Response = struct {
         id: i32,
@@ -50,7 +50,7 @@ pub const Get = struct {
         var conn = ctx.app.db.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var row = conn.row(query_string, //
-            .{ ctx.user_id.?, request.id }) catch |err| {
+            .{ ctx.user_id.?, request.note_id }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);

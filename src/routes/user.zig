@@ -1,7 +1,9 @@
 const log = std.log.scoped(.users);
 
-pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    router.*.post("/api/user", createUser, .{});
+pub const endpoint_list = &.{CreateEndpoint};
+
+pub inline fn init(router: *Handler.Router) void {
+    CreateEndpoint.init(router);
 
     //subroutes
     // /api/user/entry
@@ -14,33 +16,37 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
     Goals.init(router);
 }
 
-pub fn createUser(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
+const CreateEndpoint = Endpoint(struct {
+    pub const endpoint_data: Handler.EndpointData = .{
+        .Request = .{
+            .Body = CreateModel.Request,
+        },
+        .Response = CreateModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/user",
+        .route_data = .{},
     };
-    const json = std.json.parseFromSliceLeaky(Create.Request, allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.not_found, null);
-        return;
-    };
-    const response = Create.call(ctx.app.db, allocator, json) catch |err| {
-        switch (err) {
-            Create.Errors.UsernameNotUnique => {
-                try handleResponse(res, ResponseError.unauthorized, "Username already exists");
-            },
-            else => {
-                try handleResponse(res, ResponseError.internal_server_error, null);
-            },
-        }
-        return;
-    };
-    defer response.deinit(allocator);
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(CreateModel.Request, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = ctx.app.allocator;
 
-    res.status = 200;
-    try res.json(response, .{});
-}
+        const response = CreateModel.call(ctx.app.db, allocator, request.body) catch |err| {
+            switch (err) {
+                CreateModel.Errors.UsernameNotUnique => {
+                    try handleResponse(res, ResponseError.unauthorized, "Username already exists");
+                },
+                else => {
+                    try handleResponse(res, ResponseError.internal_server_error, null);
+                },
+            }
+            return;
+        };
+        defer response.deinit(allocator);
 
+        res.status = 200;
+        try res.json(response, .{});
+    }
+});
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -51,7 +57,7 @@ test "Endpoint User | Create" {
     const test_env = Tests.test_env;
     const allocator = std.testing.allocator;
 
-    const body = Create.Request{
+    const body = CreateModel.Request{
         .username = test_name,
         .display_name = "Display " ++ test_name,
         .password = "Testing password",
@@ -68,10 +74,10 @@ test "Endpoint User | Create" {
 
         web_test.body(body_string);
 
-        try createUser(&context, web_test.req, web_test.res);
+        try CreateEndpoint.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(Create.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(CreateModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqualStrings(body.username, response.value.username);
@@ -83,7 +89,7 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const Create = @import("../models/users_model.zig").Create;
+const CreateModel = @import("../models/users_model.zig").Create;
 const Handler = @import("../handler.zig");
 const handleResponse = @import("../response.zig").handleResponse;
 const ResponseError = @import("../response.zig").ResponseError;
@@ -94,3 +100,7 @@ const Measurement = @import("./measurement.zig");
 const NoteEntries = @import("note_entries.zig");
 const Goals = @import("goals.zig");
 const Entry = @import("entry.zig");
+
+const Endpoint = @import("../handler.zig").Endpoint;
+const EndpointRequest = @import("../handler.zig").EndpointRequest;
+const EndpointData = @import("../handler.zig").EndpointData;

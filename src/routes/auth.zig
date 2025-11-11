@@ -1,86 +1,114 @@
 const log = std.log.scoped(.auth);
 
-pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .refresh = true };
-    router.*.post("/api/auth", createToken, .{});
-    router.*.post("/api/auth/logout", invalidateToken, .{ .data = &RouteData });
-    router.*.post("/api/auth/refresh", refreshToken, .{ .data = &RouteData });
+pub inline fn init(router: *Handler.Router) void {
+    //     router.*.post("/api/auth", createToken, .{});
+    //     router.*.post("/api/auth/logout", invalidateToken, .{ .data = &RouteData });
+    //     router.*.post("/api/auth/refresh", refreshToken, .{ .data = &RouteData });
+    Create.init(router);
+    Refresh.init(router);
 }
-
-pub fn createToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
-    };
-    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    const create_props = Create.Props{
-        .allocator = ctx.app.allocator,
-        .database = ctx.app.db,
-        .jwt_secret = jwt_secret,
-        .redis_client = ctx.app.redis_client,
-    };
-    var response = Create.call(create_props, json) catch |err| switch (err) {
-        Create.Errors.UserNotFound => {
-            try handleResponse(res, ResponseError.unauthorized, null);
-            return;
+const Create = Endpoint(struct {
+    const Body = CreateModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
         },
-        else => {
-            log.err("Error caught: {s}", .{@errorName(err)});
-            try handleResponse(res, ResponseError.internal_server_error, null);
-            return;
-        },
+        .Response = CreateModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/auth",
+        .route_data = .{},
     };
-    defer response.deinit(ctx.app.allocator);
-    res.status = 200;
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
 
-    try res.json(response, .{});
-}
+        const create_props = CreateModel.Props{
+            .allocator = allocator,
+            .database = ctx.app.db,
+            .jwt_secret = jwt_secret,
+            .redis_client = ctx.app.redis_client,
+        };
+        var response = CreateModel.call(create_props, request.body) catch |err| switch (err) {
+            CreateModel.Errors.UserNotFound => {
+                try handleResponse(res, ResponseError.unauthorized, null);
+                return;
+            },
+            else => {
+                log.err("Error caught: {s}", .{@errorName(err)});
+                try handleResponse(res, ResponseError.internal_server_error, null);
+                return;
+            },
+        };
+        defer response.deinit(allocator);
+        res.status = 200;
 
-pub fn refreshToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = req; // autofix
-    const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
-
-    const refresh_props = Refresh.Props{
-        .allocator = ctx.app.allocator,
-        .jwt_secret = jwt_secret,
-        .redis_client = ctx.app.redis_client,
-        .refresh_token = ctx.refresh_token.?,
-    };
-    const response = Refresh.call(refresh_props) catch |err| switch (err) {
-        Refresh.Errors.UserNotFound => {
-            try handleResponse(res, ResponseError.unauthorized, null);
-            return;
-        },
-        else => {
-            log.err("Error caught: {s}", .{@errorName(err)});
-            try handleResponse(res, ResponseError.internal_server_error, null);
-            return;
-        },
-    };
-    defer response.deinit(ctx.app.allocator);
-    res.status = 200;
-
-    try res.json(response, .{});
-}
-
-pub fn invalidateToken(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = req; // autofix
-    const invalidate_props = Auth.InvalidateProps{ .redis_client = ctx.app.redis_client, .refresh_token = ctx.refresh_token.? };
-    const result = Auth.invalidate(invalidate_props) catch |err| {
-        log.err("Error caught: {s}", .{@errorName(err)});
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    if (result == false) {
-        try handleResponse(res, ResponseError.unauthorized, "No such active refresh token!");
-        return;
+        try res.json(response, .{});
     }
-    res.status = 200;
-}
+});
+const Refresh = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = RefreshModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/auth/refresh",
+        .route_data = .{ .refresh = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
+
+        const refresh_props = RefreshModel.Props{
+            .allocator = allocator,
+            .jwt_secret = jwt_secret,
+            .redis_client = ctx.app.redis_client,
+            .refresh_token = ctx.refresh_token.?,
+        };
+        const response = RefreshModel.call(refresh_props) catch |err| switch (err) {
+            RefreshModel.Errors.UserNotFound => {
+                try handleResponse(res, ResponseError.unauthorized, null);
+                return;
+            },
+            else => {
+                log.err("Error caught: {s}", .{@errorName(err)});
+                try handleResponse(res, ResponseError.internal_server_error, null);
+                return;
+            },
+        };
+        defer response.deinit(allocator);
+        res.status = 200;
+
+        try res.json(response, .{});
+    }
+});
+
+const Invalidate = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = RefreshModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/auth/refresh",
+        .route_data = .{ .refresh = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const invalidate_props = InvalidateModel.Props{
+            .redis_client = ctx.app.redis_client,
+            .refresh_token = ctx.refresh_token.?,
+        };
+        const result = InvalidateModel.call(invalidate_props) catch |err| {
+            log.err("Error caught: {s}", .{@errorName(err)});
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        if (result == false) {
+            try handleResponse(res, ResponseError.unauthorized, "No such active refresh token!");
+            return;
+        }
+        res.status = 200;
+    }
+});
 
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
@@ -96,7 +124,7 @@ test "Endpoint Auth | Create" {
     const user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
-    const body = Create.Request{
+    const body = CreateModel.Request{
         .username = user.username,
         .password = "Testing password",
     };
@@ -113,7 +141,7 @@ test "Endpoint Auth | Create" {
 
         web_test.body(body_string);
 
-        try createToken(&context, web_test.req, web_test.res);
+        try Create.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
     }
 }
@@ -128,7 +156,7 @@ test "Endpoint Auth | Refresh" {
     const user = try TestSetup.createUser(test_env.database, test_name);
     defer user.deinit(allocator);
 
-    const body = Create.Request{
+    const body = CreateModel.Request{
         .username = user.username,
         .password = "Testing password",
     };
@@ -143,11 +171,11 @@ test "Endpoint Auth | Refresh" {
     var create_token_web = ht.init(.{});
     defer create_token_web.deinit();
     create_token_web.body(body_string);
-    try createToken(&context, create_token_web.req, create_token_web.res);
+    try Create.call(&context, create_token_web.req, create_token_web.res);
 
     const create_token_body = try create_token_web.getBody();
 
-    const create_token_response = try std.json.parseFromSlice(Create.Response, allocator, create_token_body, .{});
+    const create_token_response = try std.json.parseFromSlice(CreateModel.Response, allocator, create_token_body, .{});
     defer create_token_response.deinit();
 
     context.refresh_token = create_token_response.value.refresh_token;
@@ -157,9 +185,9 @@ test "Endpoint Auth | Refresh" {
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        try refreshToken(&context, web_test.req, web_test.res);
+        try Refresh.call(&context, web_test.req, web_test.res);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(Refresh.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(RefreshModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try web_test.expectStatus(200);
@@ -180,6 +208,10 @@ const ResponseError = @import("../response.zig").ResponseError;
 const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
 const types = @import("../types.zig");
-const Auth = @import("../models/auth_model.zig").Auth;
-const Create = @import("../models/auth_model.zig").Create;
-const Refresh = @import("../models/auth_model.zig").Refresh;
+const CreateModel = @import("../models/auth_model.zig").Create;
+const RefreshModel = @import("../models/auth_model.zig").Refresh;
+const InvalidateModel = @import("../models/auth_model.zig").Invalidate;
+
+const Endpoint = @import("../handler.zig").Endpoint;
+const EndpointRequest = @import("../handler.zig").EndpointRequest;
+const EndpointData = @import("../handler.zig").EndpointData;

@@ -64,7 +64,7 @@ pub const Create = struct {
         const value = std.fmt.allocPrint(props.allocator, "{}", .{user_id}) catch return error.OutOfMemory;
         defer props.allocator.free(value);
 
-        const response = props.redis_client.setWithExpiry(refresh_token, value, REFRESH_TOKEN_EXPIRY) catch return error.RedisError;
+        const response = props.redis_client.setWithExpiry(props.allocator, refresh_token, value, REFRESH_TOKEN_EXPIRY) catch return error.RedisError;
         defer props.allocator.free(response);
 
         return Response{
@@ -96,7 +96,7 @@ pub const Refresh = struct {
 
     pub const Errors = error{ CannotCreateJWT, UserNotFound, RedisError, ParseError };
     pub fn call(props: Props) Errors!Response {
-        const result = props.redis_client.get(props.refresh_token) catch |err| switch (err) {
+        const result = props.redis_client.get(props.allocator, props.refresh_token) catch |err| switch (err) {
             error.KeyValuePairNotFound => return error.UserNotFound,
             else => return error.RedisError,
         };
@@ -114,40 +114,21 @@ pub const Refresh = struct {
     }
 };
 
-pub const Auth = struct {
-    allocator: std.mem.Allocator,
-    access_token: []const u8,
-    refresh_token: []const u8,
-    expires_in: i32,
-
-    pub fn deinit(self: *Auth) void {
-        self.allocator.free(self.access_token);
-        self.allocator.free(self.refresh_token);
-    }
-
-    pub const InvalidateProps = struct {
+pub const Invalidate = struct {
+    // perhaps a bit pointless as if success can be returned, it is always successful.
+    pub const Response = struct {
+        success: bool,
+    };
+    pub const Props = struct {
+        allocator: std.mem.Allocator,
         refresh_token: []const u8,
         redis_client: *redis.RedisClient,
     };
 
-    pub fn invalidate(props: InvalidateProps) anyerror!bool {
-        const response = try props.redis_client.delete(props.refresh_token);
-        defer props.redis_client.allocator.free(response);
+    pub fn call(props: Props) anyerror!bool {
+        const response = try props.redis_client.delete(props.allocator, props.refresh_token);
+        defer props.allocator.free(response);
         return if (std.mem.eql(u8, response, ":0")) false else true;
-    }
-
-    pub fn format(
-        self: Auth,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
-        try writer.writeAll("Auth{ ");
-        try writer.print(".access_token = {s}, .expires_in = {d}, .refresh_token: {s}", .{ self.access_token, self.expires_in, self.refresh_token });
-        try writer.writeAll(" }");
     }
 };
 
@@ -278,7 +259,11 @@ test "API Auth | Invalidate" {
 
     // TEST
     {
-        const invalidate_response = try Auth.invalidate(.{ .redis_client = &test_env.redis_client, .refresh_token = refresh_token });
+        const invalidate_response = try Invalidate.call(.{
+            .allocator = allocator,
+            .redis_client = &test_env.redis_client,
+            .refresh_token = refresh_token,
+        });
         try std.testing.expect(invalidate_response);
     }
 }

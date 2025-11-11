@@ -1,130 +1,154 @@
 const log = std.log.scoped(.food);
 
+const endpoint_list: []Endpoint = &.{ GetFood, PostFood };
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .restricted = true };
-
-    router.*.get("/api/food/:food_id", getFood, .{ .data = &RouteData });
-    router.*.get("/api/food", searchFood, .{ .data = &RouteData });
-    router.*.get("/api/food/:id/servings", getServings, .{ .data = &RouteData });
-    router.*.post("/api/food/:id/servings", postServings, .{ .data = &RouteData });
-    router.*.post("/api/food", postFood, .{ .data = &RouteData });
+    GetFood.init(router);
+    PostFood.init(router);
+    SearchFood.init(router);
+    GetServing.init(router);
+    CreateServing.init(router);
 }
 
-fn getFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const food_id = std.fmt.parseInt(u32, req.param("food_id").?, 10) catch {
-        try handleResponse(res, ResponseError.bad_request, "Food ID not valid integer!");
-        return;
+const GetFood = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Params = GetFoodModel.Request,
+        },
+        .Response = GetFoodModel.Response,
+        .method = .GET,
+        .config = .{},
+        .path = "/api/food/:food_id",
+        .route_data = .{ .restricted = true },
     };
-    const request: GetFood.Request = .{ .food_id = food_id };
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, GetFoodModel.Request, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
 
-    const result = GetFood.call(allocator, ctx.app.db, request) catch |err| {
-        switch (err) {
-            GetFood.Errors.FoodNotFound => try handleResponse(res, ResponseError.not_found, "Food does not exist!"),
-            GetFood.Errors.CannotGet => try handleResponse(res, ResponseError.not_found, null),
-            else => try handleResponse(res, ResponseError.internal_server_error, null),
-        }
-        return;
-    };
-    defer result.deinit(allocator);
+        const result = GetFoodModel.call(allocator, ctx.app.db, request.params) catch |err| {
+            switch (err) {
+                GetFoodModel.Errors.FoodNotFound => try handleResponse(res, ResponseError.not_found, "Food does not exist!"),
+                GetFoodModel.Errors.CannotGet => try handleResponse(res, ResponseError.not_found, null),
+                else => try handleResponse(res, ResponseError.internal_server_error, null),
+            }
+            return;
+        };
+        defer result.deinit(allocator);
 
-    res.status = 200;
-    try res.json(result, .{});
-}
-
-pub fn postFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
-    };
-    const json = std.json.parseFromSliceLeaky(CreateFood.Request, allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-
-    var result = CreateFood.call(ctx.user_id.?, allocator, ctx.app.db, json) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    defer result.deinit(allocator);
-
-    res.status = 200;
-    try res.json(result, .{});
-}
-
-pub fn searchFood(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const query = try req.query();
-    var search_term: []const u8 = undefined;
-    if (query.get("search")) |q| {
-        search_term = q;
-    } else {
-        try handleResponse(res, ResponseError.bad_request, null);
-        return;
+        res.status = 200;
+        try res.json(result, .{});
     }
-    const request: Search.Request = .{ .search_term = search_term };
-    const result = Search.call(allocator, ctx.app.db, request) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
+});
+
+const PostFood = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = CreateFood.Request,
+        },
+        .Response = CreateFood.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/food/",
+        .route_data = .{ .restricted = true },
     };
-    defer {
-        for (result) |entry| {
-            entry.deinit(allocator);
-        }
-        allocator.free(result);
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(CreateFood.Request, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+
+        var result = CreateFood.call(ctx.user_id.?, allocator, ctx.app.db, request.body) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        defer result.deinit(allocator);
+
+        res.status = 200;
+        try res.json(result, .{});
     }
-    res.status = 200;
-
-    try res.json(result, .{});
-}
-
-pub fn postServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
+});
+const SearchFood = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Query = SearchModel.Request,
+        },
+        .Response = SearchModel.Response,
+        .method = .GET,
+        .config = .{},
+        .path = "/api/food/",
+        .route_data = .{ .restricted = true },
     };
-    const food_id = try std.fmt.parseInt(i32, req.param("id").?, 10);
-    if (food_id < 0) {
-        try handleResponse(res, ResponseError.body_missing, "Food ID cannot be negative");
-        return;
-    }
-    //the struct is rq.PostServings, but without food_id.
-    //TODO: make this less ugly, preferably
-    const ServingWithoutFoodId = struct { amount: f64, unit: []const u8, multiplier: f64 };
-    const request: ServingWithoutFoodId = std.json.parseFromSliceLeaky(ServingWithoutFoodId, allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    const result = CreateServing.call(ctx, .{
-        .food_id = food_id,
-        .amount = request.amount,
-        .multiplier = request.multiplier,
-        .unit = request.unit,
-    }) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
-    try res.json(result, .{});
-}
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, SearchModel.Request), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
 
-pub fn getServings(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const allocator = ctx.app.allocator;
-    const request = GetServing.Request{ .food_id = try std.fmt.parseInt(i32, req.param("id").?, 10) };
-    const result = GetServing.call(ctx, request) catch |err| {
-        switch (err) {
-            GetServing.Errors.InvalidFoodID => try handleResponse(res, ResponseError.not_found, "Invalid food ID!"),
-            else => try handleResponse(res, ResponseError.internal_server_error, null),
+        const result = SearchModel.call(allocator, ctx.app.db, request.query) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        defer {
+            for (result) |entry| {
+                entry.deinit(allocator);
+            }
+            allocator.free(result);
         }
-        return;
-    };
-    defer allocator.free(result);
-    res.status = 200;
-    try res.json(result, .{});
-}
+        res.status = 200;
 
+        try res.json(result, .{});
+    }
+});
+const CreateServing = Endpoint(struct {
+    const Body = struct { amount: f64, unit: []const u8, multiplier: f64 };
+    const Params = struct { food_id: u32 };
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
+            .Params = Params,
+        },
+        .Response = SearchModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/food/:food_id/servings",
+        .route_data = .{ .restricted = true },
+    };
+
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, Params, void), res: *httpz.Response) anyerror!void {
+        const result = CreateServingModel.call(ctx, .{
+            .food_id = request.params.food_id,
+            .amount = request.body.amount,
+            .multiplier = request.body.multiplier,
+            .unit = request.body.unit,
+        }) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
+        try res.json(result, .{});
+    }
+});
+
+const GetServing = Endpoint(struct {
+    const Params = GetServingModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Params = Params,
+        },
+        .Response = SearchModel.Response,
+        .method = .GET,
+        .config = .{},
+        .path = "/api/food/:food_id/servings",
+        .route_data = .{ .restricted = true },
+    };
+
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const result = GetServingModel.call(allocator, ctx.app.db, request.params) catch |err| {
+            switch (err) {
+                GetServingModel.Errors.InvalidFoodID => try handleResponse(res, ResponseError.not_found, "Invalid food ID!"),
+                else => try handleResponse(res, ResponseError.internal_server_error, null),
+            }
+            return;
+        };
+        defer allocator.free(result);
+        res.status = 200;
+        try res.json(result, .{});
+    }
+});
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -163,7 +187,7 @@ test "Endpoint Food | Create" {
 
         web_test.body(body_string);
 
-        try postFood(&context, web_test.req, web_test.res);
+        try PostFood.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
         const response = try std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{});
@@ -218,7 +242,7 @@ test "Endpoint Food | Get" {
 
         web_test.param("food_id", food_id_string);
 
-        try getFood(&context, web_test.req, web_test.res);
+        try GetFood.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
         const response = try std.json.parseFromSlice(CreateFood.Response, allocator, response_body, .{});
@@ -258,7 +282,7 @@ test "Endpoint Food | Get Invalid Food" {
 
         web_test.param("food_id", food_id_string);
 
-        try getFood(&context, web_test.req, web_test.res);
+        try GetFood.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(404);
         const response_body = try web_test.getBody();
 
@@ -317,19 +341,19 @@ test "Endpoint Food | Search" {
     var second_food = try CreateFood.call(user.id, allocator, test_env.database, second_food_req);
     defer second_food.deinit(allocator);
 
-    const body = Search.Request{ .search_term = "second" };
+    const body = SearchModel.Request{ .search_term = "second" };
 
     // TEST
     {
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        web_test.query("search", body.search_term);
+        web_test.query("search_term", body.search_term);
 
-        try searchFood(&context, web_test.req, web_test.res);
+        try SearchFood.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice([]Search.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice([]SearchModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         for (response.value) |*food| {
@@ -393,12 +417,12 @@ test "Endpoint Food | Create Serving" {
         defer web_test.deinit();
 
         web_test.body(body_string);
-        web_test.param("id", food_id_string);
+        web_test.param("food_id", food_id_string);
 
-        try postServings(&context, web_test.req, web_test.res);
+        try CreateServing.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(CreateServing.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(CreateServingModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(food.id, response.value.food_id);
@@ -454,33 +478,33 @@ test "Endpoint Food | Get Serving" {
     defer create_serving.deinit();
 
     create_serving.body(create_serving_string);
-    create_serving.param("id", food_id_string);
+    create_serving.param("food_id", food_id_string);
 
-    try postServings(&context, create_serving.req, create_serving.res);
+    try CreateServing.call(&context, create_serving.req, create_serving.res);
 
     // TEST
     {
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        web_test.param("id", food_id_string);
+        web_test.param("food_id", food_id_string);
 
-        try getServings(&context, web_test.req, web_test.res);
+        try GetServing.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice([]GetServing.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice([]GetServingModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
-        const expected_servings = [_]GetServing.Response{
+        const expected_servings = [_]GetServingModel.Response{
             // Default serving
-            GetServing.Response{
+            GetServingModel.Response{
                 .id = undefined, // We do not know the ID of the serving. Doing this to prevent having to make a struct
                 .amount = first_food_req.food_grams,
                 .multiplier = first_food_req.food_grams,
                 .unit = "grams",
             },
             // Inserted serving
-            GetServing.Response{
+            GetServingModel.Response{
                 .id = undefined, // We do not know the ID of the serving. Doing this to prevent having to make a struct
                 .amount = create_serving_body.amount,
                 .multiplier = create_serving_body.multiplier,
@@ -519,9 +543,9 @@ test "Endpoint Food | Get Serving Invalid Food ID" {
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        web_test.param("id", incorrect_food_id_string);
+        web_test.param("food_id", incorrect_food_id_string);
 
-        try getServings(&context, web_test.req, web_test.res);
+        try GetServing.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(404);
         const response_body = try web_test.getBody();
 
@@ -538,14 +562,18 @@ const std = @import("std");
 
 const httpz = @import("httpz");
 
-const GetFood = @import("../models/food_model.zig").Get;
-const Search = @import("../models/food_model.zig").Search;
+const GetFoodModel = @import("../models/food_model.zig").Get;
+const SearchModel = @import("../models/food_model.zig").Search;
 const CreateFood = @import("../models/food_model.zig").Create;
-const CreateServing = @import("../models/servings_model.zig").Create;
-const GetServing = @import("../models/servings_model.zig").Get;
+const CreateServingModel = @import("../models/servings_model.zig").Create;
+const GetServingModel = @import("../models/servings_model.zig").Get;
 
 const Handler = @import("../handler.zig");
 const ResponseError = @import("../response.zig").ResponseError;
 const handleResponse = @import("../response.zig").handleResponse;
 const types = @import("../types.zig");
 const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
+
+const Endpoint = @import("../handler.zig").Endpoint;
+const EndpointRequest = @import("../handler.zig").EndpointRequest;
+const EndpointData = @import("../handler.zig").EndpointData;
