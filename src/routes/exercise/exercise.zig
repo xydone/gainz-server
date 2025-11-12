@@ -1,38 +1,53 @@
+pub const endpoint_data: []EndpointData = .{
+    GetAll.endpoint_data,
+    Create.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .restricted = true };
-    router.*.get("/api/exercise/", getExercises, .{ .data = &RouteData });
-    router.*.post("/api/exercise/", createExercise, .{ .data = &RouteData });
+    GetAll.init(router);
+    Create.init(router);
 }
 
-pub fn getExercises(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = req; // autofix
-    var exercises = GetAll.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
+const GetAll = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = GetAllModel.Response,
+        .method = .GET,
+        .path = "/api/exercise/",
+        .route_data = .{ .restricted = true },
     };
-    defer exercises.deinit();
-    res.status = 200;
-    try res.json(exercises.list, .{});
-}
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const exercises = GetAllModel.call(allocator, ctx.user_id.?, ctx.app.db) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        defer allocator.free(exercises);
+        res.status = 200;
+        try res.json(exercises, .{});
+    }
+});
+const Create = Endpoint(struct {
+    const Body = CreateModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
+        },
+        .Response = GetAllModel.Response,
+        .method = .POST,
+        .path = "/api/exercise/",
+        .route_data = .{ .restricted = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const exercise = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
 
-pub fn createExercise(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
-    };
-    const json = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    const exercise = Create.call(ctx.user_id.?, ctx.app.db, json) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
-
-    return res.json(exercise, .{});
-}
-
+        return res.json(exercise, .{});
+    }
+});
 const std = @import("std");
 
 const httpz = @import("httpz");
@@ -41,5 +56,9 @@ const Handler = @import("../../handler.zig");
 const handleResponse = @import("../../response.zig").handleResponse;
 const ResponseError = @import("../../response.zig").ResponseError;
 
-const Create = @import("../../models/exercise/exercise.zig").Create;
-const GetAll = @import("../../models/exercise/exercise.zig").GetAll;
+const CreateModel = @import("../../models/exercise/exercise.zig").Create;
+const GetAllModel = @import("../../models/exercise/exercise.zig").GetAll;
+
+const Endpoint = @import("../../handler.zig").Endpoint;
+const EndpointRequest = @import("../../handler.zig").EndpointRequest;
+const EndpointData = @import("../../handler.zig").EndpointData;

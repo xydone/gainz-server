@@ -56,14 +56,7 @@ pub const Create = struct {
 
 pub const GetAll = struct {
     pub const Request = struct {};
-    pub const Response = struct {
-        list: []Exercise,
-        allocator: std.mem.Allocator,
-
-        pub fn deinit(self: *Response) void {
-            self.allocator.free(self.list);
-        }
-    };
+    pub const Response = []Exercise;
 
     const Exercise = struct {
         id: i32,
@@ -76,6 +69,7 @@ pub const GetAll = struct {
         OutOfMemory,
     } || DatabaseErrors;
 
+    /// Caller must free slice.
     pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
@@ -100,7 +94,7 @@ pub const GetAll = struct {
                 .description = if (description == null) null else allocator.dupe(u8, description.?) catch return error.OutOfMemory,
             }) catch return error.OutOfMemory;
         }
-        return Response{ .list = response.toOwnedSlice(allocator) catch return error.OutOfMemory, .allocator = allocator };
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
     const query_string = "SELECT id,name, description FROM training.exercise WHERE created_by = $1";
 };
@@ -112,14 +106,7 @@ pub const GetRange = struct {
         /// datetime string (ex: 2024-01-01)
         range_end: []const u8,
     };
-    pub const Response = struct {
-        list: []EntryList,
-        allocator: std.mem.Allocator,
-
-        pub fn deinit(self: *Response) void {
-            self.allocator.free(self.list);
-        }
-    };
+    pub const Response = []EntryList;
 
     //TODO: this is super ugly.
     pub const EntryList = struct {
@@ -146,6 +133,7 @@ pub const GetRange = struct {
         NoEntriesFound,
     } || DatabaseErrors;
 
+    /// Caller must free slice.
     pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
@@ -165,7 +153,7 @@ pub const GetRange = struct {
             response.deinit(allocator);
             return error.NoEntriesFound;
         }
-        return Response{ .list = response.toOwnedSlice(allocator) catch return error.OutOfMemory, .allocator = allocator };
+        return response.toOwnedSlice(allocator) catch return error.OutOfMemory;
     }
     const query_string =
         \\ SELECT 
@@ -245,7 +233,7 @@ pub const LogExercise = struct {
 };
 
 pub const DeleteExerciseEntry = struct {
-    pub const Request = struct {};
+    pub const Request = struct { entry_id: u32 };
     pub const Response = struct {
         id: i32,
         created_at: i64,
@@ -259,11 +247,11 @@ pub const DeleteExerciseEntry = struct {
         CannotDelete,
         CannotParseResult,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, entry_id: u32) Errors!Response {
+    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
-        var row = conn.row(query_string, .{ user_id, entry_id }) catch |err| {
+        var row = conn.row(query_string, .{ user_id, request.entry_id }) catch |err| {
             const error_handler = ErrorHandler{ .conn = conn };
             const error_data = error_handler.handle(err);
             if (error_data) |data| ErrorHandler.printErr(data);
@@ -511,7 +499,7 @@ test "API Exercise | Delete Entry" {
     const log_response = try LogExercise.call(setup.user.id, test_env.database, log_request);
     // TEST
     {
-        const response = try DeleteExerciseEntry.call(setup.user.id, test_env.database, @intCast(log_response.id));
+        const response = try DeleteExerciseEntry.call(setup.user.id, test_env.database, .{ .entry_id = @intCast(log_response.id) });
 
         try std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id);
         try std.testing.expectEqual(@as(i32, @intCast(log_request.unit_id)), response.unit_id);
@@ -593,11 +581,11 @@ test "API Exercise | Get Range" {
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer response.deinit();
+        const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
+        defer allocator.free(response);
 
-        try std.testing.expectEqual(logged_responses.len, response.list.len);
-        for (response.list, logged_responses) |entry, logged| {
+        try std.testing.expectEqual(logged_responses.len, response.len);
+        for (response, logged_responses) |entry, logged| {
             try std.testing.expectEqual(logged.id, entry.entry_id);
             try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
             try std.testing.expectEqual(logged.unit_id, entry.unit_id);
@@ -684,11 +672,11 @@ test "API Exercise | Get Range Upper Bound" {
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer response.deinit();
+        const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
+        defer allocator.free(response);
 
-        try std.testing.expectEqual(logged_responses.len, response.list.len);
-        for (response.list, logged_responses) |entry, logged| {
+        try std.testing.expectEqual(logged_responses.len, response.len);
+        for (response, logged_responses) |entry, logged| {
             try std.testing.expectEqual(logged.id, entry.entry_id);
             try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
             try std.testing.expectEqual(logged.unit_id, entry.unit_id);
@@ -776,11 +764,11 @@ test "API Exercise | Get Range Lower Bound" {
             .range_start = range_start,
             .range_end = range_end,
         };
-        var response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer response.deinit();
+        const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
+        defer allocator.free(response);
 
-        try std.testing.expectEqual(logged_responses.len, response.list.len);
-        for (response.list, logged_responses) |entry, logged| {
+        try std.testing.expectEqual(logged_responses.len, response.len);
+        for (response, logged_responses) |entry, logged| {
             try std.testing.expectEqual(logged.id, entry.entry_id);
             try std.testing.expectEqual(logged.exercise_id, entry.exercise_id);
             try std.testing.expectEqual(logged.unit_id, entry.unit_id);

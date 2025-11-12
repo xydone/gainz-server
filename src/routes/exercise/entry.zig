@@ -1,94 +1,116 @@
+pub const endpoint_data: []EndpointData = .{
+    Create.endpoint_data,
+    Edit.endpoint_data,
+    Delete.endpoint_data,
+    GetRange.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .restricted = true };
-    router.*.post("/api/exercise/entry", createEntry, .{ .data = &RouteData });
-    router.*.put("/api/exercise/entry/:entry_id", editEntry, .{ .data = &RouteData });
-    router.*.delete("/api/exercise/entry/:entry_id", deleteEntry, .{ .data = &RouteData });
-    router.*.get("/api/exercise/entry/range", getExerciseEntryRange, .{ .data = &RouteData });
+    Create.init(router);
+    Edit.init(router);
+    Delete.init(router);
+    GetRange.init(router);
 }
 
-pub fn createEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
+const Create = Endpoint(struct {
+    const Body = CreateModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
+        },
+        .Response = CreateModel.Response,
+        .method = .POST,
+        .path = "/api/exercise/entry/",
+        .route_data = .{ .restricted = true },
     };
-    const exercise_entry = std.json.parseFromSliceLeaky(LogExercise.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    const response = LogExercise.call(ctx.user_id.?, ctx.app.db, exercise_entry) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
 
-    try res.json(response, .{});
-}
-
-pub fn editEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try handleResponse(res, ResponseError.bad_request, null);
-        return;
-    };
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
-    };
-    const exercise_entry = std.json.parseFromSliceLeaky(EditExerciseEntry.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    if (!exercise_entry.isValid()) {
-        try handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
-        return;
+        try res.json(response, .{});
     }
-    const response = EditExerciseEntry.call(ctx.user_id.?, entry_id, ctx.app.db, exercise_entry) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
+});
 
-    try res.json(response, .{});
-}
-
-pub fn deleteEntry(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const entry_id = std.fmt.parseInt(u32, req.param("entry_id").?, 10) catch {
-        try handleResponse(res, ResponseError.bad_request, null);
-        return;
+const Edit = Endpoint(struct {
+    const Body = EditModel.Request;
+    const Params = struct { entry_id: u32 };
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
+            .Params = Params,
+        },
+        .Response = EditModel.Response,
+        .method = .PUT,
+        .path = "/api/exercise/entry/:entry_id",
+        .route_data = .{ .restricted = true },
     };
-    const response = DeleteExerciseEntry.call(ctx.user_id.?, ctx.app.db, entry_id) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
-
-    try res.json(response, .{});
-}
-
-pub fn getExerciseEntryRange(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const query = try req.query();
-    const start = query.get("start") orelse {
-        try handleResponse(res, ResponseError.bad_request, "Missing ?start= from request parameters!");
-        return;
-    };
-    const end = query.get("end") orelse {
-        try handleResponse(res, ResponseError.bad_request, "Missing ?end= from request parameters!");
-        return;
-    };
-    const request: GetRange.Request = .{ .range_start = start, .range_end = end };
-
-    var exercises = GetRange.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db, request) catch |err| {
-        switch (err) {
-            error.NoEntriesFound => try handleResponse(res, ResponseError.not_found, "No exercise entries found in the given range!"),
-            else => try handleResponse(res, ResponseError.internal_server_error, null),
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, Params, void), res: *httpz.Response) anyerror!void {
+        // TODO: merge this with future handler based verification
+        if (!request.body.isValid()) {
+            try handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
+            return;
         }
-        return;
+        const response = EditModel.call(ctx.user_id.?, request.params.entry_id, ctx.app.db, request.body) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
+
+        try res.json(response, .{});
+    }
+});
+
+const Delete = Endpoint(struct {
+    const Params = DeleteModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Params = Params,
+        },
+        .Response = DeleteModel.Response,
+        .method = .DELETE,
+        .path = "/api/exercise/entry/:entry_id",
+        .route_data = .{ .restricted = true },
     };
-    defer exercises.deinit();
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
+        const response = DeleteModel.call(ctx.user_id.?, ctx.app.db, request.params) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
 
-    res.status = 200;
-    try res.json(exercises.list, .{});
-}
+        try res.json(response, .{});
+    }
+});
 
+const GetRange = Endpoint(struct {
+    const Query = GetRangeModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Query = Query,
+        },
+        .Response = GetRangeModel.Response,
+        .method = .GET,
+        .path = "/api/exercise/entry/range",
+        .route_data = .{ .restricted = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, Query), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const response = GetRangeModel.call(allocator, ctx.user_id.?, ctx.app.db, request.query) catch |err| {
+            switch (err) {
+                error.NoEntriesFound => try handleResponse(res, ResponseError.not_found, "No exercise entries found in the given range!"),
+                else => try handleResponse(res, ResponseError.internal_server_error, null),
+            }
+            return;
+        };
+        defer allocator.free(response);
+
+        res.status = 200;
+        try res.json(response, .{});
+    }
+});
 const Tests = @import("../../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -96,7 +118,7 @@ test "Endpoint Exercise | Log Entry" {
     // SETUP
     const test_name = "Endpoint Exercise | Log Entry";
     const ht = @import("httpz").testing;
-    const Create = @import("../../models/exercise/exercise.zig").Create;
+    const CreateExercise = @import("../../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
     const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
@@ -116,15 +138,15 @@ test "Endpoint Exercise | Log Entry" {
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
-    const create_request = Create.Request{
+    const create_request = CreateExercise.Request{
         .name = test_name ++ " exercise",
         .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
-    const exercise = try Create.call(user.id, test_env.database, create_request);
+    const exercise = try CreateExercise.call(user.id, test_env.database, create_request);
 
-    const body = LogExercise.Request{
+    const body = CreateModel.Request{
         .exercise_id = @intCast(exercise.id),
         .unit_id = @intCast(unit.id),
         .value = 123,
@@ -141,10 +163,10 @@ test "Endpoint Exercise | Log Entry" {
 
         web_test.body(body_string);
 
-        try createEntry(&context, web_test.req, web_test.res);
+        try Create.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(LogExercise.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(CreateModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
@@ -158,7 +180,7 @@ test "Endpoint Exercise | Edit Entry" {
     // SETUP
     const test_name = "Endpoint Exercise | Edit Entry";
     const ht = @import("httpz").testing;
-    const Create = @import("../../models/exercise/exercise.zig").Create;
+    const CreateExercise = @import("../../models/exercise/exercise.zig").Create;
     const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
     const test_env = Tests.test_env;
@@ -179,21 +201,21 @@ test "Endpoint Exercise | Edit Entry" {
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
-    const create_request = Create.Request{
+    const create_request = CreateExercise.Request{
         .name = test_name ++ " exercise",
         .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
-    const exercise = try Create.call(user.id, test_env.database, create_request);
+    const exercise = try CreateExercise.call(user.id, test_env.database, create_request);
 
-    const log_request = LogExercise.Request{
+    const log_request = CreateModel.Request{
         .exercise_id = @intCast(exercise.id),
         .unit_id = @intCast(unit.id),
         .value = 123,
     };
-    const log_response = try LogExercise.call(user.id, test_env.database, log_request);
-    const body = EditExerciseEntry.Request{
+    const log_response = try CreateModel.call(user.id, test_env.database, log_request);
+    const body = EditModel.Request{
         .value = 10,
         .notes = test_name ++ "'s notes",
     };
@@ -215,10 +237,10 @@ test "Endpoint Exercise | Edit Entry" {
 
         web_test.param("entry_id", log_id);
 
-        try editEntry(&context, web_test.req, web_test.res);
+        try Edit.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(EditExerciseEntry.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(EditModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
@@ -235,7 +257,7 @@ test "Endpoint Exercise | Delete Entry" {
     // SETUP
     const test_name = "Endpoint Exercise | Delete Entry";
     const ht = @import("httpz").testing;
-    const Create = @import("../../models/exercise/exercise.zig").Create;
+    const CreateExercise = @import("../../models/exercise/exercise.zig").Create;
     const CreateCategory = @import("../../models/exercise/category.zig").Create;
     const CreateUnit = @import("../../models/exercise/unit.zig").Create;
     const test_env = Tests.test_env;
@@ -256,15 +278,15 @@ test "Endpoint Exercise | Delete Entry" {
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
-    const create_request = Create.Request{
+    const create_request = CreateExercise.Request{
         .name = test_name ++ " exercise",
         .unit_ids = &unit_ids,
         .category_ids = &category_ids,
     };
 
-    const exercise = try Create.call(user.id, test_env.database, create_request);
+    const exercise = try CreateExercise.call(user.id, test_env.database, create_request);
 
-    const log_request = LogExercise.Request{
+    const log_request = CreateModel.Request{
         .exercise_id = @intCast(exercise.id),
         .unit_id = @intCast(unit.id),
         .value = 123,
@@ -273,7 +295,7 @@ test "Endpoint Exercise | Delete Entry" {
     var context = try TestSetup.createContext(user.id, allocator, test_env.database);
     defer TestSetup.deinitContext(allocator, context);
 
-    const log = try LogExercise.call(user.id, test_env.database, log_request);
+    const log = try CreateModel.call(user.id, test_env.database, log_request);
 
     const log_id = try std.fmt.allocPrint(allocator, "{}", .{log.id});
     defer allocator.free(log_id);
@@ -284,10 +306,10 @@ test "Endpoint Exercise | Delete Entry" {
 
         web_test.param("entry_id", log_id);
 
-        try deleteEntry(&context, web_test.req, web_test.res);
+        try Delete.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice(LogExercise.Response, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice(CreateModel.Response, allocator, response_body, .{});
         defer response.deinit();
 
         try std.testing.expectEqual(user.id, response.value.created_by);
@@ -362,7 +384,7 @@ test "Endpoint Exercise | Get Range" {
     defer allocator.free(range_end);
 
     // log exercise
-    const log_exercise = try LogExercise.call(user.id, test_env.database, .{
+    const log_exercise = try CreateModel.call(user.id, test_env.database, .{
         .exercise_id = @intCast(create_exercise.id),
         .unit_id = @intCast(unit.id),
         .value = 123,
@@ -373,13 +395,13 @@ test "Endpoint Exercise | Get Range" {
         var web_test = ht.init(.{});
         defer web_test.deinit();
 
-        web_test.query("start", range_start);
-        web_test.query("end", range_end);
+        web_test.query("range_start", range_start);
+        web_test.query("range_end", range_end);
 
-        try getExerciseEntryRange(&context, web_test.req, web_test.res);
+        try GetRange.call(&context, web_test.req, web_test.res);
         try web_test.expectStatus(200);
         const response_body = try web_test.getBody();
-        const response = try std.json.parseFromSlice([]GetRange.EntryList, allocator, response_body, .{});
+        const response = try std.json.parseFromSlice([]GetRangeModel.EntryList, allocator, response_body, .{});
         defer response.deinit();
 
         for (response.value) |entry| {
@@ -401,9 +423,13 @@ const Handler = @import("../../handler.zig");
 const handleResponse = @import("../../response.zig").handleResponse;
 const ResponseError = @import("../../response.zig").ResponseError;
 
-const LogExercise = @import("../../models/exercise/exercise.zig").LogExercise;
-const DeleteExerciseEntry = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
-const EditExerciseEntry = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
-const GetRange = @import("../../models/exercise/exercise.zig").GetRange;
+const CreateModel = @import("../../models/exercise/exercise.zig").LogExercise;
+const DeleteModel = @import("../../models/exercise/exercise.zig").DeleteExerciseEntry;
+const EditModel = @import("../../models/exercise/exercise.zig").EditExerciseEntry;
+const GetRangeModel = @import("../../models/exercise/exercise.zig").GetRange;
 
 const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;
+
+const Endpoint = @import("../../handler.zig").Endpoint;
+const EndpointRequest = @import("../../handler.zig").EndpointRequest;
+const EndpointData = @import("../../handler.zig").EndpointData;

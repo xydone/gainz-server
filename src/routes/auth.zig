@@ -1,9 +1,8 @@
 const log = std.log.scoped(.auth);
 
+const endpoint_list: []EndpointData = .{ Create.endpoint_data, Refresh.endpoint_data };
+
 pub inline fn init(router: *Handler.Router) void {
-    //     router.*.post("/api/auth", createToken, .{});
-    //     router.*.post("/api/auth/logout", invalidateToken, .{ .data = &RouteData });
-    //     router.*.post("/api/auth/refresh", refreshToken, .{ .data = &RouteData });
     Create.init(router);
     Refresh.init(router);
 }

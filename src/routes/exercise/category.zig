@@ -1,35 +1,54 @@
+pub const endpoint_data: []EndpointData = .{
+    Get.endpoint_data,
+    Create.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
-    const RouteData = Handler.RouteData{ .restricted = true };
-    router.*.get("/api/exercise/category", getCategories, .{ .data = &RouteData });
-    router.*.post("/api/exercise/category", createCategory, .{ .data = &RouteData });
+    Get.init(router);
+    Create.init(router);
 }
 
-pub fn getCategories(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    _ = req; // autofix
-    const categories = Get.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
+pub const Get = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = GetModel.Response,
+        .method = .GET,
+        .path = "/api/exercise/category",
+        .route_data = .{ .restricted = true },
     };
-    res.status = 200;
-    try res.json(categories, .{});
-}
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const allocator = res.arena;
+        const categories = GetModel.call(allocator, ctx.user_id.?, ctx.app.db) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        allocator.free(categories);
+        res.status = 200;
+        try res.json(categories, .{});
+    }
+});
 
-pub fn createCategory(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) anyerror!void {
-    const body = req.body() orelse {
-        try handleResponse(res, ResponseError.body_missing, null);
-        return;
+pub const Create = Endpoint(struct {
+    const Body = CreateModel.Request;
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{
+            .Body = Body,
+        },
+        .Response = CreateModel.Response,
+        .method = .POST,
+        .path = "/api/exercise/category",
+        .route_data = .{ .restricted = true },
     };
-    const category = std.json.parseFromSliceLeaky(Create.Request, ctx.app.allocator, body, .{}) catch {
-        try handleResponse(res, ResponseError.body_missing_fields, null);
-        return;
-    };
-    _ = Create.call(ctx.user_id.?, ctx.app.db, category) catch {
-        try handleResponse(res, ResponseError.internal_server_error, null);
-        return;
-    };
-    res.status = 200;
-}
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+            try handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        res.status = 200;
 
+        try res.json(response, .{});
+    }
+});
 const std = @import("std");
 
 const httpz = @import("httpz");
@@ -39,5 +58,9 @@ const handleResponse = @import("../../response.zig").handleResponse;
 const ResponseError = @import("../../response.zig").ResponseError;
 
 const types = @import("../../types.zig");
-const Create = @import("../../models/exercise/category.zig").Create;
-const Get = @import("../../models/exercise/category.zig").Get;
+const CreateModel = @import("../../models/exercise/category.zig").Create;
+const GetModel = @import("../../models/exercise/category.zig").Get;
+
+const Endpoint = @import("../../handler.zig").Endpoint;
+const EndpointRequest = @import("../../handler.zig").EndpointRequest;
+const EndpointData = @import("../../handler.zig").EndpointData;
