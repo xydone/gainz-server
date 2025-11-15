@@ -1,4 +1,4 @@
-pub const endpoint_data: []EndpointData = .{
+pub const endpoint_data = [_]EndpointData{
     Get.endpoint_data,
     Create.endpoint_data,
 };

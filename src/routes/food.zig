@@ -1,6 +1,12 @@
 const log = std.log.scoped(.food);
 
-const endpoint_list: []Endpoint = &.{ GetFood, PostFood };
+pub const endpoint_data = [_]EndpointData{
+    GetFood.endpoint_data,
+    PostFood.endpoint_data,
+    SearchFood.endpoint_data,
+    GetServing.endpoint_data,
+    CreateServing.endpoint_data,
+};
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     GetFood.init(router);

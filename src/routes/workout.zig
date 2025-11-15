@@ -1,3 +1,10 @@
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    GetAll.endpoint_data,
+    GetExerciseList.endpoint_data,
+    AddExercises.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Create.init(router);
     GetAll.init(router);

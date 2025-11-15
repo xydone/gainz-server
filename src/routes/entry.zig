@@ -1,4 +1,16 @@
 const log = std.log.scoped(.entry);
+
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    Get.endpoint_data,
+    Delete.endpoint_data,
+    Edit.endpoint_data,
+    GetRecent.endpoint_data,
+    GetAverage.endpoint_data,
+    GetBreakdown.endpoint_data,
+    GetRange.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Create.init(router);
     Get.init(router);

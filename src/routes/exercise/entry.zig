@@ -1,4 +1,4 @@
-pub const endpoint_data: []EndpointData = .{
+pub const endpoint_data = [_]EndpointData{
     Create.endpoint_data,
     Edit.endpoint_data,
     Delete.endpoint_data,

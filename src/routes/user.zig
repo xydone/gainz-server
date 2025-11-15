@@ -1,6 +1,7 @@
 const log = std.log.scoped(.users);
-
-pub const endpoint_list = &.{CreateEndpoint};
+pub const endpoint_data = [_]EndpointData{
+    CreateEndpoint.endpoint_data,
+};
 
 pub inline fn init(router: *Handler.Router) void {
     CreateEndpoint.init(router);

@@ -1,12 +1,3 @@
-const endpoint_list: []Handler.Endpoint = &.{
-    User.endpoint_list,
-    Food.endpoint_list,
-    Auth.endpoint_list,
-    Note.endpoint_list,
-    Exercise.endpoint_list,
-    Workout.endpoint_list,
-};
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     // /api/user
     User.init(router);

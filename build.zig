@@ -1,10 +1,13 @@
-const std = @import("std");
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const module = b.addModule("gainz_server", .{
         .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const openapi_module = b.addModule("openapi-generator", .{
+        .root_source_file = b.path("src/openapi.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -32,6 +35,11 @@ pub fn build(b: *std.Build) void {
     module.addImport("jwt", jwt.module("jwt"));
     module.addImport("zdt", zdt.module("zdt"));
 
+    openapi_module.addImport("pg", pg.module("pg"));
+    openapi_module.addImport("httpz", httpz.module("httpz"));
+    openapi_module.addImport("jwt", jwt.module("jwt"));
+    openapi_module.addImport("zdt", zdt.module("zdt"));
+
     const exe = b.addExecutable(.{
         .name = "gainz_server",
         .root_module = module,
@@ -39,6 +47,12 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
 
     b.installArtifact(exe);
+
+    const openapi_generator_exe = b.addExecutable(.{
+        .name = "openapi-generator",
+        .root_module = openapi_module,
+    });
+    openapi_generator_exe.linkLibC();
 
     const run_cmd = b.addRunArtifact(exe);
 
@@ -56,6 +70,12 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    const run_openapi_generator = b.addRunArtifact(openapi_generator_exe);
+
+    const openapi_run_step = b.step("openapi", "Run OpenAPI generator");
+
+    openapi_run_step.dependOn(&run_openapi_generator.step);
+
     // add args
     if (b.args) |args| {
         run_cmd.addArgs(args);
@@ -65,6 +85,13 @@ pub fn build(b: *std.Build) void {
         .name = "gainz_server",
         .root_module = module,
     });
+    const openapi_check = b.addExecutable(.{
+        .name = "openapi-generator",
+        .root_module = openapi_module,
+    });
     const check = b.step("check", "Check if gainz_server compiles");
     check.dependOn(&exe_check.step);
+    check.dependOn(&openapi_check.step);
 }
+
+const std = @import("std");

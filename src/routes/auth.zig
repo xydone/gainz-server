@@ -1,6 +1,9 @@
 const log = std.log.scoped(.auth);
 
-const endpoint_list: []EndpointData = .{ Create.endpoint_data, Refresh.endpoint_data };
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    Refresh.endpoint_data,
+};
 
 pub inline fn init(router: *Handler.Router) void {
     Create.init(router);

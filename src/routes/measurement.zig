@@ -1,5 +1,12 @@
 const log = std.log.scoped(.measurement);
 
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    Get.endpoint_data,
+    GetRange.endpoint_data,
+    GetRecent.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Create.init(router);
     Get.init(router);
@@ -15,7 +22,7 @@ pub const Get = Endpoint(struct {
         },
         .Response = GetModel.Response,
         .method = .GET,
-        .path = "/api/user/measurement",
+        .path = "/api/user/measurement/:measurement_id",
         .route_data = .{ .restricted = true },
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {

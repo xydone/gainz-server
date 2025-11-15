@@ -1,12 +1,15 @@
 const log = std.log.scoped(.goals);
 
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    GetActive.endpoint_data,
+    GetAll.endpoint_data,
+};
+
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Create.init(router);
     GetActive.init(router);
     GetAll.init(router);
-    // router.*.post("/api/user/goals", createGoal, .{ .data = &RouteData });
-    // router.*.get("/api/user/goals", GetAll.call, .{ .data = &RouteData });
-    // router.*.get("/api/user/goals/active", GetActive.call, .{ .data = &RouteData });
 }
 
 const Create = Endpoint(struct {

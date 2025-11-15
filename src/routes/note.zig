@@ -1,6 +1,9 @@
 const log = std.log.scoped(.users);
 
-const endpoint_list: []EndpointData = .{ Create.endpoint_data, Get.endpoint_data };
+pub const endpoint_data = [_]EndpointData{
+    Create.endpoint_data,
+    Get.endpoint_data,
+};
 
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Create.init(router);

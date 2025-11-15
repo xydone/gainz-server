@@ -1,10 +1,3 @@
-const endpoint_list: []Handler.EndpointData = .{
-    Exercise.endpoint_data,
-    Category.endpoint_data,
-    Unit.endpoint_data,
-    Entry.endpoint_data,
-};
-
 pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestContext, *httpz.request.Request, *httpz.response.Response) anyerror!void)) void {
     Exercise.init(router);
     Category.init(router);
