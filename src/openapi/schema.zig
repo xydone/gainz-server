@@ -36,11 +36,19 @@ pub fn init(T: type) Schema {
             const child_type = switch (type_info) {
                 .optional => inner_blk: {
                     if (@typeInfo(type_info.optional.child) == .pointer) {
-                        break :inner_blk @typeInfo(type_info.optional.child).pointer.child;
+                        const child = @typeInfo(type_info.optional.child).pointer.child;
+                        if (child == u8) {
+                            break :inner_blk []u8;
+                        }
+                        break :inner_blk child;
                     }
+
                     break :inner_blk type_info.optional.child;
                 },
-                .pointer => type_info.pointer.child,
+                .pointer => inner_blk: {
+                    const child = type_info.pointer.child;
+                    break :inner_blk if (child == u8 and type_info.pointer.size == .slice) []u8 else child;
+                },
                 else => T,
             };
             break :blk .{
@@ -69,13 +77,11 @@ pub const Types = enum {
             },
             .@"enum" => return .string,
             .pointer => |ptr| {
-                if (ptr.size == .slice) return .array;
+                if (ptr.size == .slice and ptr.child != u8) return .array else return .string;
             },
             else => {},
         }
         return switch (T) {
-            u8,
-            i8,
             i16,
             u16,
             i32,
@@ -95,8 +101,7 @@ pub const Types = enum {
             => .number,
             []const u8, []u8, ?[]const u8, ?[]u8 => .string,
             []i32 => .array,
-            else => |nt| @compileError(std.fmt.comptimePrint("{} not supported | {}", .{ nt, type_info })),
-            // else => .string, //TODO: this is not correct
+            else => |t| @compileError(std.fmt.comptimePrint("{} not supported | {}", .{ t, type_info })),
         };
     }
 };

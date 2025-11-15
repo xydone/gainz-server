@@ -33,10 +33,10 @@ pub fn main() !void {
             defer required.deinit(allocator);
 
             if (@typeInfo(endpoint.Request.Body) == .@"struct") {
-                const str = @typeInfo(endpoint.Request.Body).@"struct";
-                inline for (str.fields) |field| {
+                const @"struct" = @typeInfo(endpoint.Request.Body).@"struct";
+                inline for (@"struct".fields) |field| {
                     if (@typeInfo(field.type) != .optional) try required.append(allocator, field.name);
-                    // try schema_map.put(field.name, Schema.init(field.type));
+                    try schema_map.put(field.name, Schema.init(field.type));
                 }
             }
             if (schema_map.count() != 0) {
@@ -55,9 +55,9 @@ pub fn main() !void {
             }
 
             if (@typeInfo(endpoint.Request.Params) == .@"struct") {
-                const str = @typeInfo(endpoint.Request.Params).@"struct";
+                const @"struct" = @typeInfo(endpoint.Request.Params).@"struct";
 
-                inline for (str.fields) |field| {
+                inline for (@"struct".fields) |field| {
                     try parameters.append(allocator, .{
                         .name = field.name,
                         .in = .path,
@@ -67,9 +67,9 @@ pub fn main() !void {
                 }
             }
             if (@typeInfo(endpoint.Request.Query) == .@"struct") {
-                const str = @typeInfo(endpoint.Request.Query).@"struct";
+                const @"struct" = @typeInfo(endpoint.Request.Query).@"struct";
 
-                inline for (str.fields) |field| {
+                inline for (@"struct".fields) |field| {
                     try parameters.append(allocator, .{
                         .name = field.name,
                         .in = .query,
@@ -139,8 +139,8 @@ fn insertParameter(route_info: struct {
 
     var schema_map = std.StringHashMap(Schema).init(allocator);
     if (@typeInfo(ResponseT) == .@"struct") {
-        const str = @typeInfo(ResponseT).@"struct";
-        inline for (str.fields) |field| {
+        const @"struct" = @typeInfo(ResponseT).@"struct";
+        inline for (@"struct".fields) |field| {
             try schema_map.put(field.name, Schema.init(field.type));
         }
     }

@@ -4,9 +4,6 @@ info: struct {
     version: []const u8,
 },
 paths: std.StringHashMap(Path),
-// components: ?struct {
-//     schemas: std.StaticStringMap(Schema),
-// } = null,
 
 pub fn jsonStringify(self: @This(), jws: *std.json.Stringify) !void {
     try jsonStringifyWithoutNull(self, jws);
