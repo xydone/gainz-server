@@ -19,7 +19,7 @@ pattern: ?[]const u8 = null,
 items: ?*Schema = null,
 minProperties: ?i64 = null,
 required: ?[]const []const u8 = null,
-enum_values: ?[][]const u8 = null,
+@"enum": ?[][]const u8 = null,
 type: ?Types = null,
 description: ?[]const u8 = null,
 format: ?[]const u8 = null,
@@ -31,8 +31,16 @@ deprecated: ?bool = null,
 pub fn init(T: type, allocator: std.mem.Allocator) Schema {
     const @"type" = Types.parse(T);
     const type_info = @typeInfo(T);
+
     return .{
         .type = @"type",
+        .@"enum" = if (type_info == .@"enum") blk: {
+            var values = std.ArrayList([]const u8).empty;
+            inline for (type_info.@"enum".fields) |field| {
+                values.append(allocator, field.name) catch @panic("OOM");
+            }
+            break :blk values.items;
+        } else null,
         .items = if (@"type" == .array) blk: {
             const child_type = switch (type_info) {
                 .optional => inner_blk: {
