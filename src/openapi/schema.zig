@@ -13,9 +13,10 @@ minLength: ?i64 = null,
 pattern: ?[]const u8 = null,
 // This should actually be of type SchemaObject, however right now this would introduce
 // a circular dependency, so I have only included the minimally necessary things for Gainz.
-items: ?struct {
-    type: ?Types = null,
-} = null,
+// items: ?struct {
+//     type: ?Types = null,
+// } = null,
+items: ?*Schema = null,
 minProperties: ?i64 = null,
 required: ?[]const []const u8 = null,
 enum_values: ?[][]const u8 = null,
@@ -27,7 +28,7 @@ readOnly: ?bool = null,
 writeOnly: ?bool = null,
 deprecated: ?bool = null,
 
-pub fn init(T: type) Schema {
+pub fn init(T: type, allocator: std.mem.Allocator) Schema {
     const @"type" = Types.parse(T);
     const type_info = @typeInfo(T);
     return .{
@@ -51,9 +52,34 @@ pub fn init(T: type) Schema {
                 },
                 else => T,
             };
-            break :blk .{
-                .type = Types.parse(child_type),
+            const schema = allocator.create(Schema) catch @panic("OOM");
+            const parsed_type = Types.parse(child_type);
+
+            var properties_map: ?std.StringHashMap(Schema) = null;
+
+            if (parsed_type == .object) {
+                var map = std.StringHashMap(Schema).init(allocator);
+                const child_type_info = @typeInfo(child_type);
+                const struct_info = switch (child_type_info) {
+                    .optional => @typeInfo(child_type_info.optional.child),
+                    else => child_type_info,
+                };
+
+                if (struct_info == .@"struct") {
+                    inline for (struct_info.@"struct".fields) |field| {
+                        // recursively generate each field element
+                        const field_schema = Schema.init(field.type, allocator);
+                        map.put(field.name, field_schema) catch @panic("OOM");
+                    }
+                }
+                properties_map = map;
+            }
+
+            schema.* = Schema{
+                .type = parsed_type,
+                .properties = properties_map,
             };
+            break :blk schema;
         } else null,
     };
 }

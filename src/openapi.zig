@@ -36,7 +36,7 @@ pub fn main() !void {
                 const @"struct" = @typeInfo(endpoint.Request.Body).@"struct";
                 inline for (@"struct".fields) |field| {
                     if (@typeInfo(field.type) != .optional) try required.append(allocator, field.name);
-                    try schema_map.put(field.name, Schema.init(field.type));
+                    try schema_map.put(field.name, Schema.init(field.type, allocator));
                 }
             }
             if (schema_map.count() != 0) {
@@ -62,7 +62,7 @@ pub fn main() !void {
                         .name = field.name,
                         .in = .path,
                         .required = true,
-                        .schema = Schema.init(field.type),
+                        .schema = Schema.init(field.type, allocator),
                     });
                 }
             }
@@ -74,7 +74,7 @@ pub fn main() !void {
                         .name = field.name,
                         .in = .query,
                         .required = true,
-                        .schema = Schema.init(field.type),
+                        .schema = Schema.init(field.type, allocator),
                     });
                 }
             }
@@ -138,20 +138,41 @@ fn insertParameter(route_info: struct {
     var responses = std.StringHashMap(Response).init(allocator);
 
     var schema_map = std.StringHashMap(Schema).init(allocator);
-    if (@typeInfo(ResponseT) == .@"struct") {
-        const @"struct" = @typeInfo(ResponseT).@"struct";
-        inline for (@"struct".fields) |field| {
-            try schema_map.put(field.name, Schema.init(field.type));
-        }
+
+    switch (@typeInfo(ResponseT)) {
+        .@"struct" => |@"struct"| {
+            inline for (@"struct".fields) |field| {
+                try schema_map.put(field.name, Schema.init(field.type, allocator));
+            }
+        },
+        .pointer => |ptr| blk: {
+            if (ptr.size != .slice) break :blk;
+            inline for (@typeInfo(ptr.child).@"struct".fields) |field| {
+                try schema_map.put(field.name, Schema.init(field.type, allocator));
+            }
+        },
+        else => {},
     }
+
+    const schema: Schema = switch (@typeInfo(ResponseT)) {
+        .@"struct" => Schema{ .properties = schema_map },
+        .pointer => blk: {
+            const items = try allocator.create(Schema);
+            items.* = Schema{
+                .type = .object,
+                .properties = schema_map,
+            };
+
+            break :blk Schema{ .type = .array, .items = items };
+        },
+        else => {},
+    };
 
     try responses.put("200", Response{
         .description = "Success",
         .content = .{
             .@"application/json" = .{
-                .schema = .{
-                    .properties = schema_map,
-                },
+                .schema = schema,
             },
         },
     });
