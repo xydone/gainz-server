@@ -86,7 +86,7 @@ pub fn main() !void {
             }, endpoint.Response, allocator, &path_map);
         }
     }
-    const file = try std.fs.cwd().createFile("openapi.json", .{});
+    const file = try std.fs.cwd().createFile("docs/openapi.json", .{});
     defer file.close();
 
     const document: OpenAPI = .{

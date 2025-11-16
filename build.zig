@@ -75,6 +75,7 @@ pub fn build(b: *std.Build) void {
     const openapi_run_step = b.step("openapi", "Run OpenAPI generator");
 
     openapi_run_step.dependOn(&run_openapi_generator.step);
+    run_step.dependOn(openapi_run_step);
 
     // add args
     if (b.args) |args| {
@@ -85,13 +86,14 @@ pub fn build(b: *std.Build) void {
         .name = "gainz_server",
         .root_module = module,
     });
-    const openapi_check = b.addExecutable(.{
+    const openapi_exe = b.addExecutable(.{
         .name = "openapi-generator",
         .root_module = openapi_module,
     });
+
     const check = b.step("check", "Check if gainz_server compiles");
     check.dependOn(&exe_check.step);
-    check.dependOn(&openapi_check.step);
+    check.dependOn(&openapi_exe.step);
 }
 
 const std = @import("std");
