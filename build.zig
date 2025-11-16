@@ -94,6 +94,7 @@ pub fn build(b: *std.Build) void {
     const check = b.step("check", "Check if gainz_server compiles");
     check.dependOn(&exe_check.step);
     check.dependOn(&openapi_exe.step);
+    check.dependOn(&exe_unit_tests.step);
 }
 
 const std = @import("std");

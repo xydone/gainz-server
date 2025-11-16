@@ -46,6 +46,7 @@ test "tests:beforeAll" {
     try Tests.TestEnvironment.init();
 
     std.testing.refAllDecls(@This());
+    _ = @import("endpoint.zig");
 }
 
 test "tests:afterAll" {

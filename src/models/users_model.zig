@@ -10,8 +10,8 @@ pub const Create = struct {
     };
     pub const Response = struct {
         id: i32,
-        display_name: []u8,
-        username: []u8,
+        display_name: []const u8,
+        username: []const u8,
         pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
             allocator.free(self.display_name);
             allocator.free(self.username);

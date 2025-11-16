@@ -10,7 +10,7 @@ pub const Create = struct {
     pub const Response = struct {
         id: i32,
         amount: f64,
-        unit: []u8,
+        unit: []const u8,
         multiplier: f64,
         food_id: i32,
     };
@@ -73,7 +73,7 @@ pub const Get = struct {
         while (result.next() catch return error.CannotGet) |row| {
             const id = row.get(i32, 0);
             const amount = row.get(f64, 3);
-            const unit = row.get([]u8, 4);
+            const unit = row.get([]const u8, 4);
             const multiplier = row.get(f64, 5);
 
             response.append(allocator, Response{ .id = id, .amount = amount, .unit = unit, .multiplier = multiplier }) catch return error.OutOfMemory;

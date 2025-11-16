@@ -40,8 +40,8 @@ pub const Create = struct {
 
 pub const Get = struct {
     pub const Request = struct {
-        name: []u8,
-        description: ?[]u8 = null,
+        name: []const u8,
+        description: ?[]const u8 = null,
     };
     pub const Response = struct {
         id: i32,
