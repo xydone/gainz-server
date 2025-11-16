@@ -159,7 +159,6 @@ pub fn Endpoint(
 
         pub fn call(ctx: *Handler.RequestContext, req: *httpz.Request, res: *httpz.Response) !void {
             const allocator = res.arena;
-            // TODO: Make this handle missing data!!!
             const request: EndpointRequest(T.endpoint_data.Request.Body, T.endpoint_data.Request.Params, T.endpoint_data.Request.Query) = .{
                 .body = blk: {
                     switch (@typeInfo(T.endpoint_data.Request.Body)) {
@@ -183,10 +182,17 @@ pub fn Endpoint(
                         else => |type_info| {
                             var params: T.endpoint_data.Request.Params = undefined;
                             inline for (type_info.@"struct".fields) |field| {
+                                const value = req.param(field.name) orelse {
+                                    const msg = try std.fmt.allocPrint(allocator, "{s} not found inside parameters!", .{field.name});
+                                    defer allocator.free(msg);
+                                    return try handleResponse(res, ResponseError.bad_request, msg);
+                                };
                                 switch (field.type) {
-                                    u16, u32, u64 => |t| @field(params, field.name) = try std.fmt.parseInt(t, req.param(field.name).?, 10),
-                                    f16, f32, f64 => |t| @field(params, field.name) = try std.fmt.parseFloat(t, req.param(field.name).?),
-                                    []const u8, []u8 => @field(params, field.name) = req.param(field.name).?,
+                                    u16, u32, u64 => |t| @field(params, field.name) = try std.fmt.parseInt(t, value, 10),
+                                    f16, f32, f64 => |t| @field(params, field.name) = try std.fmt.parseFloat(
+                                        t,
+                                    ),
+                                    []const u8, []u8 => @field(params, field.name) = value,
                                     else => |t| @compileError(std.fmt.comptimePrint("{} not supported!", .{t})),
                                 }
                             }
@@ -202,12 +208,32 @@ pub fn Endpoint(
                             var query: T.endpoint_data.Request.Query = undefined;
                             inline for (type_info.@"struct".fields) |field| {
                                 var q = try req.query();
+                                const value = q.get(field.name) orelse {
+                                    const msg = try std.fmt.allocPrint(allocator, "{s} not found inside query!", .{field.name});
+                                    defer allocator.free(msg);
+                                    return try handleResponse(res, ResponseError.bad_request, msg);
+                                };
                                 switch (field.type) {
-                                    u16, u32, u64 => |t| @field(query, field.name) = try std.fmt.parseInt(t, q.get(field.name).?, 10),
-                                    f16, f32, f64 => |t| @field(query, field.name) = try std.fmt.parseFloat(t, q.get(field.name).?),
-                                    []const u8, []u8 => @field(query, field.name) = q.get(field.name) orelse std.debug.panic("{s} wasn't found", .{field.name}),
-                                    types.MeasurementType => @field(query, field.name) = std.meta.stringToEnum(types.MeasurementType, q.get(field.name).?) orelse std.debug.panic("{s} wasn't found in MeasurementType", .{field.name}),
-                                    else => |t| @compileError(std.fmt.comptimePrint("{} not supported!", .{t})),
+                                    u16, u32, u64 => |t| @field(query, field.name) = try std.fmt.parseInt(t, value, 10),
+                                    f16, f32, f64 => |t| @field(query, field.name) = try std.fmt.parseFloat(t, value),
+                                    []const u8, []u8 => @field(query, field.name) = value,
+                                    else => |t| {
+                                        switch (@typeInfo(t)) {
+                                            .@"enum" => @field(query, field.name) = std.meta.stringToEnum(t, value) orelse {
+                                                const enum_name = enum_blk: {
+                                                    const name = @typeName(t);
+                                                    // filter out the namespace that gets included inside the @typeInfo() response
+                                                    // exit early if type does not have a namespace
+                                                    const i = std.mem.lastIndexOfScalar(u8, name, '.') orelse break :enum_blk name;
+                                                    break :enum_blk name[i + 1 ..];
+                                                };
+                                                const msg = try std.fmt.allocPrint(allocator, "Incorrect value '{s}' for enum {s}", .{ value, enum_name });
+                                                defer allocator.free(msg);
+                                                return try handleResponse(res, ResponseError.bad_request, msg);
+                                            },
+                                            else => @compileError(std.fmt.comptimePrint("{} not supported!", .{t})),
+                                        }
+                                    },
                                 }
                             }
 
