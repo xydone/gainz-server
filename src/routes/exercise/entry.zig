@@ -25,7 +25,7 @@ const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -50,11 +50,11 @@ const Edit = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, Params, void), res: *httpz.Response) anyerror!void {
         // TODO: merge this with future handler based verification
         if (!request.body.isValid()) {
-            try handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
+            handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
             return;
         }
         const response = EditModel.call(ctx.user_id.?, request.params.entry_id, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -76,7 +76,7 @@ const Delete = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
         const response = DeleteModel.call(ctx.user_id.?, ctx.app.db, request.params) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -100,8 +100,8 @@ const GetRange = Endpoint(struct {
         const allocator = res.arena;
         const response = GetRangeModel.call(allocator, ctx.user_id.?, ctx.app.db, request.query) catch |err| {
             switch (err) {
-                error.NoEntriesFound => try handleResponse(res, ResponseError.not_found, "No exercise entries found in the given range!"),
-                else => try handleResponse(res, ResponseError.internal_server_error, null),
+                error.NoEntriesFound => handleResponse(res, ResponseError.not_found, "No exercise entries found in the given range!"),
+                else => handleResponse(res, ResponseError.internal_server_error, null),
             }
             return;
         };
@@ -430,6 +430,6 @@ const GetRangeModel = @import("../../models/exercise/exercise.zig").GetRange;
 
 const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;
 
-const Endpoint = @import("../../handler.zig").Endpoint;
-const EndpointRequest = @import("../../handler.zig").EndpointRequest;
-const EndpointData = @import("../../handler.zig").EndpointData;
+const Endpoint = @import("../../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../../endpoint.zig").EndpointData;

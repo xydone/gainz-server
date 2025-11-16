@@ -24,11 +24,11 @@ const Get = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
         const result = GetModel.call(ctx, request.params) catch |err| switch (err) {
             error.NotFound => {
-                try handleResponse(res, ResponseError.not_found, null);
+                handleResponse(res, ResponseError.not_found, null);
                 return;
             },
             else => {
-                try handleResponse(res, ResponseError.internal_server_error, null);
+                handleResponse(res, ResponseError.internal_server_error, null);
                 return;
             },
         };
@@ -50,7 +50,7 @@ pub const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const result = CreateModel.call(ctx, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -68,6 +68,6 @@ const Handler = @import("../handler.zig");
 const handleResponse = @import("../response.zig").handleResponse;
 const ResponseError = @import("../response.zig").ResponseError;
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint =@import("../endpoint.zig").Endpoint;
+const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
+const EndpointData =@import("../endpoint.zig").EndpointData;

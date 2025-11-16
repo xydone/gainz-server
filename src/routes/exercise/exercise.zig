@@ -19,7 +19,7 @@ const GetAll = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
         const exercises = GetAllModel.call(allocator, ctx.user_id.?, ctx.app.db) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         defer allocator.free(exercises);
@@ -40,7 +40,7 @@ const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const exercise = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -59,6 +59,6 @@ const ResponseError = @import("../../response.zig").ResponseError;
 const CreateModel = @import("../../models/exercise/exercise.zig").Create;
 const GetAllModel = @import("../../models/exercise/exercise.zig").GetAll;
 
-const Endpoint = @import("../../handler.zig").Endpoint;
-const EndpointRequest = @import("../../handler.zig").EndpointRequest;
-const EndpointData = @import("../../handler.zig").EndpointData;
+const Endpoint = @import("../../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../../endpoint.zig").EndpointData;

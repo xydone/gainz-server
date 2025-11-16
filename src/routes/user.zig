@@ -18,7 +18,7 @@ pub inline fn init(router: *Handler.Router) void {
 }
 
 const CreateEndpoint = Endpoint(struct {
-    pub const endpoint_data: Handler.EndpointData = .{
+    pub const endpoint_data: EndpointData = .{
         .Request = .{
             .Body = CreateModel.Request,
         },
@@ -34,10 +34,10 @@ const CreateEndpoint = Endpoint(struct {
         const response = CreateModel.call(ctx.app.db, allocator, request.body) catch |err| {
             switch (err) {
                 CreateModel.Errors.UsernameNotUnique => {
-                    try handleResponse(res, ResponseError.unauthorized, "Username already exists");
+                    handleResponse(res, ResponseError.unauthorized, "Username already exists");
                 },
                 else => {
-                    try handleResponse(res, ResponseError.internal_server_error, null);
+                    handleResponse(res, ResponseError.internal_server_error, null);
                 },
             }
             return;
@@ -102,6 +102,6 @@ const NoteEntries = @import("note_entries.zig");
 const Goals = @import("goals.zig");
 const Entry = @import("entry.zig");
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

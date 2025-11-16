@@ -26,7 +26,7 @@ const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const goal = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -46,11 +46,11 @@ const GetActive = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
         const response = GetActiveModel.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
             error.NoGoals => {
-                try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
+                handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
                 return;
             },
             else => {
-                try handleResponse(res, ResponseError.internal_server_error, null);
+                handleResponse(res, ResponseError.internal_server_error, null);
                 return;
             },
         };
@@ -70,11 +70,11 @@ const GetAll = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
         const response = GetAllModel.call(ctx.app.allocator, ctx.user_id.?, ctx.app.db) catch |err| switch (err) {
             error.NoGoals => {
-                try handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
+                handleResponse(res, ResponseError.not_found, "The user has no goals entered!");
                 return;
             },
             else => {
-                try handleResponse(res, ResponseError.internal_server_error, null);
+                handleResponse(res, ResponseError.internal_server_error, null);
                 return;
             },
         };
@@ -227,6 +227,6 @@ const CreateModel = @import("../models/goals_model.zig").Create;
 const GetActiveModel = @import("../models/goals_model.zig").GetActive;
 const GetAllModel = @import("../models/goals_model.zig").GetAll;
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint =@import("../endpoint.zig").Endpoint;
+const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
+const EndpointData =@import("../endpoint.zig").EndpointData;

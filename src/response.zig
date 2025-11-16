@@ -33,11 +33,11 @@ pub const ResponseError = struct {
     };
 };
 
-pub fn handleResponse(httpz_res: *httpz.Response, response_error: ResponseError, details: ?[]const u8) !void {
+pub fn handleResponse(httpz_res: *httpz.Response, response_error: ResponseError, details: ?[]const u8) void {
     var response = response_error;
     response.details = details orelse null;
     httpz_res.status = response.code;
-    try httpz_res.json(response, .{ .emit_null_optional_fields = false });
+    httpz_res.json(response, .{ .emit_null_optional_fields = false }) catch @panic("Couldn't parse error response.");
     return;
 }
 

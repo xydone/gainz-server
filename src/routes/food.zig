@@ -27,14 +27,14 @@ const GetFood = Endpoint(struct {
         .path = "/api/food/:food_id",
         .route_data = .{ .restricted = true },
     };
-    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, GetFoodModel.Request, void), res: *httpz.Response) anyerror!void {
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, GetFoodModel.Request, void) ,res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
 
         const result = GetFoodModel.call(allocator, ctx.app.db, request.params) catch |err| {
             switch (err) {
-                GetFoodModel.Errors.FoodNotFound => try handleResponse(res, ResponseError.not_found, "Food does not exist!"),
-                GetFoodModel.Errors.CannotGet => try handleResponse(res, ResponseError.not_found, null),
-                else => try handleResponse(res, ResponseError.internal_server_error, null),
+                GetFoodModel.Errors.FoodNotFound => handleResponse(res, ResponseError.not_found, "Food does not exist!"),
+                GetFoodModel.Errors.CannotGet => handleResponse(res, ResponseError.not_found, null),
+                else => handleResponse(res, ResponseError.internal_server_error, null),
             }
             return;
         };
@@ -60,7 +60,7 @@ const PostFood = Endpoint(struct {
         const allocator = res.arena;
 
         var result = CreateFood.call(ctx.user_id.?, allocator, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         defer result.deinit(allocator);
@@ -84,7 +84,7 @@ const SearchFood = Endpoint(struct {
         const allocator = res.arena;
 
         const result = SearchModel.call(allocator, ctx.app.db, request.query) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         defer {
@@ -120,7 +120,7 @@ const CreateServing = Endpoint(struct {
             .multiplier = request.body.multiplier,
             .unit = request.body.unit,
         }) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         res.status = 200;
@@ -145,8 +145,8 @@ const GetServing = Endpoint(struct {
         const allocator = res.arena;
         const result = GetServingModel.call(allocator, ctx.app.db, request.params) catch |err| {
             switch (err) {
-                GetServingModel.Errors.InvalidFoodID => try handleResponse(res, ResponseError.not_found, "Invalid food ID!"),
-                else => try handleResponse(res, ResponseError.internal_server_error, null),
+                GetServingModel.Errors.InvalidFoodID => handleResponse(res, ResponseError.not_found, "Invalid food ID!"),
+                else => handleResponse(res, ResponseError.internal_server_error, null),
             }
             return;
         };
@@ -580,6 +580,6 @@ const handleResponse = @import("../response.zig").handleResponse;
 const types = @import("../types.zig");
 const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint =@import("../endpoint.zig").Endpoint;
+const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
+const EndpointData =@import("../endpoint.zig").EndpointData;

@@ -31,7 +31,7 @@ pub fn main() !void {
     });
     const router = try server.router(.{ .middlewares = &.{cors} });
 
-    // /api endpoinds
+    // /api endpoints
     API.init(router);
 
     log.info("listening http://{s}:{d}/", .{ address, PORT });

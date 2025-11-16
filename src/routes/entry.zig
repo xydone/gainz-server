@@ -35,7 +35,7 @@ const Get = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
         const response = GetModel.call(ctx.user_id.?, ctx.app.db, request.params) catch {
-            try handleResponse(res, ResponseError.not_found, null);
+            handleResponse(res, ResponseError.not_found, null);
             return;
         };
         res.status = 200;
@@ -57,7 +57,7 @@ const Delete = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
         DeleteModel.call(ctx.app.db, request.params) catch {
-            try handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
+            handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
             return;
         };
         res.status = 200;
@@ -79,7 +79,7 @@ pub const Edit = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, Params, void), res: *httpz.Response) anyerror!void {
         EditModel.call(ctx.app.db, request.body, request.params.entry_id) catch {
-            try handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
+            handleResponse(res, ResponseError.not_found, "Cannot find an entry with this ID.");
             return;
         };
         res.status = 200;
@@ -99,7 +99,7 @@ const GetRecent = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, Query), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
         const result = GetRecentModel.call(allocator, ctx.user_id.?, ctx.app.db, request.query) catch {
-            try handleResponse(res, ResponseError.not_found, null);
+            handleResponse(res, ResponseError.not_found, null);
             return;
         };
         defer {
@@ -127,7 +127,7 @@ const GetAverage = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, Query), res: *httpz.Response) anyerror!void {
         const result = GetAverageModel.call(ctx.user_id.?, ctx.app.db, request.query) catch {
-            try handleResponse(res, ResponseError.not_found, null);
+            handleResponse(res, ResponseError.not_found, null);
             return;
         };
         res.status = 200;
@@ -150,7 +150,7 @@ pub const GetBreakdown = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, Query), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
         const result = GetBreakdownModel.call(allocator, ctx.user_id.?, ctx.app.db, request.query) catch {
-            try handleResponse(res, ResponseError.not_found, null);
+            handleResponse(res, ResponseError.not_found, null);
             return;
         };
         res.status = 200;
@@ -172,7 +172,7 @@ pub const GetRange = Endpoint(struct {
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, void, Query), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
         const result = GetRangeModel.call(allocator, ctx.user_id.?, ctx.app.db, request.query) catch {
-            try handleResponse(res, ResponseError.not_found, null);
+            handleResponse(res, ResponseError.not_found, null);
             return;
         };
         defer allocator.free(result);
@@ -195,7 +195,7 @@ pub const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
 
@@ -221,6 +221,6 @@ const handleResponse = @import("../response.zig").handleResponse;
 const ResponseError = @import("../response.zig").ResponseError;
 const types = @import("../types.zig");
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

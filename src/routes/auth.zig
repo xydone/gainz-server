@@ -33,12 +33,12 @@ const Create = Endpoint(struct {
         };
         var response = CreateModel.call(create_props, request.body) catch |err| switch (err) {
             CreateModel.Errors.UserNotFound => {
-                try handleResponse(res, ResponseError.unauthorized, null);
+                handleResponse(res, ResponseError.unauthorized, null);
                 return;
             },
             else => {
                 log.err("Error caught: {s}", .{@errorName(err)});
-                try handleResponse(res, ResponseError.internal_server_error, null);
+                handleResponse(res, ResponseError.internal_server_error, null);
                 return;
             },
         };
@@ -69,12 +69,12 @@ const Refresh = Endpoint(struct {
         };
         const response = RefreshModel.call(refresh_props) catch |err| switch (err) {
             RefreshModel.Errors.UserNotFound => {
-                try handleResponse(res, ResponseError.unauthorized, null);
+                handleResponse(res, ResponseError.unauthorized, null);
                 return;
             },
             else => {
                 log.err("Error caught: {s}", .{@errorName(err)});
-                try handleResponse(res, ResponseError.internal_server_error, null);
+                handleResponse(res, ResponseError.internal_server_error, null);
                 return;
             },
         };
@@ -101,11 +101,11 @@ const Invalidate = Endpoint(struct {
         };
         const result = InvalidateModel.call(invalidate_props) catch |err| {
             log.err("Error caught: {s}", .{@errorName(err)});
-            try handleResponse(res, ResponseError.internal_server_error, null);
+            handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
         if (result == false) {
-            try handleResponse(res, ResponseError.unauthorized, "No such active refresh token!");
+            handleResponse(res, ResponseError.unauthorized, "No such active refresh token!");
             return;
         }
         res.status = 200;
@@ -214,6 +214,6 @@ const CreateModel = @import("../models/auth_model.zig").Create;
 const RefreshModel = @import("../models/auth_model.zig").Refresh;
 const InvalidateModel = @import("../models/auth_model.zig").Invalidate;
 
-const Endpoint = @import("../handler.zig").Endpoint;
-const EndpointRequest = @import("../handler.zig").EndpointRequest;
-const EndpointData = @import("../handler.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

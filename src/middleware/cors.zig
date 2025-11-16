@@ -34,13 +34,13 @@ pub fn execute(self: *const Cors, req: *httpz.Request, res: *httpz.Response, exe
     }
 
     // NOTE: This is done due to an issue in Firefox (or the framework of my choice) which does not send out `sec-fetch-mode: cors` out correctly when it should. TODO: Extremely band-aid fix which should be adressed
-    // const mode = req.header("sec-fetch-mode") orelse {
-    //     return executor.next();
-    // };
+    const mode = req.header("sec-fetch-mode") orelse {
+        return executor.next();
+    };
 
-    // if (std.mem.eql(u8, mode, "cors") == false) {
-    //     return executor.next();
-    // }
+    if (std.mem.eql(u8, mode, "cors") == false) {
+        return executor.next();
+    }
 
     if (self.headers) |headers| {
         res.header("Access-Control-Allow-Headers", headers);
