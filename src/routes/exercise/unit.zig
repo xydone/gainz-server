@@ -19,8 +19,8 @@ const Create = Endpoint(struct {
         .path = "/api/exercise/unit",
         .route_data = .{ .restricted = true },
     };
-    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void) ,res: *httpz.Response) anyerror!void {
-        const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
+        const response = CreateModel.call(res.arena, ctx.user_id.?, ctx.app.db, request.body) catch {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
@@ -43,7 +43,10 @@ const GetAll = Endpoint(struct {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
-        defer allocator.free(response);
+        defer {
+            for (response) |value| value.deinit(allocator);
+            allocator.free(response);
+        }
         res.status = 200;
 
         try res.json(response, .{});
@@ -101,7 +104,8 @@ test "Endpoint Exercise Unit | Get All" {
     defer user.deinit(allocator);
 
     const create_request = CreateModel.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
-    const create = try CreateModel.call(user.id, test_env.database, create_request);
+    const create = try CreateModel.call(allocator, user.id, test_env.database, create_request);
+    defer create.deinit(allocator);
 
     const created_list = [_]CreateModel.Response{create};
 
@@ -140,6 +144,6 @@ const GetAllModel = @import("../../models/exercise/unit.zig").GetAll;
 
 const jsonStringify = @import("../../util/jsonStringify.zig").jsonStringify;
 
-const Endpoint =@import("../../endpoint.zig").Endpoint;
-const EndpointRequest =@import("../../endpoint.zig").EndpointRequest;
-const EndpointData =@import("../../endpoint.zig").EndpointData;
+const Endpoint = @import("../../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../../endpoint.zig").EndpointData;

@@ -53,7 +53,7 @@ const Edit = Endpoint(struct {
             handleResponse(res, ResponseError.body_missing_fields, "Request body must contain at least one of the optional values");
             return;
         }
-        const response = EditModel.call(ctx.user_id.?, request.params.entry_id, ctx.app.db, request.body) catch {
+        const response = EditModel.call(res.arena, ctx.user_id.?, request.params.entry_id, ctx.app.db, request.body) catch {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
@@ -129,12 +129,15 @@ test "Endpoint Exercise | Log Entry" {
 
     const category_request = CreateCategory.Request{ .name = "Chest" };
 
-    const category = try CreateCategory.call(user.id, test_env.database, category_request);
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, user.id, test_env.database, category_request);
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -191,13 +194,15 @@ test "Endpoint Exercise | Edit Entry" {
 
     const category_request = CreateCategory.Request{ .name = "Chest" };
 
-    const category = try CreateCategory.call(user.id, test_env.database, category_request);
+    const category = try CreateCategory.call(allocator, user.id, test_env.database, category_request);
+    defer category.deinit(allocator);
 
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -268,13 +273,15 @@ test "Endpoint Exercise | Delete Entry" {
 
     const category_request = CreateCategory.Request{ .name = "Chest" };
 
-    const category = try CreateCategory.call(user.id, test_env.database, category_request);
+    const category = try CreateCategory.call(allocator, user.id, test_env.database, category_request);
+    defer category.deinit(allocator);
 
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -338,13 +345,15 @@ test "Endpoint Exercise | Get Range" {
     const create_category_request = CreateCategory.Request{
         .name = test_name,
     };
-    const create_category = try CreateCategory.call(user.id, test_env.database, create_category_request);
+    const create_category = try CreateCategory.call(allocator, user.id, test_env.database, create_category_request);
+    defer create_category.deinit(allocator);
 
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     // create exercise

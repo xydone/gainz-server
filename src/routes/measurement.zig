@@ -98,7 +98,7 @@ const Create = Endpoint(struct {
         .route_data = .{ .restricted = true },
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
-        const result = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+        const result = CreateModel.call(res.arena, ctx.user_id.?, ctx.app.db, request.body) catch {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
@@ -121,6 +121,6 @@ const ResponseError = @import("../response.zig").ResponseError;
 const handleResponse = @import("../response.zig").handleResponse;
 const types = @import("../types.zig");
 
-const Endpoint =@import("../endpoint.zig").Endpoint;
-const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
-const EndpointData =@import("../endpoint.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

@@ -6,16 +6,19 @@ const BORDER = "=" ** 80;
 
 var current_test: ?[]const u8 = null;
 var is_fail_first_triggered = false;
+var is_fail_leak_triggered = false;
 
 const Config = struct {
     verbose: bool,
     fail_first: bool,
+    fail_leak: bool,
     filter: ?[]const u8,
 
     pub fn init() Config {
         return Config{
             .verbose = false,
             .fail_first = false,
+            .fail_leak = false,
             .filter = null,
         };
     }
@@ -83,6 +86,7 @@ const TestList = struct {
 
         if (std.testing.allocator_instance.deinit() == .leak) {
             params.test_stats.leak += 1;
+            if (params.config.fail_first) is_fail_leak_triggered = true;
         }
 
         if (result) |_| {
@@ -117,6 +121,7 @@ pub fn main() !void {
     for (process_args) |arg| {
         if (std.mem.eql(u8, arg, "--verbose")) config.verbose = true;
         if (std.mem.eql(u8, arg, "--fail-first")) config.fail_first = true;
+        if (std.mem.eql(u8, arg, "--fail-leak")) config.fail_first = true;
         if (std.mem.startsWith(u8, arg, "--filter")) {
             var tokens = std.mem.tokenizeSequence(u8, arg, "=");
             //skip "--filter"
@@ -168,7 +173,7 @@ pub fn main() !void {
     const test_run_order = [_]TestList{ setup_queue, api_queue, endpoint_queue, teardown_queue };
     for (test_run_order) |list| outer: {
         for (list.test_functions.items) |t| {
-            if (is_fail_first_triggered) break :outer;
+            if (is_fail_first_triggered or is_fail_leak_triggered) break :outer;
             current_test = t.name;
             const params = TestList.CallbackParams{ .config = config, .printer = printer, .test_stats = &test_stats, .t = t };
             try list.callback(params);

@@ -27,7 +27,7 @@ const GetFood = Endpoint(struct {
         .path = "/api/food/:food_id",
         .route_data = .{ .restricted = true },
     };
-    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, GetFoodModel.Request, void) ,res: *httpz.Response) anyerror!void {
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, GetFoodModel.Request, void), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
 
         const result = GetFoodModel.call(allocator, ctx.app.db, request.params) catch |err| {
@@ -114,7 +114,7 @@ const CreateServing = Endpoint(struct {
     };
 
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, Params, void), res: *httpz.Response) anyerror!void {
-        const result = CreateServingModel.call(ctx, .{
+        const result = CreateServingModel.call(res.arena, ctx, .{
             .food_id = request.params.food_id,
             .amount = request.body.amount,
             .multiplier = request.body.multiplier,
@@ -580,6 +580,6 @@ const handleResponse = @import("../response.zig").handleResponse;
 const types = @import("../types.zig");
 const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
-const Endpoint =@import("../endpoint.zig").Endpoint;
-const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
-const EndpointData =@import("../endpoint.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

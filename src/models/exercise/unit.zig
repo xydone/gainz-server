@@ -13,9 +13,12 @@ pub const Create = struct {
         amount: f64,
         unit: []const u8,
         multiplier: f64,
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.unit);
+        }
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
@@ -27,7 +30,7 @@ pub const Create = struct {
         } orelse return error.CannotCreate;
         defer row.deinit() catch {};
 
-        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        return row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
     }
 
     const query_string =
@@ -48,6 +51,9 @@ pub const GetAll = struct {
         amount: f64,
         unit: []const u8,
         multiplier: f64,
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.unit);
+        }
     };
     pub const Errors = error{
         CannotGet,
@@ -71,7 +77,7 @@ pub const GetAll = struct {
         };
 
         while (result.next() catch return error.CannotGet) |row| {
-            list.append(allocator, row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            list.append(allocator, row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
 
         return list.toOwnedSlice(allocator);
@@ -98,7 +104,8 @@ test "API Exercise Unit | Create" {
     // TEST
     {
         const request = Create.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
-        const response = try Create.call(setup.user.id, test_env.database, request);
+        const response = try Create.call(allocator, setup.user.id, test_env.database, request);
+        defer response.deinit(allocator);
 
         try std.testing.expectEqual(setup.user.id, response.created_by);
         try std.testing.expectEqual(request.amount, response.amount);
@@ -116,14 +123,19 @@ test "API Exercise Unit | Get All" {
     defer setup.deinit(allocator);
 
     const create_request = Create.Request{ .amount = 1, .multiplier = 1, .unit = test_name ++ "'s unit" };
-    const create = try Create.call(setup.user.id, test_env.database, create_request);
+    const create = try Create.call(allocator, setup.user.id, test_env.database, create_request);
+    defer create.deinit(allocator);
 
     const created_units = [_]Create.Response{create};
     // TEST
     {
         const response_list = try GetAll.call(allocator, setup.user.id, test_env.database);
-        defer allocator.free(response_list);
-
+        defer {
+            for (response_list) |response| {
+                response.deinit(allocator);
+            }
+            allocator.free(response_list);
+        }
         try std.testing.expectEqual(created_units.len, response_list.len);
 
         for (response_list, created_units) |response, created| {

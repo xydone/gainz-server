@@ -11,9 +11,14 @@ pub const Create = struct {
         created_by: i32,
         name: []const u8,
         description: ?[]const u8 = null,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.name);
+            if (self.description) |description| allocator.free(description);
+        }
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
@@ -26,7 +31,7 @@ pub const Create = struct {
         } orelse return error.CannotCreate;
         defer row.deinit() catch {};
 
-        const response = row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        const response = row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
         return response;
     }
     const query_string =
@@ -86,9 +91,11 @@ test "API Exercise Category | Create" {
     // TEST
     {
         const request = Create.Request{ .name = "Chest" };
-        const response = try Create.call(setup.user.id, test_env.database, .{
+        const response = try Create.call(allocator, setup.user.id, test_env.database, .{
             .name = "Chest",
         });
+        defer response.deinit(allocator);
+
         try std.testing.expectEqual(request.description, response.description);
         try std.testing.expectEqualStrings(request.name, response.name);
     }

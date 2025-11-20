@@ -16,7 +16,7 @@ pub const Create = struct {
         CannotCreate,
         CannotParseResult,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         var row = conn.row(query_string, //
@@ -34,7 +34,7 @@ pub const Create = struct {
         } orelse return error.CannotCreate;
         defer row.deinit() catch {};
 
-        return row.to(Response, .{ .dupe = true }) catch return error.CannotCreate;
+        return row.to(Response, .{ .allocator = allocator }) catch return error.CannotCreate;
     }
     const query_string = "INSERT INTO measurements (user_id,type, value, created_at) VALUES ($1,$2,$3,COALESCE(TO_TIMESTAMP($4, 'YYYY-MM-DD'), NOW())) RETURNING id,created_at, type, value;";
 };
@@ -192,7 +192,7 @@ test "API Measurement | Create (with date)" {
 
     // TEST
     {
-        const response = try Create.call(setup.user.id, test_env.database, create_request);
+        const response = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
         //validate date
         const db_timestamp = try zdt.Datetime.fromUnix(response.created_at, .microsecond, null);
@@ -223,7 +223,7 @@ test "API Measurement | Create (default date)" {
     };
     // TEST
     {
-        const response = try Create.call(setup.user.id, test_env.database, create_request);
+        const response = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
         //validate date
         const db_timestamp = try zdt.Datetime.fromUnix(response.created_at, .microsecond, null);
@@ -251,7 +251,7 @@ test "API Measurement | Delete" {
         .value = 75.35,
     };
     // Initialize data
-    const measurement = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const created_measurements = [_]Create.Response{measurement};
     // Test
@@ -274,21 +274,21 @@ test "API Measurement | Get in range (lower bound)" {
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
@@ -331,21 +331,21 @@ test "API Measurement | Get in range (upper bound)" {
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
@@ -383,21 +383,21 @@ test "API Measurement | Get in range (overlap)" {
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    const inserted_measurement = try Create.call(setup.user.id, test_env.database, create_request);
+    const inserted_measurement = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-02",
@@ -440,21 +440,21 @@ test "API Measurement | Get in range (multiple)" {
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    const measurement_1 = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement_1 = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    const measurement_2 = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement_2 = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    const measurement_3 = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement_3 = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    const measurement_4 = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement_4 = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const get_range_request = GetInRange.Request{
         .range_start = "2025-01-01",
@@ -493,21 +493,21 @@ test "API Measurement | Get in range (empty)" {
         .type = types.MeasurementType.weight,
         .value = 75.35,
     };
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-03";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     create_request.date = "2025-01-04";
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     const get_range_request = GetInRange.Request{
         .range_start = "2099-01-01",
@@ -543,21 +543,21 @@ test "API Measurement | Get by ID" {
         .value = 75.35,
     };
 
-    const measurement_1 = try Create.call(setup.user.id, test_env.database, create_request);
+    const measurement_1 = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-03";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-04";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     // TEST
     {
@@ -582,21 +582,21 @@ test "API Measurement | Get recent" {
         .value = 75.35,
     };
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.neck;
     create_request.date = "2025-01-02";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.type = types.MeasurementType.weight;
     create_request.date = "2025-01-02";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-03";
 
-    _ = try Create.call(setup.user.id, test_env.database, create_request);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_request);
     create_request.date = "2025-01-04";
 
-    const last_weight_measurement = try Create.call(setup.user.id, test_env.database, create_request);
+    const last_weight_measurement = try Create.call(allocator, setup.user.id, test_env.database, create_request);
 
     // TEST
     {

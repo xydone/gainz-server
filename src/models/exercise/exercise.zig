@@ -125,6 +125,14 @@ pub const GetRange = struct {
         category_id: i32,
         category_name: []const u8,
         category_description: ?[]const u8,
+        pub fn deinit(self: EntryList, allocator: std.mem.Allocator) void {
+            allocator.free(self.exercise_name);
+            allocator.free(self.unit_name);
+            allocator.free(self.category_name);
+            if (self.notes) |notes| allocator.free(notes);
+            if (self.category_description) |category_description| allocator.free(category_description);
+            if (self.exercise_description) |exercise_description| allocator.free(exercise_description);
+        }
     };
     pub const Errors = error{
         CannotGet,
@@ -147,7 +155,7 @@ pub const GetRange = struct {
         defer result.deinit();
         var response: std.ArrayList(EntryList) = .empty;
         while (result.next() catch return error.CannotGet) |row| {
-            response.append(allocator, row.to(EntryList, .{ .dupe = true }) catch return error.OutOfMemory) catch return error.OutOfMemory;
+            response.append(allocator, row.to(EntryList, .{ .allocator = allocator }) catch return error.OutOfMemory) catch return error.OutOfMemory;
         }
         if (response.items.len == 0) {
             response.deinit(allocator);
@@ -293,7 +301,7 @@ pub const EditExerciseEntry = struct {
         CannotEdit,
         CannotParseResult,
     } || DatabaseErrors;
-    pub fn call(user_id: i32, entry_id: u32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, entry_id: u32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
@@ -305,7 +313,7 @@ pub const EditExerciseEntry = struct {
         } orelse return error.CannotEdit;
         defer row.deinit() catch {};
 
-        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        return row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
     }
     const query_string =
         \\UPDATE training.exercise_entry
@@ -333,14 +341,17 @@ test "API Exercise | Create" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -368,14 +379,17 @@ test "API Exercise | Log Entry" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -414,14 +428,17 @@ test "API Exercise | Edit Entry" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -444,7 +461,8 @@ test "API Exercise | Edit Entry" {
         .multiplier = 1,
         .unit = test_name ++ "'s unit",
     };
-    const unit_response = try CreateUnit.call(setup.user.id, test_env.database, unit_request);
+    const unit_response = try CreateUnit.call(allocator, setup.user.id, test_env.database, unit_request);
+    defer unit_response.deinit(allocator);
 
     // TEST
     {
@@ -452,7 +470,7 @@ test "API Exercise | Edit Entry" {
             .value = 10,
             .unit_id = unit_response.id,
         };
-        const response = try EditExerciseEntry.call(setup.user.id, @intCast(log_response.id), test_env.database, request);
+        const response = try EditExerciseEntry.call(allocator, setup.user.id, @intCast(log_response.id), test_env.database, request);
 
         try std.testing.expectEqual(@as(i32, @intCast(log_request.exercise_id)), response.exercise_id);
         try std.testing.expectEqual(@as(i32, @intCast(request.unit_id.?)), response.unit_id);
@@ -473,14 +491,17 @@ test "API Exercise | Delete Entry" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -521,14 +542,17 @@ test "API Exercise | Get Range" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -582,8 +606,12 @@ test "API Exercise | Get Range" {
             .range_end = range_end,
         };
         const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer allocator.free(response);
-
+        defer {
+            for (response) |value| {
+                value.deinit(allocator);
+            }
+            allocator.free(response);
+        }
         try std.testing.expectEqual(logged_responses.len, response.len);
         for (response, logged_responses) |entry, logged| {
             try std.testing.expectEqual(logged.id, entry.entry_id);
@@ -613,14 +641,17 @@ test "API Exercise | Get Range Upper Bound" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -673,8 +704,12 @@ test "API Exercise | Get Range Upper Bound" {
             .range_end = range_end,
         };
         const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer allocator.free(response);
-
+        defer {
+            for (response) |value| {
+                value.deinit(allocator);
+            }
+            allocator.free(response);
+        }
         try std.testing.expectEqual(logged_responses.len, response.len);
         for (response, logged_responses) |entry, logged| {
             try std.testing.expectEqual(logged.id, entry.entry_id);
@@ -705,14 +740,17 @@ test "API Exercise | Get Range Lower Bound" {
     const allocator = std.testing.allocator;
     defer setup.deinit(allocator);
 
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -765,7 +803,12 @@ test "API Exercise | Get Range Lower Bound" {
             .range_end = range_end,
         };
         const response = try GetRange.call(allocator, setup.user.id, test_env.database, request);
-        defer allocator.free(response);
+        defer {
+            for (response) |value| {
+                value.deinit(allocator);
+            }
+            allocator.free(response);
+        }
 
         try std.testing.expectEqual(logged_responses.len, response.len);
         for (response, logged_responses) |entry, logged| {

@@ -19,7 +19,7 @@ pub const Create = struct {
         CannotParseResult,
         OutOfMemory,
     } || DatabaseErrors;
-    pub fn call(ctx: *Handler.RequestContext, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, ctx: *Handler.RequestContext, request: Request) Errors!Response {
         var conn = ctx.app.db.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
@@ -31,7 +31,7 @@ pub const Create = struct {
         } orelse return error.CannotCreate;
         defer row.deinit() catch {};
 
-        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        return row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
     }
     const query_string = "INSERT INTO servings (created_by, food_id, amount, unit, multiplier) VALUES($1,$2,$3,$4,$5) RETURNING id, amount, unit, multiplier, food_id;";
 };

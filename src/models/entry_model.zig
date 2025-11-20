@@ -19,7 +19,7 @@ pub const Create = struct {
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
 
-    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
 
@@ -33,7 +33,7 @@ pub const Create = struct {
         //NOTE: you must deinitialize rows or else query time balloons 10x
         defer row.deinit() catch {};
 
-        return row.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        return row.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
     }
 
     const query_string =
@@ -604,7 +604,7 @@ test "API Entry | Create" {
     var entry_id: i32 = undefined;
     // TEST
     {
-        const entry = try Create.call(user.id, test_env.database, create_entry);
+        const entry = try Create.call(allocator, user.id, test_env.database, create_entry);
         entry_id = entry.id;
 
         try std.testing.expectEqual(create_entry.food_id, entry.food_id);
@@ -631,7 +631,7 @@ test "API Entry | Get" {
         .amount = 0.5,
     };
 
-    const entry = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     // TEST
     {
         const result = try Get.call(
@@ -674,13 +674,13 @@ test "API Entry | Get range" {
         .amount = 0.5,
     };
 
-    const entry_1 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_1 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    const entry_2 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_2 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .day));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .day));
@@ -753,13 +753,13 @@ test "API Entry | Get range (empty)" {
         .amount = 0.5,
     };
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     var lower_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(3, .day));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(3, .day));
@@ -820,13 +820,13 @@ test "API Entry | Get recent (all)" {
         .amount = 0.5,
     };
 
-    const entry_1 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_1 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    const entry_2 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_2 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    const entry_3 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_3 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     const limit: u32 = 50;
     // TEST
@@ -882,13 +882,13 @@ test "API Entry | Get recent (partial)" {
         .amount = 0.5,
     };
 
-    const entry_1 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_1 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    const entry_2 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_2 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     const limit: u32 = 2;
     const inserted_entries = [_]Create.Response{ entry_2, entry_1 };
@@ -939,13 +939,13 @@ test "API Entry | Get recent (empty)" {
         .amount = 0.5,
     };
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    _ = try Create.call(setup.user.id, test_env.database, create_entry);
+    _ = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     const limit: u32 = 0;
     // TEST
     {
@@ -986,13 +986,13 @@ test "API Entry | Get average" {
         .amount = 0.5,
     };
 
-    const entry_1 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_1 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    const entry_2 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_2 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    const entry_3 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_3 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));
@@ -1061,13 +1061,13 @@ test "API Entry | Get breakdown" {
         .amount = 0.5,
     };
 
-    const entry_1 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_1 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.amount = 2.4;
-    const entry_2 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_2 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
     create_entry.created_at = try date_string.toOwnedSlice();
     defer allocator.free(create_entry.created_at.?);
 
-    const entry_3 = try Create.call(setup.user.id, test_env.database, create_entry);
+    const entry_3 = try Create.call(allocator, setup.user.id, test_env.database, create_entry);
 
     var lower_bound = try now_day.sub(zdt.Duration.fromTimespanMultiple(1, .week));
     var upper_bound = try now_day.add(zdt.Duration.fromTimespanMultiple(1, .week));

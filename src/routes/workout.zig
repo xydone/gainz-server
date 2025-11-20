@@ -24,7 +24,7 @@ const Create = Endpoint(struct {
         .route_data = .{ .restricted = true },
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
-        const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+        const response = CreateModel.call(res.arena, ctx.user_id.?, ctx.app.db, request.body) catch {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
@@ -211,16 +211,20 @@ test "Endpoint Workout | Add Exercises" {
     defer user.deinit(allocator);
 
     // Create workout
-    const workout = try CreateModel.call(user.id, test_env.database, .{ .name = test_name });
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const workout = try CreateModel.call(allocator, user.id, test_env.database, .{ .name = test_name });
+    defer workout.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     // Create exercise category
-    const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
+    const category = try CreateCategory.call(allocator, user.id, test_env.database, .{ .name = test_name ++ "'s category" });
+    defer category.deinit(allocator);
 
     var category_ids = [_]i32{category.id};
     // Create exercise
@@ -285,7 +289,8 @@ test "Endpoint Workout | Add Exercise Invalid Exercise ID" {
     defer user.deinit(allocator);
 
     // Create workout
-    const workout = try CreateModel.call(user.id, test_env.database, .{ .name = test_name });
+    const workout = try CreateModel.call(allocator, user.id, test_env.database, .{ .name = test_name });
+    defer workout.deinit(allocator);
 
     const nonexistent_exercise_id = std.math.maxInt(i32);
     const body = [_]AddExerciseModel.Request{
@@ -340,16 +345,20 @@ test "Endpoint Workout | Get Exercises List" {
     defer user.deinit(allocator);
 
     // Create workout
-    const workout = try CreateModel.call(user.id, test_env.database, .{ .name = test_name });
-    const unit = try CreateUnit.call(user.id, test_env.database, .{
+    const workout = try CreateModel.call(allocator, user.id, test_env.database, .{ .name = test_name });
+    defer workout.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     // Create exercise category
-    const category = try CreateCategory.call(user.id, test_env.database, .{ .name = test_name ++ "'s category" });
+    const category = try CreateCategory.call(allocator, user.id, test_env.database, .{ .name = test_name ++ "'s category" });
+    defer category.deinit(allocator);
 
     var category_ids = [_]i32{category.id};
 
@@ -433,6 +442,6 @@ const AddExerciseModel = @import("../models/workout.zig").AddExercise;
 
 const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 
-const Endpoint =@import("../endpoint.zig").Endpoint;
-const EndpointRequest =@import("../endpoint.zig").EndpointRequest;
-const EndpointData =@import("../endpoint.zig").EndpointData;
+const Endpoint = @import("../endpoint.zig").Endpoint;
+const EndpointRequest = @import("../endpoint.zig").EndpointRequest;
+const EndpointData = @import("../endpoint.zig").EndpointData;

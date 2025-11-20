@@ -9,10 +9,14 @@ pub const Create = struct {
         name: []const u8,
         created_at: i64,
         created_by: i32,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.name);
+        }
     };
     pub const Errors = error{ CannotCreate, CannotParseResult } || DatabaseErrors;
 
-    pub fn call(user_id: i32, database: *Pool, request: Request) Errors!Response {
+    pub fn call(allocator: std.mem.Allocator, user_id: i32, database: *Pool, request: Request) Errors!Response {
         var conn = database.acquire() catch return error.CannotAcquireConnection;
         defer conn.release();
         const error_handler = ErrorHandler{ .conn = conn };
@@ -24,7 +28,7 @@ pub const Create = struct {
         } orelse return error.CannotCreate;
         defer result.deinit() catch {};
 
-        const response = result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult;
+        const response = result.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult;
         return response;
     }
 
@@ -44,6 +48,10 @@ pub const Get = struct {
         name: []const u8,
         created_at: i64,
         created_by: i32,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.name);
+        }
     };
     pub const Errors = error{
         CannotGet,
@@ -67,7 +75,7 @@ pub const Get = struct {
         var response: std.ArrayList(Response) = .empty;
 
         while (query.next() catch return error.CannotGet) |result| {
-            response.append(allocator, result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            response.append(allocator, result.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
         return response.toOwnedSlice(allocator);
     }
@@ -94,6 +102,10 @@ pub const AddExercise = struct {
         notes: []const u8,
         sets: i32,
         reps: i32,
+
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.notes);
+        }
     };
     pub const Errors = error{
         CannotCreate,
@@ -139,7 +151,7 @@ pub const AddExercise = struct {
         var response: std.ArrayList(Response) = .empty;
 
         while (result.next() catch return error.CannotCreate) |row| {
-            const res = row.to(Response, .{ .dupe = true }) catch return error.CannotCreate;
+            const res = row.to(Response, .{ .allocator = allocator }) catch return error.CannotCreate;
             response.append(allocator, res) catch return error.OutOfMemory;
         }
 
@@ -166,6 +178,10 @@ pub const GetExerciseList = struct {
         sets: i32,
         reps: i32,
         notes: []const u8,
+        pub fn deinit(self: Response, allocator: std.mem.Allocator) void {
+            allocator.free(self.workout_name);
+            allocator.free(self.notes);
+        }
     };
     pub const Errors = error{
         CannotGet,
@@ -187,7 +203,7 @@ pub const GetExerciseList = struct {
         var response: std.ArrayList(Response) = .empty;
 
         while (query.next() catch return error.CannotGet) |result| {
-            response.append(allocator, result.to(Response, .{ .dupe = true }) catch return error.CannotParseResult) catch return error.OutOfMemory;
+            response.append(allocator, result.to(Response, .{ .allocator = allocator }) catch return error.CannotParseResult) catch return error.OutOfMemory;
         }
         return response.toOwnedSlice(allocator);
     }
@@ -220,10 +236,13 @@ test "API Workout | Create" {
     // TEST
     {
         const response = try Create.call(
+            allocator,
             setup.user.id,
             test_env.database,
             .{ .name = test_name },
         );
+        defer response.deinit(allocator);
+
         try std.testing.expectEqual(setup.user.id, response.created_by);
         try std.testing.expectEqualStrings(test_name, response.name);
     }
@@ -237,17 +256,21 @@ test "API Workout | Get" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
     const create = try Create.call(
+        allocator,
         setup.user.id,
         test_env.database,
         .{ .name = test_name },
     );
+    defer create.deinit(allocator);
 
     const create_responses = [_]Create.Response{create};
     // TEST
     {
         const response = try Get.call(allocator, setup.user.id, test_env.database);
-        defer allocator.free(response);
-
+        defer {
+            for (response) |value| value.deinit(allocator);
+            allocator.free(response);
+        }
         for (create_responses, response) |created, res| {
             try std.testing.expectEqual(created.id, res.id);
             try std.testing.expectEqual(created.created_by, res.created_by);
@@ -268,15 +291,20 @@ test "API Workout | Add Exercise" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    const workout = try Create.call(setup.user.id, test_env.database, .{ .name = test_name });
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const workout = try Create.call(allocator, setup.user.id, test_env.database, .{ .name = test_name });
+    defer workout.deinit(allocator);
+
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -297,8 +325,10 @@ test "API Workout | Add Exercise" {
     // TEST
     {
         const response = try AddExercise.call(allocator, test_env.database, @intCast(workout.id), &request);
-        defer allocator.free(response);
-
+        defer {
+            for (response) |value| value.deinit(allocator);
+            allocator.free(response);
+        }
         for (request, response) |req, res| {
             try std.testing.expectEqual(req.exercise_id, @as(u32, @intCast(res.exercise_id)));
             try std.testing.expectEqual(workout.id, res.workout_id);
@@ -320,15 +350,20 @@ test "API Workout | Get Exercise List" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    const workout = try Create.call(setup.user.id, test_env.database, .{ .name = test_name });
-    const category = try CreateCategory.call(setup.user.id, test_env.database, .{
+    const workout = try Create.call(allocator, setup.user.id, test_env.database, .{ .name = test_name });
+    defer workout.deinit(allocator);
+
+    const category = try CreateCategory.call(allocator, setup.user.id, test_env.database, .{
         .name = "Chest",
     });
-    const unit = try CreateUnit.call(setup.user.id, test_env.database, .{
+    defer category.deinit(allocator);
+
+    const unit = try CreateUnit.call(allocator, setup.user.id, test_env.database, .{
         .amount = 1,
         .unit = "kg",
         .multiplier = 1,
     });
+    defer unit.deinit(allocator);
 
     var unit_ids = [_]i32{unit.id};
     var category_ids = [_]i32{category.id};
@@ -353,14 +388,18 @@ test "API Workout | Get Exercise List" {
     };
 
     const add_exercise_response = try AddExercise.call(allocator, test_env.database, @intCast(workout.id), &add_exercise_request);
-    defer allocator.free(add_exercise_response);
-
+    defer {
+        for (add_exercise_response) |value| value.deinit(allocator);
+        allocator.free(add_exercise_response);
+    }
     // TEST
     {
         const request: GetExerciseList.Request = .{ .workout_id = @intCast(workout.id) };
         const response = try GetExerciseList.call(allocator, request, test_env.database);
-        defer allocator.free(response);
-
+        defer {
+            for (response) |value| value.deinit(allocator);
+            allocator.free(response);
+        }
         for (add_exercise_request, response) |req, res| {
             try std.testing.expectEqual(req.exercise_id, @as(u32, @intCast(res.exercise_id)));
             try std.testing.expectEqual(workout.id, res.workout_id);

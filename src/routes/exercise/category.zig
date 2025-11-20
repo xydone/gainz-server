@@ -40,7 +40,7 @@ pub const Create = Endpoint(struct {
         .route_data = .{ .restricted = true },
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
-        const response = CreateModel.call(ctx.user_id.?, ctx.app.db, request.body) catch {
+        const response = CreateModel.call(res.arena, ctx.user_id.?, ctx.app.db, request.body) catch {
             handleResponse(res, ResponseError.internal_server_error, null);
             return;
         };
