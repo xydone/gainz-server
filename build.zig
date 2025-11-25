@@ -29,22 +29,27 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const xgboost = b.dependency("xgboost", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     module.addImport("pg", pg.module("pg"));
     module.addImport("httpz", httpz.module("httpz"));
     module.addImport("jwt", jwt.module("jwt"));
     module.addImport("zdt", zdt.module("zdt"));
+    module.addImport("xgboost", xgboost.module("xgboost"));
 
     openapi_module.addImport("pg", pg.module("pg"));
     openapi_module.addImport("httpz", httpz.module("httpz"));
     openapi_module.addImport("jwt", jwt.module("jwt"));
     openapi_module.addImport("zdt", zdt.module("zdt"));
+    openapi_module.addImport("xgboost", xgboost.module("xgboost"));
 
     const exe = b.addExecutable(.{
         .name = "gainz_server",
         .root_module = module,
     });
-    exe.linkLibC();
 
     b.installArtifact(exe);
 

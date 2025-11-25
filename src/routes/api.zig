@@ -11,6 +11,8 @@ pub inline fn init(router: *httpz.Router(*Handler, *const fn (*Handler.RequestCo
     Exercise.init(router);
     // /api/exercise
     Workout.init(router);
+    // /api/analytics
+    Analytics.init(router);
 }
 
 const std = @import("std");
@@ -27,3 +29,4 @@ const User = @import("user.zig");
 const Note = @import("note.zig");
 const Workout = @import("workout.zig");
 const Exercise = @import("exercise/routes.zig");
+const Analytics = @import("analytics//routes.zig");

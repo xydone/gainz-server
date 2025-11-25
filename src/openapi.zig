@@ -8,6 +8,7 @@ pub fn main() !void {
         Entry.endpoint_data,
         Measurement.endpoint_data,
         Goals.endpoint_data,
+        Weight.endpoint_data,
 
         Exercise.endpoint_data,
         ExerciseCategory.endpoint_data,
@@ -252,6 +253,7 @@ const User = @import("routes/user.zig");
 const Note = @import("routes/note.zig");
 const Workout = @import("routes/workout.zig");
 const ExerciseRoutes = @import("routes/exercise/routes.zig");
+const Weight = @import("routes/analytics/weight.zig");
 const Exercise = @import("routes/exercise/exercise.zig");
 const ExerciseUnit = @import("routes/exercise/unit.zig");
 const ExerciseEntry = @import("routes/exercise/entry.zig");
