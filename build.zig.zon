@@ -21,8 +21,8 @@
             .hash = "zdt-0.8.1-xr0_vAxUDwCJRDh9pcAS_mdZBIsvcGTtN-K8JJSWY4I6",
         },
         .xgboost = .{
-            .url = "git+https://www.github.com/xydone/xgboost-zig#09117d90ca7a010b12b11bcab0a479ff25484a89",
-            .hash = "xgboost-0.0.0-nGNUZWtrAQA5QfIDUMYkKtWB8spmcZvBg2jqJFgtoqaB",
+            .url = "git+https://www.github.com/xydone/xgboost-zig#0dbecea142f93d8dfd0a96850aad803e2efa2d0e",
+            .hash = "xgboost-0.0.0-nGNUZQ5sAQCeHZbbh2Ge-TppD0BZFQoKL0VQygbV7s5_",
         },
     },
 

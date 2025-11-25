@@ -17,6 +17,15 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: ml; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA ml;
+
+
+ALTER SCHEMA ml OWNER TO postgres;
+
+--
 -- Name: training; Type: SCHEMA; Schema: -; Owner: postgres
 --
 
@@ -119,6 +128,48 @@ ALTER TYPE public.nutrients OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: weight_model; Type: TABLE; Schema: ml; Owner: postgres
+--
+
+CREATE TABLE ml.weight_model (
+    id integer NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    user_id integer NOT NULL
+);
+
+
+ALTER TABLE ml.weight_model OWNER TO postgres;
+
+--
+-- Name: COLUMN weight_model.created_at; Type: COMMENT; Schema: ml; Owner: postgres
+--
+
+COMMENT ON COLUMN ml.weight_model.created_at IS 'No default value as it is expected that the user provides it.';
+
+
+--
+-- Name: weight_model_id_seq; Type: SEQUENCE; Schema: ml; Owner: postgres
+--
+
+CREATE SEQUENCE ml.weight_model_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE ml.weight_model_id_seq OWNER TO postgres;
+
+--
+-- Name: weight_model_id_seq; Type: SEQUENCE OWNED BY; Schema: ml; Owner: postgres
+--
+
+ALTER SEQUENCE ml.weight_model_id_seq OWNED BY ml.weight_model.id;
+
 
 --
 -- Name: food; Type: TABLE; Schema: public; Owner: postgres
@@ -560,7 +611,7 @@ CREATE TABLE training.exercise_has_category (
 ALTER TABLE training.exercise_has_category OWNER TO postgres;
 
 --
--- Name: exercise_has_category; Type: TABLE; Schema: training; Owner: postgres
+-- Name: exercise_has_unit; Type: TABLE; Schema: training; Owner: postgres
 --
 
 CREATE TABLE training.exercise_has_unit (
@@ -570,7 +621,6 @@ CREATE TABLE training.exercise_has_unit (
 
 
 ALTER TABLE training.exercise_has_unit OWNER TO postgres;
-
 
 --
 -- Name: exercise_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
@@ -697,10 +747,10 @@ CREATE TABLE training.workout_exercise (
 ALTER TABLE training.workout_exercise OWNER TO postgres;
 
 --
--- Name: workout_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+-- Name: workout_exercise_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
 --
 
-CREATE SEQUENCE training.workout_id_seq
+CREATE SEQUENCE training.workout_exercise_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -708,7 +758,21 @@ CREATE SEQUENCE training.workout_id_seq
     NO MAXVALUE
     CACHE 1;
 
-CREATE SEQUENCE training.workout_exercise_id_seq
+
+ALTER SEQUENCE training.workout_exercise_id_seq OWNER TO postgres;
+
+--
+-- Name: workout_exercise_id_seq; Type: SEQUENCE OWNED BY; Schema: training; Owner: postgres
+--
+
+ALTER SEQUENCE training.workout_exercise_id_seq OWNED BY training.workout_exercise.id;
+
+
+--
+-- Name: workout_id_seq; Type: SEQUENCE; Schema: training; Owner: postgres
+--
+
+CREATE SEQUENCE training.workout_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -725,7 +789,12 @@ ALTER SEQUENCE training.workout_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE training.workout_id_seq OWNED BY training.workout.id;
 
-ALTER SEQUENCE training.workout_exercise_id_seq OWNED BY training.workout_exercise.id;
+
+--
+-- Name: weight_model id; Type: DEFAULT; Schema: ml; Owner: postgres
+--
+
+ALTER TABLE ONLY ml.weight_model ALTER COLUMN id SET DEFAULT nextval('ml.weight_model_id_seq'::regclass);
 
 
 --
@@ -825,7 +894,20 @@ ALTER TABLE ONLY training.program ALTER COLUMN id SET DEFAULT nextval('training.
 
 ALTER TABLE ONLY training.workout ALTER COLUMN id SET DEFAULT nextval('training.workout_id_seq'::regclass);
 
+
+--
+-- Name: workout_exercise id; Type: DEFAULT; Schema: training; Owner: postgres
+--
+
 ALTER TABLE ONLY training.workout_exercise ALTER COLUMN id SET DEFAULT nextval('training.workout_exercise_id_seq'::regclass);
+
+
+--
+-- Name: weight_model weight_model_pkey; Type: CONSTRAINT; Schema: ml; Owner: postgres
+--
+
+ALTER TABLE ONLY ml.weight_model
+    ADD CONSTRAINT weight_model_pkey PRIMARY KEY (id);
 
 
 --
@@ -923,6 +1005,11 @@ ALTER TABLE ONLY training.exercise_entry
 ALTER TABLE ONLY training.exercise_has_category
     ADD CONSTRAINT exercise_has_category_pkey PRIMARY KEY (exercise_id, category_id);
 
+
+--
+-- Name: exercise_has_unit exercise_has_unit_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
+--
+
 ALTER TABLE ONLY training.exercise_has_unit
     ADD CONSTRAINT exercise_has_unit_pkey PRIMARY KEY (exercise_id, unit_id);
 
@@ -959,16 +1046,12 @@ ALTER TABLE ONLY training.workout_exercise
     ADD CONSTRAINT workout_exercise_pkey PRIMARY KEY (id);
 
 
-
 --
 -- Name: workout workout_pkey; Type: CONSTRAINT; Schema: training; Owner: postgres
 --
 
 ALTER TABLE ONLY training.workout
     ADD CONSTRAINT workout_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY training.workout
-    ADD CONSTRAINT "Created by To User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
 
 
 --
@@ -983,6 +1066,14 @@ CREATE INDEX entry_index_4 ON public.entry USING btree (created_at);
 --
 
 CREATE INDEX idx_entry_food_id ON public.entry USING btree (food_id);
+
+
+--
+-- Name: weight_model weight_model_relation_1; Type: FK CONSTRAINT; Schema: ml; Owner: postgres
+--
+
+ALTER TABLE ONLY ml.weight_model
+    ADD CONSTRAINT weight_model_relation_1 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -1074,6 +1165,14 @@ ALTER TABLE ONLY public.goals
 
 
 --
+-- Name: workout Created by To User; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
+ALTER TABLE ONLY training.workout
+    ADD CONSTRAINT "Created by To User" FOREIGN KEY (created_by) REFERENCES public.users(id) ON UPDATE CASCADE;
+
+
+--
 -- Name: exercise_category exercise_category_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
 --
 
@@ -1120,8 +1219,18 @@ ALTER TABLE ONLY training.exercise_has_category
 ALTER TABLE ONLY training.exercise_has_category
     ADD CONSTRAINT exercise_has_category_relation_2 FOREIGN KEY (category_id) REFERENCES training.exercise_category(id);
 
+
+--
+-- Name: exercise_has_unit exercise_has_unit_relation_1; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
+
 ALTER TABLE ONLY training.exercise_has_unit
     ADD CONSTRAINT exercise_has_unit_relation_1 FOREIGN KEY (exercise_id) REFERENCES training.exercise(id);
+
+
+--
+-- Name: exercise_has_unit exercise_has_unit_relation_2; Type: FK CONSTRAINT; Schema: training; Owner: postgres
+--
 
 ALTER TABLE ONLY training.exercise_has_unit
     ADD CONSTRAINT exercise_has_unit_relation_2 FOREIGN KEY (unit_id) REFERENCES training.exercise_unit(id);

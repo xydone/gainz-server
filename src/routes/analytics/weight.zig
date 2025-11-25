@@ -13,7 +13,10 @@ const Train = Endpoint(struct {
         /// datetime string (ex: 2024-01-01)
         range_end: []const u8,
     };
-    const Response = TrainML.Response;
+    const Response = struct {
+        r2: f32,
+        mae: f32,
+    };
     pub const endpoint_data: EndpointData = .{
         .Request = .{
             .Body = Body,
@@ -75,7 +78,16 @@ const Train = Endpoint(struct {
             }
         }
 
-        const result = try TrainML.run(res.arena, combined_values.items);
+        const response = try TrainML.run(res.arena, ctx.user_id.?, combined_values.items);
+
+        _ = CreateModel.call(ctx.app.db, ctx.user_id.?, .{
+            .created_at = response.created_at,
+        }) catch {
+            handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+
+        const result: Response = .{ .r2 = response.r2, .mae = response.mae };
         res.status = 200;
         try res.json(result, .{});
     }
@@ -96,6 +108,8 @@ const handleResponse = @import("../../response.zig").handleResponse;
 const types = @import("../../types.zig");
 
 const TrainML = @import("../../ml/train.zig");
+
+const CreateModel = @import("../../models/ml_model.zig").Create;
 
 const Endpoint = @import("../../endpoint.zig").Endpoint;
 const EndpointRequest = @import("../../endpoint.zig").EndpointRequest;

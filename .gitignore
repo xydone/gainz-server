@@ -4,3 +4,4 @@ zig-out/
 .testing.env
 *.rdb
 .vscode
+models/

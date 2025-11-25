@@ -17,9 +17,10 @@ const Features = struct {
 pub const Response = struct {
     r2: f32,
     mae: f32,
+    created_at: i64,
 };
 
-pub fn run(allocator: std.mem.Allocator, data: []Data) !Response {
+pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) !Response {
     var calories = try allocator.alloc(f32, data.len);
     defer allocator.free(calories);
     var carbs = try allocator.alloc(f32, data.len);
@@ -120,9 +121,17 @@ pub fn run(allocator: std.mem.Allocator, data: []Data) !Response {
     const r2 = r2Score(test_labels, y_pred);
     const mae = meanAbsoluteError(test_labels, y_pred);
 
+    const created_at = std.time.microTimestamp();
+
+    const file_path = try std.fmt.allocPrint(allocator, "./models/model_{}_{}.ubj", .{ user_id, created_at });
+    defer allocator.free(file_path);
+
+    try booster.saveModel(file_path);
+
     return .{
         .r2 = r2,
         .mae = mae,
+        .created_at = created_at,
     };
 }
 
