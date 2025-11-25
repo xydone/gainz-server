@@ -20,7 +20,9 @@ pub const Response = struct {
     created_at: i64,
 };
 
-pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) !Response {
+pub const Errors = error{ CouldntSaveModel, XGBoostError, OutOfMemory };
+
+pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) Errors!Response {
     var calories = try allocator.alloc(f32, data.len);
     defer allocator.free(calories);
     var carbs = try allocator.alloc(f32, data.len);
@@ -126,7 +128,13 @@ pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) !Response {
     const file_path = try std.fmt.allocPrint(allocator, "./models/model_{}_{}.ubj", .{ user_id, created_at });
     defer allocator.free(file_path);
 
-    try booster.saveModel(file_path);
+    // XGBoost's saveModel requires the folder to already be created
+    // if ./models cannot be opened, assume it is not present and create it
+    _ = std.fs.cwd().openDir("./models", .{}) catch {
+        std.fs.cwd().makeDir("./models") catch return error.CouldntSaveModel;
+    };
+
+    booster.saveModel(file_path) catch return error.CouldntSaveModel;
 
     return .{
         .r2 = r2,

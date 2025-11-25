@@ -78,7 +78,10 @@ const Train = Endpoint(struct {
             }
         }
 
-        const response = try TrainML.run(res.arena, ctx.user_id.?, combined_values.items);
+        const response = TrainML.run(res.arena, ctx.user_id.?, combined_values.items) catch |err| {
+            std.debug.print("error: {}\n", .{err});
+            return err;
+        };
 
         _ = CreateModel.call(ctx.app.db, ctx.user_id.?, .{
             .created_at = response.created_at,
