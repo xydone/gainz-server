@@ -16,14 +16,6 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
---
--- Name: ml; Type: SCHEMA; Schema: -; Owner: postgres
---
-
-CREATE SCHEMA ml;
-
-
-ALTER SCHEMA ml OWNER TO postgres;
 
 --
 -- Name: training; Type: SCHEMA; Schema: -; Owner: postgres
@@ -128,48 +120,6 @@ ALTER TYPE public.nutrients OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: weight_model; Type: TABLE; Schema: ml; Owner: postgres
---
-
-CREATE TABLE ml.weight_model (
-    id integer NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    user_id integer NOT NULL
-);
-
-
-ALTER TABLE ml.weight_model OWNER TO postgres;
-
---
--- Name: COLUMN weight_model.created_at; Type: COMMENT; Schema: ml; Owner: postgres
---
-
-COMMENT ON COLUMN ml.weight_model.created_at IS 'No default value as it is expected that the user provides it.';
-
-
---
--- Name: weight_model_id_seq; Type: SEQUENCE; Schema: ml; Owner: postgres
---
-
-CREATE SEQUENCE ml.weight_model_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE ml.weight_model_id_seq OWNER TO postgres;
-
---
--- Name: weight_model_id_seq; Type: SEQUENCE OWNED BY; Schema: ml; Owner: postgres
---
-
-ALTER SEQUENCE ml.weight_model_id_seq OWNED BY ml.weight_model.id;
-
 
 --
 -- Name: food; Type: TABLE; Schema: public; Owner: postgres
@@ -791,13 +741,6 @@ ALTER SEQUENCE training.workout_id_seq OWNED BY training.workout.id;
 
 
 --
--- Name: weight_model id; Type: DEFAULT; Schema: ml; Owner: postgres
---
-
-ALTER TABLE ONLY ml.weight_model ALTER COLUMN id SET DEFAULT nextval('ml.weight_model_id_seq'::regclass);
-
-
---
 -- Name: entry id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -900,14 +843,6 @@ ALTER TABLE ONLY training.workout ALTER COLUMN id SET DEFAULT nextval('training.
 --
 
 ALTER TABLE ONLY training.workout_exercise ALTER COLUMN id SET DEFAULT nextval('training.workout_exercise_id_seq'::regclass);
-
-
---
--- Name: weight_model weight_model_pkey; Type: CONSTRAINT; Schema: ml; Owner: postgres
---
-
-ALTER TABLE ONLY ml.weight_model
-    ADD CONSTRAINT weight_model_pkey PRIMARY KEY (id);
 
 
 --
@@ -1066,14 +1001,6 @@ CREATE INDEX entry_index_4 ON public.entry USING btree (created_at);
 --
 
 CREATE INDEX idx_entry_food_id ON public.entry USING btree (food_id);
-
-
---
--- Name: weight_model weight_model_relation_1; Type: FK CONSTRAINT; Schema: ml; Owner: postgres
---
-
-ALTER TABLE ONLY ml.weight_model
-    ADD CONSTRAINT weight_model_relation_1 FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --

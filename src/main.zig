@@ -2,6 +2,9 @@ const allocator = std.heap.smp_allocator;
 const log = std.log.scoped(.main);
 const PORT = 3000;
 pub fn main() !void {
+    const path = try std.fs.selfExeDirPathAlloc(allocator);
+    defer allocator.free(path);
+
     var env = try dotenv.init(allocator, ".env");
     defer env.deinit();
 
@@ -9,6 +12,12 @@ pub fn main() !void {
         log.err("The .env file is missing a \"JWT_SECRET\" parameter, please add it and try again!", .{});
         return;
     };
+
+    _ = env.get("DATA_DIR") orelse {
+        log.err("The .env file is missing a \"DATA_DIR\" parameter, please add it and try again!", .{});
+        return;
+    };
+
     const database = try db.init(allocator, env);
     defer database.deinit();
 

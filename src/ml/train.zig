@@ -22,7 +22,7 @@ pub const Response = struct {
 
 pub const Errors = error{ CouldntSaveModel, XGBoostError, OutOfMemory };
 
-pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) Errors!Response {
+pub fn run(allocator: std.mem.Allocator, absolute_path: []const u8, user_id: i32, data: []Data) Errors!Response {
     var calories = try allocator.alloc(f32, data.len);
     defer allocator.free(calories);
     var carbs = try allocator.alloc(f32, data.len);
@@ -128,12 +128,16 @@ pub fn run(allocator: std.mem.Allocator, user_id: i32, data: []Data) Errors!Resp
     const file_path = try std.fmt.allocPrint(allocator, "./models/model_{}_{}.ubj", .{ user_id, created_at });
     defer allocator.free(file_path);
 
-    // XGBoost's saveModel requires the folder to already be created
-    // if ./models cannot be opened, assume it is not present and create it
-    _ = std.fs.cwd().openDir("./models", .{}) catch {
-        std.fs.cwd().makeDir("./models") catch return error.CouldntSaveModel;
+    const data_dir = std.fs.openDirAbsolute(absolute_path, .{}) catch blk: {
+        std.fs.cwd().makeDir(absolute_path) catch return error.CouldntSaveModel;
+        break :blk std.fs.openDirAbsolute(absolute_path, .{}) catch return error.CouldntSaveModel;
     };
 
+    // XGBoost's saveModel requires the folder to already be created
+    // if ./models cannot be opened, assume it is not present and create it
+    _ = data_dir.openDir("./models", .{}) catch blk: {
+        break :blk data_dir.makeDir("./models") catch return error.CouldntSaveModel;
+    };
     booster.saveModel(file_path) catch return error.CouldntSaveModel;
 
     return .{

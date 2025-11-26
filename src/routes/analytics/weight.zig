@@ -78,16 +78,9 @@ const Train = Endpoint(struct {
             }
         }
 
-        const response = TrainML.run(res.arena, ctx.user_id.?, combined_values.items) catch |err| {
+        const response = TrainML.run(res.arena, ctx.app.env.get("DATA_DIR").?, ctx.user_id.?, combined_values.items) catch |err| {
             std.debug.print("error: {}\n", .{err});
             return err;
-        };
-
-        _ = CreateModel.call(ctx.app.db, ctx.user_id.?, .{
-            .created_at = response.created_at,
-        }) catch {
-            handleResponse(res, ResponseError.internal_server_error, null);
-            return;
         };
 
         const result: Response = .{ .r2 = response.r2, .mae = response.mae };
@@ -111,8 +104,6 @@ const handleResponse = @import("../../response.zig").handleResponse;
 const types = @import("../../types.zig");
 
 const TrainML = @import("../../ml/train.zig");
-
-const CreateModel = @import("../../models/ml_model.zig").Create;
 
 const Endpoint = @import("../../endpoint.zig").Endpoint;
 const EndpointRequest = @import("../../endpoint.zig").EndpointRequest;
