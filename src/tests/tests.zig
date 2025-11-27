@@ -2,7 +2,7 @@ pub var test_env: TestEnvironment = undefined;
 
 pub const TestEnvironment = struct {
     database: *pg.Pool,
-    env: dotenv,
+    env: Env,
     redis_client: redis.RedisClient,
 
     const InitErrors = error{ CouldntInitializeDotenv, CouldntInitializeRedis, CouldntInitializeDB, NotRunningOnTestDB } || anyerror;
@@ -10,12 +10,12 @@ pub const TestEnvironment = struct {
     /// Initializes the struct and clears all data from the database *only if* it is the test database
     pub fn init() InitErrors!void {
         const alloc = std.heap.smp_allocator;
-        const env = dotenv.init(alloc, ".testing.env") catch return InitErrors.CouldntInitializeDotenv;
+        const env = try Env.init(alloc);
+        defer env.deinit(alloc);
 
         const database = Database.init(alloc, env) catch return InitErrors.CouldntInitializeDB;
 
-        const redis_port = std.fmt.parseInt(u16, env.get("REDIS_PORT") orelse return InitErrors.CouldntInitializeRedis, 10) catch return InitErrors.CouldntInitializeRedis;
-        const redis_client = redis.RedisClient.init(std.testing.allocator, "127.0.0.1", redis_port) catch return InitErrors.CouldntInitializeRedis;
+        const redis_client = redis.RedisClient.init(std.testing.allocator, "127.0.0.1", env.REDIS_PORT.?) catch return InitErrors.CouldntInitializeRedis;
 
         test_env = TestEnvironment{ .database = database, .env = env, .redis_client = redis_client };
 
@@ -43,8 +43,9 @@ pub const TestEnvironment = struct {
         _ = try conn.exec(string, .{});
     }
     pub fn deinit(self: *TestEnvironment) void {
+        const allocator = std.heap.smp_allocator;
         self.database.deinit();
-        self.env.deinit();
+        self.env.deinit(allocator);
         self.redis_client.deinit();
     }
 };
@@ -88,7 +89,7 @@ pub const TestSetup = struct {
         const app = try allocator.create(Handler);
         app.* = Handler{
             .allocator = allocator,
-            .env = try dotenv.init(allocator, ".env"),
+            .env = try Env.init(allocator),
             .redis_client = &test_env.redis_client,
             .db = database,
         };
@@ -99,7 +100,7 @@ pub const TestSetup = struct {
         };
     }
     pub fn deinitContext(allocator: std.mem.Allocator, context: Handler.RequestContext) void {
-        context.app.env.deinit();
+        context.app.env.deinit(allocator);
         allocator.destroy(context.app);
     }
     pub fn deinit(self: *TestSetup, allocator: std.mem.Allocator) void {
@@ -109,7 +110,7 @@ pub const TestSetup = struct {
 
 const std = @import("std");
 const pg = @import("pg");
-const dotenv = @import("../util/dotenv.zig").dotenv;
+const Env = @import("../env.zig");
 const Database = @import("../db.zig");
 const redis = @import("../util/redis.zig");
 const Handler = @import("../handler.zig");

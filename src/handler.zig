@@ -1,6 +1,6 @@
 allocator: std.mem.Allocator,
 db: *pg.Pool,
-env: dotenv,
+env: Env,
 redis_client: *redis.RedisClient,
 
 const Handler = @This();
@@ -64,7 +64,7 @@ fn verifyToken(req: *httpz.Request, ctx: *RequestContext, res: *httpz.Response) 
                 ctx.app.allocator,
                 auth.JWTClaims,
                 access_token.?,
-                .{ .secret = ctx.app.env.get("JWT_SECRET").? },
+                .{ .secret = ctx.app.env.JWT_SECRET },
                 //NOTE: there is a leeway by default in the validation struct
                 .{},
             ) catch {
@@ -142,5 +142,5 @@ const ResponseError = @import("response.zig").ResponseError;
 
 const types = @import("types.zig");
 const auth = @import("util/auth.zig");
-const dotenv = @import("util/dotenv.zig").dotenv;
+const Env = @import("env.zig");
 const redis = @import("util/redis.zig");

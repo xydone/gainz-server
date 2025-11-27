@@ -5,30 +5,20 @@ pub fn main() !void {
     const path = try std.fs.selfExeDirPathAlloc(allocator);
     defer allocator.free(path);
 
-    var env = try dotenv.init(allocator, ".env");
-    defer env.deinit();
-
-    _ = env.get("JWT_SECRET") orelse {
-        log.err("The .env file is missing a \"JWT_SECRET\" parameter, please add it and try again!", .{});
-        return;
-    };
-
-    _ = env.get("DATA_DIR") orelse {
-        log.err("The .env file is missing a \"DATA_DIR\" parameter, please add it and try again!", .{});
-        return;
-    };
+    var env = try Env.init(allocator);
+    defer env.deinit(allocator);
 
     const database = try db.init(allocator, env);
     defer database.deinit();
 
-    const redis_port = try std.fmt.parseInt(u16, env.get("REDIS_PORT") orelse "6379", 10);
-
-    var redis_client = try redis.RedisClient.init(allocator, "127.0.0.1", redis_port);
+    var redis_client = try redis.RedisClient.init(allocator, env.ADDRESS, env.REDIS_PORT.?);
     defer redis_client.deinit();
 
-    const address = env.get("ADDRESS") orelse "127.0.0.1";
     var handler = Handler{ .allocator = allocator, .db = database, .env = env, .redis_client = &redis_client };
-    var server = try httpz.Server(*Handler).init(allocator, .{ .port = PORT, .address = address }, &handler);
+    var server = try httpz.Server(*Handler).init(allocator, .{
+        .port = PORT,
+        .address = env.ADDRESS,
+    }, &handler);
     defer server.deinit();
     defer server.stop();
 
@@ -43,7 +33,7 @@ pub fn main() !void {
     // /api endpoints
     API.init(router);
 
-    log.info("listening http://{s}:{d}/", .{ address, PORT });
+    log.info("listening http://{s}:{d}/", .{ env.ADDRESS, PORT });
 
     try server.listen();
 }
@@ -75,6 +65,6 @@ const Handler = @import("handler.zig");
 const API = @import("routes/api.zig");
 const Cors = @import("middleware/cors.zig");
 
-const dotenv = @import("util/dotenv.zig").dotenv;
+const Env = @import("env.zig");
 const redis = @import("util/redis.zig");
 const types = @import("types.zig");

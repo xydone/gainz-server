@@ -78,7 +78,7 @@ const Train = Endpoint(struct {
             }
         }
 
-        const response = TrainML.run(res.arena, ctx.app.env.get("DATA_DIR").?, ctx.user_id.?, combined_values.items) catch |err| {
+        const response = TrainML.run(res.arena, ctx.app.env.DATA_DIR, ctx.user_id.?, combined_values.items) catch |err| {
             std.debug.print("error: {}\n", .{err});
             return err;
         };

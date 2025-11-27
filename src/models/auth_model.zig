@@ -144,7 +144,7 @@ test "API Auth | Create" {
     var setup = try TestSetup.init(test_env.database, test_name);
     defer setup.deinit(allocator);
 
-    const jwt_secret = test_env.env.get("JWT_SECRET").?;
+    const jwt_secret = test_env.env.JWT_SECRET;
     const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,
@@ -192,7 +192,7 @@ test "API Auth | Refresh" {
 
     const password = try std.fmt.allocPrint(allocator, "Testing password", .{});
     defer allocator.free(password);
-    const jwt_secret = test_env.env.get("JWT_SECRET").?;
+    const jwt_secret = test_env.env.JWT_SECRET;
     const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,
@@ -239,7 +239,7 @@ test "API Auth | Invalidate" {
 
     const password = try std.fmt.allocPrint(allocator, "Testing password", .{});
     defer allocator.free(password);
-    const jwt_secret = test_env.env.get("JWT_SECRET").?;
+    const jwt_secret = test_env.env.JWT_SECRET;
     const props = Create.Props{
         .allocator = allocator,
         .database = test_env.database,

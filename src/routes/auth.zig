@@ -23,7 +23,7 @@ const Create = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
-        const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
+        const jwt_secret = ctx.app.env.JWT_SECRET;
 
         const create_props = CreateModel.Props{
             .allocator = allocator,
@@ -59,7 +59,7 @@ const Refresh = Endpoint(struct {
     };
     pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
         const allocator = res.arena;
-        const jwt_secret = ctx.app.env.get("JWT_SECRET").?;
+        const jwt_secret = ctx.app.env.JWT_SECRET;
 
         const refresh_props = RefreshModel.Props{
             .allocator = allocator,
