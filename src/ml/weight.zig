@@ -7,46 +7,75 @@ pub const Data = struct {
     weight: f32,
 };
 
+pub const Windows = struct {
+    short: usize,
+    long: usize,
+};
+
 pub const Features = struct {
-    calories_rolling: f32,
-    carbs_rolling: f32,
-    sugar_rolling: f32,
-    protein_rolling: f32,
-    sodium_rolling: f32,
+    /// short timespan, for example a 3 day rolling average
+    calories_rolling_short: f32,
+
+    /// slightly longer timespan, for example a 7 day rolling average
+    calories_rolling_long: f32,
+    carbs_rolling_long: f32,
+    sugar_rolling_long: f32,
+    protein_rolling_long: f32,
+    sodium_rolling_long: f32,
+
+    /// weight from yesterday
     previous_weight: f32,
     weight_delta: f32,
     weight: f32,
 
-    fn fromData(allocator: std.mem.Allocator, data: []Data, rolling_window: usize) ![]Features {
-        var calories = try allocator.alloc(f32, data.len);
-        defer allocator.free(calories);
-        var carbs = try allocator.alloc(f32, data.len);
-        defer allocator.free(carbs);
-        var sugar = try allocator.alloc(f32, data.len);
-        defer allocator.free(sugar);
-        var protein = try allocator.alloc(f32, data.len);
-        defer allocator.free(protein);
-        var sodium = try allocator.alloc(f32, data.len);
-        defer allocator.free(sodium);
+    fn fromData(allocator: std.mem.Allocator, data: []Data, windows: Windows) ![]Features {
+        const Metrics = struct {
+            calories: []f32,
+            carbs: []f32,
+            sugar: []f32,
+            protein: []f32,
+            sodium: []f32,
+        };
+        var metrics: Metrics = undefined;
 
-        for (data, 0..) |record, i| {
-            calories[i] = record.calories;
-            carbs[i] = record.carbs;
-            sugar[i] = record.sugar;
-            protein[i] = record.protein;
-            sodium[i] = record.sodium;
+        inline for (@typeInfo(Metrics).@"struct".fields) |field| {
+            @field(metrics, field.name) = try allocator.alloc(f32, data.len);
+        }
+        defer {
+            inline for (@typeInfo(Metrics).@"struct".fields) |field| {
+                allocator.free(@field(metrics, field.name));
+            }
         }
 
-        const calories_rolling = try rollingMean(allocator, calories, rolling_window);
-        defer allocator.free(calories_rolling);
-        const carbs_rolling = try rollingMean(allocator, carbs, rolling_window);
-        defer allocator.free(carbs_rolling);
-        const sugar_rolling = try rollingMean(allocator, sugar, rolling_window);
-        defer allocator.free(sugar_rolling);
-        const protein_rolling = try rollingMean(allocator, protein, rolling_window);
-        defer allocator.free(protein_rolling);
-        const sodium_rolling = try rollingMean(allocator, sodium, rolling_window);
-        defer allocator.free(sodium_rolling);
+        for (data, 0..) |record, i| {
+            metrics.calories[i] = record.calories;
+            metrics.carbs[i] = record.carbs;
+            metrics.sugar[i] = record.sugar;
+            metrics.protein[i] = record.protein;
+            metrics.sodium[i] = record.sodium;
+        }
+
+        const RollingMeans = struct {
+            calories_rolling_short: []f32,
+            calories_rolling_long: []f32,
+            carbs_rolling_long: []f32,
+            sugar_rolling_long: []f32,
+            protein_rolling_long: []f32,
+            sodium_rolling_long: []f32,
+        };
+        const rolling_means: RollingMeans = .{
+            .calories_rolling_short = try rollingMean(allocator, metrics.calories, windows.short),
+            .calories_rolling_long = try rollingMean(allocator, metrics.calories, windows.long),
+            .carbs_rolling_long = try rollingMean(allocator, metrics.carbs, windows.long),
+            .protein_rolling_long = try rollingMean(allocator, metrics.protein, windows.long),
+            .sugar_rolling_long = try rollingMean(allocator, metrics.sugar, windows.long),
+            .sodium_rolling_long = try rollingMean(allocator, metrics.sodium, windows.long),
+        };
+        defer {
+            inline for (@typeInfo(RollingMeans).@"struct".fields) |field| {
+                allocator.free(@field(rolling_means, field.name));
+            }
+        }
 
         var processed_data = std.ArrayList(Features).empty;
         defer processed_data.deinit(allocator);
@@ -54,11 +83,12 @@ pub const Features = struct {
         // start at 1 as we don't know the previous weight of the first element
         for (data[1..], 1..) |record, i| {
             try processed_data.append(allocator, .{
-                .calories_rolling = calories_rolling[i - 1],
-                .carbs_rolling = carbs_rolling[i - 1],
-                .sugar_rolling = sugar_rolling[i - 1],
-                .protein_rolling = protein_rolling[i - 1],
-                .sodium_rolling = sodium_rolling[i - 1],
+                .calories_rolling_short = rolling_means.calories_rolling_short[i - 1],
+                .calories_rolling_long = rolling_means.calories_rolling_long[i - 1],
+                .carbs_rolling_long = rolling_means.carbs_rolling_long[i - 1],
+                .sugar_rolling_long = rolling_means.sugar_rolling_long[i - 1],
+                .protein_rolling_long = rolling_means.protein_rolling_long[i - 1],
+                .sodium_rolling_long = rolling_means.sodium_rolling_long[i - 1],
                 .previous_weight = data[i - 1].weight,
                 .weight_delta = record.weight - data[i - 1].weight,
                 .weight = record.weight,
@@ -78,7 +108,10 @@ pub const Train = struct {
     pub const Errors = error{ CouldntSaveModel, XGBoostError, OutOfMemory };
 
     pub fn run(allocator: std.mem.Allocator, absolute_path: []const u8, user_id: i32, data: []Data) Errors!Response {
-        const processed_data = try Features.fromData(allocator, data, 3);
+        const processed_data = try Features.fromData(allocator, data, .{
+            .long = 7,
+            .short = 3,
+        });
         defer allocator.free(processed_data);
 
         const split = try trainTestSplit(processed_data, 0.3);
@@ -169,10 +202,8 @@ pub const Predict = struct {
         predicted_delta: f32,
         predicted_weight: f32,
     };
-    pub fn run(allocator: std.mem.Allocator, user_id: i32, data_dir: []const u8, data: []Data) !Response {
-        const window_size = 3;
-
-        if (data.len < window_size) {
+    pub fn run(allocator: std.mem.Allocator, user_id: i32, data_dir: []const u8, data: []Data, windows: Windows) !Response {
+        if (data.len < windows.long) {
             return error.NotEnoughData;
         }
         const file_name = getMostRecentModel(allocator, data_dir, user_id) catch return error.NoModelFound;
@@ -181,31 +212,39 @@ pub const Predict = struct {
         const booster = XGBoost.Booster.initModelFromFile(file_name) catch return error.CouldntInitModel;
         defer booster.deinit();
 
-        const window = data[data.len - window_size ..];
+        const long_window = data[data.len - windows.long ..];
+        const short_window = data[data.len - windows.short ..];
 
-        var sum_calories: f32 = 0;
-        var sum_carbs: f32 = 0;
-        var sum_sugar: f32 = 0;
-        var sum_protein: f32 = 0;
-        var sum_sodium: f32 = 0;
+        var calories_short: f32 = 0;
+        var calories_long: f32 = 0;
+        var carbs_long: f32 = 0;
+        var sugar_long: f32 = 0;
+        var protein_long: f32 = 0;
+        var sodium_long: f32 = 0;
 
-        for (window) |d| {
-            sum_calories += d.calories;
-            sum_carbs += d.carbs;
-            sum_sugar += d.sugar;
-            sum_protein += d.protein;
-            sum_sodium += d.sodium;
+        for (long_window) |d| {
+            calories_long += d.calories;
+            carbs_long += d.carbs;
+            sugar_long += d.sugar;
+            protein_long += d.protein;
+            sodium_long += d.sodium;
         }
 
-        const f_size = @as(f32, @floatFromInt(window_size));
+        for (short_window) |d| {
+            calories_short += d.calories;
+        }
+
+        const long_window_size = @as(f32, @floatFromInt(windows.long));
+        const short_window_size = @as(f32, @floatFromInt(windows.short));
         const last_known_weight = data[data.len - 1].weight;
 
         const next_feature = Features{
-            .calories_rolling = sum_calories / f_size,
-            .carbs_rolling = sum_carbs / f_size,
-            .sugar_rolling = sum_sugar / f_size,
-            .protein_rolling = sum_protein / f_size,
-            .sodium_rolling = sum_sodium / f_size,
+            .calories_rolling_short = calories_short / short_window_size,
+            .calories_rolling_long = calories_long / long_window_size,
+            .carbs_rolling_long = carbs_long / long_window_size,
+            .sugar_rolling_long = sugar_long / long_window_size,
+            .protein_rolling_long = protein_long / long_window_size,
+            .sodium_rolling_long = sodium_long / long_window_size,
             .previous_weight = last_known_weight,
             // 0 as they are the ones being predicted
             .weight_delta = 0,
@@ -327,12 +366,14 @@ fn createMatrix(allocator: std.mem.Allocator, data: []const Features) !struct { 
     var labels = try allocator.alloc(f32, data.len);
 
     for (data, 0..) |record, i| {
-        feat[i * num_features + 0] = record.calories_rolling;
-        feat[i * num_features + 1] = record.carbs_rolling;
-        feat[i * num_features + 2] = record.sugar_rolling;
-        feat[i * num_features + 3] = record.protein_rolling;
-        feat[i * num_features + 4] = record.sodium_rolling;
-        feat[i * num_features + 5] = record.previous_weight;
+        // WARN: if a new feature is added but not included here, it is UB
+        feat[i * num_features + 0] = record.calories_rolling_long;
+        feat[i * num_features + 1] = record.calories_rolling_short;
+        feat[i * num_features + 2] = record.carbs_rolling_long;
+        feat[i * num_features + 3] = record.sugar_rolling_long;
+        feat[i * num_features + 4] = record.protein_rolling_long;
+        feat[i * num_features + 5] = record.sodium_rolling_long;
+        feat[i * num_features + 6] = record.previous_weight;
         labels[i] = record.weight_delta;
     }
 

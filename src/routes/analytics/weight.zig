@@ -107,7 +107,19 @@ const Predict = Endpoint(struct {
             }
         };
 
-        const prediction = try PredictML.run(res.arena, ctx.user_id.?, ctx.app.env.DATA_DIR, data);
+        // NOTE: consider opening this up to the user from the body?
+        const windows: Windows = .{
+            .long = 7,
+            .short = 3,
+        };
+
+        const prediction = try PredictML.run(
+            res.arena,
+            ctx.user_id.?,
+            ctx.app.env.DATA_DIR,
+            data,
+            windows,
+        );
         try res.json(prediction, .{});
     }
 });
@@ -185,6 +197,7 @@ const types = @import("../../types.zig");
 
 const Data = @import("../../ml/weight.zig").Data;
 const Features = @import("../../ml/weight.zig").Features;
+const Windows = @import("../../ml/weight.zig").Windows;
 const TrainML = @import("../../ml/weight.zig").Train;
 const PredictML = @import("../../ml/weight.zig").Predict;
 
