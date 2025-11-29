@@ -137,7 +137,8 @@ CREATE TABLE auth.api_keys (
     id integer NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     user_id integer NOT NULL,
-    token character varying(255) NOT NULL
+    public_id character varying(20) NOT NULL,
+    secret_hash bytea NOT NULL
 );
 
 
@@ -900,7 +901,7 @@ ALTER TABLE ONLY training.workout_exercise ALTER COLUMN id SET DEFAULT nextval('
 -- Data for Name: api_keys; Type: TABLE DATA; Schema: auth; Owner: postgres
 --
 
-COPY auth.api_keys (id, created_at, user_id, token) FROM stdin;
+COPY auth.api_keys (id, created_at, user_id, public_id, secret_hash) FROM stdin;
 \.
 
 
@@ -1308,14 +1309,7 @@ ALTER TABLE ONLY training.workout
 -- Name: api_keys_index_2; Type: INDEX; Schema: auth; Owner: postgres
 --
 
-CREATE UNIQUE INDEX api_keys_index_2 ON auth.api_keys USING btree (token);
-
-
---
--- Name: api_keys_index_3; Type: INDEX; Schema: auth; Owner: postgres
---
-
-CREATE INDEX api_keys_index_3 ON auth.api_keys USING btree (user_id);
+CREATE UNIQUE INDEX api_keys_index_2 ON auth.api_keys USING btree (public_id);
 
 
 --

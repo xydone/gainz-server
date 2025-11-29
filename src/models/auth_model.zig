@@ -132,7 +132,6 @@ pub const Invalidate = struct {
     }
 };
 
-// TODO: test this
 // NOTE: currently this does not handle a potential collision and just errors. This *should* be unlikely though.
 pub const CreateAPIKey = struct {
     pub const Response = struct {
@@ -149,13 +148,14 @@ pub const CreateAPIKey = struct {
         defer conn.release();
         const error_handler = ErrorHandler{ .conn = conn };
 
-        const api_key = createAPIKey(allocator) catch return error.CannotCreate;
-
-        const hashed_token = hashPassword(allocator, api_key) catch return error.CannotCreate;
-        defer allocator.free(hashed_token);
+        const api_key_response = createAPIKey(allocator) catch return error.CannotCreate;
+        defer {
+            allocator.free(api_key_response.public_id);
+            allocator.free(api_key_response.secret_hash);
+        }
 
         _ = conn.exec(query_string, //
-            .{ user_id, hashed_token }) catch |err| {
+            .{ user_id, api_key_response.public_id, api_key_response.secret_hash }) catch |err| {
             const error_data = error_handler.handle(err);
             if (error_data) |data| {
                 ErrorHandler.printErr(data);
@@ -165,14 +165,56 @@ pub const CreateAPIKey = struct {
         };
 
         return .{
-            .api_key = api_key,
+            .api_key = api_key_response.full_key,
         };
     }
     const query_string =
-        \\INSERT INTO auth.api_keys (user_id, token)
-        \\VALUES ($1, $2);
+        \\INSERT INTO auth.api_keys (user_id, public_id, secret_hash)
+        \\VALUES ($1, $2, $3);
     ;
 };
+
+pub const GetUserByAPIKey = struct {
+    pub const Response = i32;
+    pub const Errors = error{ OutOfMemory, CannotGet, InvalidAPIKey, UserNotFound } || DatabaseErrors;
+    pub fn call(database: *Pool, api_key: []const u8) Errors!Response {
+        var conn = database.acquire() catch return error.CannotAcquireConnection;
+        defer conn.release();
+        const error_handler = ErrorHandler{ .conn = conn };
+
+        var it = std.mem.tokenizeScalar(u8, api_key, '_');
+        _ = it.next(); // skip the prefix
+
+        const public_id = it.next() orelse return error.InvalidAPIKey;
+
+        const secret = it.next() orelse return error.InvalidAPIKey;
+
+        var row = conn.row(query_string, //
+            .{public_id}) catch |err| {
+            const error_data = error_handler.handle(err);
+            if (error_data) |data| {
+                ErrorHandler.printErr(data);
+            }
+
+            return error.CannotGet;
+        } orelse return error.UserNotFound;
+        defer row.deinit() catch {};
+
+        const response = row.to(struct { user_id: i32, secret_hash: []u8 }, .{}) catch return error.CannotGet;
+        std.debug.assert(response.secret_hash.len == 32);
+        const hash = response.secret_hash[0..32].*;
+
+        if (!verifyAPIKey(hash, secret)) return error.CannotGet;
+
+        return response.user_id;
+    }
+    const query_string =
+        \\SELECT user_id, secret_hash
+        \\FROM auth.api_keys
+        \\WHERE public_id = $1;
+    ;
+};
+
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
 
@@ -360,4 +402,5 @@ const hashPassword = @import("../util/auth.zig").hashPassword;
 const createJWT = @import("../util/auth.zig").createJWT;
 const createSessionToken = @import("../util/auth.zig").createSessionToken;
 const createAPIKey = @import("../util/auth.zig").createAPIKey;
+const verifyAPIKey = @import("../util/auth.zig").verifyAPIKey;
 const redis = @import("../util/redis.zig");
