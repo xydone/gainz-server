@@ -16,6 +16,14 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: auth; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA auth;
+
+
+ALTER SCHEMA auth OWNER TO postgres;
 
 --
 -- Name: training; Type: SCHEMA; Schema: -; Owner: postgres
@@ -120,6 +128,42 @@ ALTER TYPE public.nutrients OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: api_keys; Type: TABLE; Schema: auth; Owner: postgres
+--
+
+CREATE TABLE auth.api_keys (
+    id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    user_id integer NOT NULL,
+    token character varying(255) NOT NULL
+);
+
+
+ALTER TABLE auth.api_keys OWNER TO postgres;
+
+--
+-- Name: api_keys_id_seq; Type: SEQUENCE; Schema: auth; Owner: postgres
+--
+
+CREATE SEQUENCE auth.api_keys_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE auth.api_keys_id_seq OWNER TO postgres;
+
+--
+-- Name: api_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: auth; Owner: postgres
+--
+
+ALTER SEQUENCE auth.api_keys_id_seq OWNED BY auth.api_keys.id;
+
 
 --
 -- Name: food; Type: TABLE; Schema: public; Owner: postgres
@@ -741,6 +785,13 @@ ALTER SEQUENCE training.workout_id_seq OWNED BY training.workout.id;
 
 
 --
+-- Name: api_keys id; Type: DEFAULT; Schema: auth; Owner: postgres
+--
+
+ALTER TABLE ONLY auth.api_keys ALTER COLUMN id SET DEFAULT nextval('auth.api_keys_id_seq'::regclass);
+
+
+--
 -- Name: entry id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -843,6 +894,270 @@ ALTER TABLE ONLY training.workout ALTER COLUMN id SET DEFAULT nextval('training.
 --
 
 ALTER TABLE ONLY training.workout_exercise ALTER COLUMN id SET DEFAULT nextval('training.workout_exercise_id_seq'::regclass);
+
+
+--
+-- Data for Name: api_keys; Type: TABLE DATA; Schema: auth; Owner: postgres
+--
+
+COPY auth.api_keys (id, created_at, user_id, token) FROM stdin;
+\.
+
+
+--
+-- Data for Name: entry; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.entry (id, created_at, user_id, food_id, category, amount, serving_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: food; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.food (id, created_by, created_at, calories, fat, sat_fat, polyunsat_fat, monounsat_fat, trans_fat, cholesterol, sodium, potassium, carbs, fiber, sugar, protein, vitamin_a, vitamin_c, calcium, iron, brand_name, food_name, added_sugars, vitamin_d, sugar_alcohols, food_grams) FROM stdin;
+\.
+
+
+--
+-- Data for Name: goals; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.goals (id, created_at, target, value, created_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: measurements; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.measurements (id, created_at, type, value, user_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: note_entry; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.note_entry (id, created_at, note_id, created_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: notes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.notes (id, created_at, title, description, created_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: servings; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.servings (id, created_at, created_by, amount, unit, multiplier, food_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.users (id, created_at, display_name, username, password) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise (id, created_at, created_by, name, description) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise_category; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise_category (id, created_at, created_by, name, description) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise_entry; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise_entry (id, created_at, created_by, exercise_id, value, unit_id, notes) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise_has_category; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise_has_category (exercise_id, category_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise_has_unit; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise_has_unit (exercise_id, unit_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: exercise_unit; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.exercise_unit (id, created_at, created_by, amount, unit, multiplier) FROM stdin;
+\.
+
+
+--
+-- Data for Name: program; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.program (id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: workout; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.workout (id, name, created_at, created_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: workout_exercise; Type: TABLE DATA; Schema: training; Owner: postgres
+--
+
+COPY training.workout_exercise (id, workout_id, exercise_id, notes, sets, reps) FROM stdin;
+\.
+
+
+--
+-- Name: api_keys_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: postgres
+--
+
+SELECT pg_catalog.setval('auth.api_keys_id_seq', 1, false);
+
+
+--
+-- Name: Food_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."Food_id_seq"', 1, false);
+
+
+--
+-- Name: Log_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."Log_id_seq"', 1, false);
+
+
+--
+-- Name: Measurement_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."Measurement_id_seq"', 1, false);
+
+
+--
+-- Name: Servings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."Servings_id_seq"', 1, false);
+
+
+--
+-- Name: User_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."User_id_seq"', 1, false);
+
+
+--
+-- Name: goals_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.goals_id_seq', 1, false);
+
+
+--
+-- Name: note_entries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.note_entries_id_seq', 1, false);
+
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.notes_id_seq', 1, false);
+
+
+--
+-- Name: exercise_category_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.exercise_category_id_seq', 1, false);
+
+
+--
+-- Name: exercise_entry_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.exercise_entry_id_seq', 1, false);
+
+
+--
+-- Name: exercise_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.exercise_id_seq', 1, false);
+
+
+--
+-- Name: exercise_value_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.exercise_value_id_seq', 1, false);
+
+
+--
+-- Name: program_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.program_id_seq', 1, false);
+
+
+--
+-- Name: workout_exercise_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.workout_exercise_id_seq', 1, false);
+
+
+--
+-- Name: workout_id_seq; Type: SEQUENCE SET; Schema: training; Owner: postgres
+--
+
+SELECT pg_catalog.setval('training.workout_id_seq', 1, false);
+
+
+--
+-- Name: api_keys api_keys_pkey; Type: CONSTRAINT; Schema: auth; Owner: postgres
+--
+
+ALTER TABLE ONLY auth.api_keys
+    ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -990,6 +1305,20 @@ ALTER TABLE ONLY training.workout
 
 
 --
+-- Name: api_keys_index_2; Type: INDEX; Schema: auth; Owner: postgres
+--
+
+CREATE UNIQUE INDEX api_keys_index_2 ON auth.api_keys USING btree (token);
+
+
+--
+-- Name: api_keys_index_3; Type: INDEX; Schema: auth; Owner: postgres
+--
+
+CREATE INDEX api_keys_index_3 ON auth.api_keys USING btree (user_id);
+
+
+--
 -- Name: entry_index_4; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1001,6 +1330,14 @@ CREATE INDEX entry_index_4 ON public.entry USING btree (created_at);
 --
 
 CREATE INDEX idx_entry_food_id ON public.entry USING btree (food_id);
+
+
+--
+-- Name: api_keys api_keys_relation_1; Type: FK CONSTRAINT; Schema: auth; Owner: postgres
+--
+
+ALTER TABLE ONLY auth.api_keys
+    ADD CONSTRAINT api_keys_relation_1 FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

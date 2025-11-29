@@ -48,6 +48,18 @@ pub fn hashPassword(allocator: std.mem.Allocator, password: []const u8) ![]const
     return hashed;
 }
 
+// https://github.com/thienpow/zui/blob/467c84de15259956a2139bba4a863ac0285a8a22/src/app/utils/token.zig
+/// Caller must free slice
+pub fn createAPIKey(allocator: std.mem.Allocator) ![]u8 {
+    var random_bytes: [48]u8 = undefined;
+    std.crypto.random.bytes(&random_bytes);
+    const encoded_len = std.base64.url_safe_no_pad.Encoder.calcSize(random_bytes.len);
+    const encoded = try allocator.alloc(u8, encoded_len);
+    defer allocator.free(encoded);
+    const result = std.base64.url_safe_no_pad.Encoder.encode(encoded, &random_bytes);
+    return try allocator.dupe(u8, result);
+}
+
 pub fn createJWT(allocator: std.mem.Allocator, claims: anytype, secret: []const u8) ![]const u8 {
     return try jwt.encode(
         allocator,

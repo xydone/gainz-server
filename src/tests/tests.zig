@@ -11,7 +11,6 @@ pub const TestEnvironment = struct {
     pub fn init() InitErrors!void {
         const alloc = std.heap.smp_allocator;
         const env = try Env.init(alloc);
-        defer env.deinit(alloc);
 
         const database = Database.init(alloc, env) catch return InitErrors.CouldntInitializeDB;
 

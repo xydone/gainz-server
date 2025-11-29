@@ -3,11 +3,13 @@ const log = std.log.scoped(.auth);
 pub const endpoint_data = [_]EndpointData{
     Create.endpoint_data,
     Refresh.endpoint_data,
+    CreateAPIKey.endpoint_data,
 };
 
 pub inline fn init(router: *Handler.Router) void {
     Create.init(router);
     Refresh.init(router);
+    CreateAPIKey.init(router);
 }
 const Create = Endpoint(struct {
     const Body = CreateModel.Request;
@@ -111,6 +113,26 @@ const Invalidate = Endpoint(struct {
         res.status = 200;
     }
 });
+pub const CreateAPIKey = Endpoint(struct {
+    pub const endpoint_data: EndpointData = .{
+        .Request = .{},
+        .Response = CreateAPIKeyModel.Response,
+        .method = .POST,
+        .config = .{},
+        .path = "/api/auth/api-keys",
+        .route_data = .{ .restricted = true },
+    };
+    pub fn call(ctx: *Handler.RequestContext, _: EndpointRequest(void, void, void), res: *httpz.Response) anyerror!void {
+        const response = CreateAPIKeyModel.call(res.arena, ctx.app.db, ctx.user_id.?) catch {
+            handleResponse(res, ResponseError.internal_server_error, null);
+            return;
+        };
+        defer response.deinit(res.arena);
+
+        res.status = 200;
+        try res.json(response, .{});
+    }
+});
 
 const Tests = @import("../tests/tests.zig");
 const TestSetup = Tests.TestSetup;
@@ -198,6 +220,37 @@ test "Endpoint Auth | Refresh" {
         try std.testing.expectEqualStrings(create_token_response.value.refresh_token, response.value.refresh_token);
     }
 }
+test "Endpoint Auth | Create API Key" {
+    // SETUP
+    const test_name = "Endpoint Auth | Create API Key";
+    const ht = @import("httpz").testing;
+    const test_env = Tests.test_env;
+    const allocator = std.testing.allocator;
+
+    const user = try TestSetup.createUser(test_env.database, test_name);
+    defer user.deinit(allocator);
+
+    const body = CreateModel.Request{
+        .username = user.username,
+        .password = "Testing password",
+    };
+
+    const body_string = try jsonStringify(allocator, body);
+    defer allocator.free(body_string);
+
+    var context = try TestSetup.createContext(user.id, allocator, test_env.database);
+    defer TestSetup.deinitContext(allocator, context);
+    // TEST
+    {
+        var web_test = ht.init(.{});
+        defer web_test.deinit();
+
+        web_test.body(body_string);
+
+        try CreateAPIKey.call(&context, web_test.req, web_test.res);
+        try web_test.expectStatus(200);
+    }
+}
 
 const std = @import("std");
 
@@ -212,6 +265,7 @@ const jsonStringify = @import("../util/jsonStringify.zig").jsonStringify;
 const types = @import("../types.zig");
 const CreateModel = @import("../models/auth_model.zig").Create;
 const RefreshModel = @import("../models/auth_model.zig").Refresh;
+const CreateAPIKeyModel = @import("../models/auth_model.zig").CreateAPIKey;
 const InvalidateModel = @import("../models/auth_model.zig").Invalidate;
 
 const Endpoint = @import("../endpoint.zig").Endpoint;
