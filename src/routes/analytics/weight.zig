@@ -58,20 +58,20 @@ const Train = Endpoint(struct {
 });
 
 const Predict = Endpoint(struct {
-    const Body = struct {
+    const Params = struct {
         /// The most recent date
         date: []const u8,
     };
     const Response = PredictML.Response;
     pub const endpoint_data: EndpointData = .{
-        .Request = .{ .Body = Body },
+        .Request = .{ .Params = Params },
         .Response = Response,
-        .method = .POST,
-        .path = "/api/user/analytics/weight/predict",
+        .method = .GET,
+        .path = "/api/user/analytics/weight/predict/:date",
         .route_data = .{ .restricted = true },
     };
-    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(Body, void, void), res: *httpz.Response) anyerror!void {
-        const end_date = zdt.Datetime.fromString(request.body.date, "%Y-%m-%d") catch {
+    pub fn call(ctx: *Handler.RequestContext, request: EndpointRequest(void, Params, void), res: *httpz.Response) anyerror!void {
+        const end_date = zdt.Datetime.fromString(request.params.date, "%Y-%m-%d") catch {
             //TODO: handle date parsing and verification inside handler
             handleResponse(res, ResponseError.bad_request, "Date is not valid");
             return;
@@ -90,7 +90,7 @@ const Predict = Endpoint(struct {
         const start_date = try writer.toOwnedSlice();
         defer res.arena.free(start_date);
 
-        const data = collectData(ctx, res.arena, start_date, request.body.date) catch |err| {
+        const data = collectData(ctx, res.arena, start_date, request.params.date) catch |err| {
             switch (err) {
                 error.NoFoodEntries => {
                     handleResponse(res, ResponseError.not_found, "Food entries data missing");
