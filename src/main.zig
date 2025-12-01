@@ -24,8 +24,7 @@ pub fn main() !void {
 
     const cors = try server.middleware(Cors, .{
         .origin = "*",
-        //NOTE: review what headers I'm actually allowing
-        .headers = "*",
+        .headers = "Authorization",
         .methods = "*",
     });
     const router = try server.router(.{ .middlewares = &.{cors} });
