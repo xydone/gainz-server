@@ -43,22 +43,22 @@ pub fn Endpoint(
                     router.*.post(path, call, .{ .data = &route_data });
                 },
                 .PATCH => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.patch(path, call, .{ .data = &route_data });
                 },
                 .PUT => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.put(path, call, .{ .data = &route_data });
                 },
                 .OPTIONS => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.options(path, call, .{ .data = &route_data });
                 },
                 .CONNECT => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.connect(path, call, .{ .data = &route_data });
                 },
                 .DELETE => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.delete(path, call, .{ .data = &route_data });
                 },
                 .HEAD => {
-                    router.*.post(path, call, .{ .data = &route_data });
+                    router.*.head(path, call, .{ .data = &route_data });
                 },
                 // NOTE: http.zig supports non-standard http methods. For now, creating routes with a non-standard method is not supported.
                 .OTHER => {
